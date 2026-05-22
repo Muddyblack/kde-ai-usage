@@ -2,6 +2,21 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
+
+BETA_FLAG=false
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --beta)
+            BETA_FLAG=true
+            shift
+            ;;
+        *)
+            echo "Usage: $0 [--beta]" >&2
+            exit 1
+            ;;
+    esac
+done
+
 METADATA_FILE="$HERE/package/metadata.json"
 
 if [ ! -f "$METADATA_FILE" ]; then
@@ -39,22 +54,18 @@ case "$bump_choice" in
     *) NEW_NUMERIC="${MAJOR}.${MINOR}.$((PATCH + 1))" ;;
 esac
 
-if [[ -n "$CURRENT_SUFFIX" ]]; then
+if [[ "$BETA_FLAG" == true ]]; then
+    NEW_SUFFIX="-beta"
+elif [[ -n "$CURRENT_SUFFIX" ]]; then
     echo ""
-    read -rp "Keep beta suffix? [Y/n]: " keep_suffix
-    if [[ "$keep_suffix" =~ ^[Nn]$ ]]; then
+    read -rp "Remove beta suffix? [y/N]: " remove_beta
+    if [[ "$remove_beta" =~ ^[Yy]$ ]]; then
         NEW_SUFFIX=""
     else
         NEW_SUFFIX="$CURRENT_SUFFIX"
     fi
 else
-    echo ""
-    read -rp "Add beta suffix? [y/N]: " add_suffix
-    if [[ "$add_suffix" =~ ^[Yy]$ ]]; then
-        NEW_SUFFIX="-beta"
-    else
-        NEW_SUFFIX=""
-    fi
+    NEW_SUFFIX=""
 fi
 
 NEW_VERSION="${NEW_NUMERIC}${NEW_SUFFIX}"
