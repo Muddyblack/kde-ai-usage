@@ -1,15 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 200" width="520" height="200">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 312 168" width="312" height="168">
 <defs>
-  <style>
-    @keyframes fillSession { 0%,100%{width:174px} 40%{width:210px} 70%{width:190px} }
-    @keyframes fillWeekly  { 0%,100%{width:88px}  40%{width:96px}  70%{width:80px}  }
-    @keyframes cdTick      { 0%,100%{opacity:1}   50%{opacity:0.6} }
-    @keyframes panPct      { 0%,100%{opacity:1}   50%{opacity:0.75}}
-  </style>
-  <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-    <stop offset="0%"   stop-color="#141420"/>
-    <stop offset="100%" stop-color="#0d0d18"/>
-  </linearGradient>
   <linearGradient id="sessionGrad" x1="0" y1="0" x2="1" y2="0">
     <stop offset="0%"   stop-color="#e87272"/>
     <stop offset="100%" stop-color="#e05252"/>
@@ -22,102 +12,57 @@
     <stop offset="0%"   stop-color="#1e1e2e"/>
     <stop offset="100%" stop-color="#18181f"/>
   </linearGradient>
-  <filter id="glow">
-    <feGaussianBlur stdDeviation="2.5" result="blur"/>
-    <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-  </filter>
-  <clipPath id="seg1"><rect x="0" y="0" width="232" height="8" rx="2"/></clipPath>
-  <clipPath id="seg2"><rect x="0" y="0" width="232" height="8" rx="2"/></clipPath>
 </defs>
 
-<!-- Card -->
-<rect width="520" height="200" rx="14" fill="url(#bg)"/>
-<rect width="520" height="200" rx="14" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+<!-- Card Background -->
+<rect width="312" height="168" rx="10" fill="url(#panelBg)"/>
+<rect width="312" height="168" rx="10" fill="none" stroke="rgba(255,255,255,0.09)" stroke-width="1"/>
 
-<!-- ── Panel preview (left) ── -->
-<rect x="24" y="24" width="148" height="152" rx="10" fill="url(#panelBg)" stroke="rgba(255,255,255,0.09)" stroke-width="1"/>
-<text x="88" y="46" text-anchor="middle" font-family="sans-serif" font-size="9" fill="rgba(255,255,255,0.3)">panel</text>
-
-<!-- icon -->
-<g transform="translate(52,62) scale(1.15)" opacity="0.22" fill="#cc785c">
-  <path d="M 12,2 C 12,6.5 13.5,8 18,8 C 13.5,8 12,9.5 12,14 C 12,9.5 10.5,8 6,8 C 10.5,8 12,6.5 12,2 Z"/>
-</g>
-<g transform="translate(52,62) scale(1.15)" fill="#cc785c">
-  <path d="M 12,2 C 12,6.5 13.5,8 18,8 C 13.5,8 12,9.5 12,14 C 12,9.5 10.5,8 6,8 C 10.5,8 12,6.5 12,2 Z" transform="scale(0.85) translate(2,2)"/>
-</g>
-
-<!-- panel: 5h row -->
-<g transform="translate(44,90)">
-  <g transform="scale(0.9)" fill="#e05252" opacity="0.22">
-    <path d="M 12,2 C 12,6.5 13.5,8 18,8 C 13.5,8 12,9.5 12,14 C 12,9.5 10.5,8 6,8 C 10.5,8 12,6.5 12,2 Z" transform="scale(0.65) translate(2.5,2.5)"/>
+<!-- Header -->
+<g transform="translate(18,18)">
+  <!-- Background icon (22px) at opacity 0.22 -->
+  <g opacity="0.22" fill="#cc785c" transform="scale(0.92)">
+    <path d="M 3.5,10 A 8.5,8.5 0 0,0 20.5,10 M 6.5,10 A 5.5,5.5 0 0,0 17.5,10" fill="none" stroke="#cc785c" stroke-width="1.8" stroke-linecap="round" />
+    <path d="M 12,2 C 12,6.5 13.5,8 18,8 C 13.5,8 12,9.5 12,14 C 12,9.5 10.5,8 6,8 C 10.5,8 12,6.5 12,2 Z" />
+    <path d="M 18.5,1.5 C 18.5,2.7 18.9,3.1 20.1,3.1 C 18.9,3.1 18.5,3.5 18.5,4.7 C 18.5,3.5 18.1,3.1 16.9,3.1 C 18.1,3.1 18.5,2.7 18.5,1.5 Z" />
   </g>
-  <g transform="scale(0.9)" fill="#e05252">
-    <path d="M 12,2 C 12,6.5 13.5,8 18,8 C 13.5,8 12,9.5 12,14 C 12,9.5 10.5,8 6,8 C 10.5,8 12,6.5 12,2 Z" transform="scale(0.5) translate(5,5)"/>
-  </g>
-  <text x="18" y="10" font-family="monospace" font-size="11" font-weight="bold" fill="#e05252">
-    <animate attributeName="opacity" values="1;0.75;1" dur="3s" repeatCount="indefinite"/>
-    10%
-  </text>
-</g>
-
-<!-- divider -->
-<rect x="88" y="93" width="1" height="14" rx="0.5" fill="rgba(255,255,255,0.16)"/>
-
-<!-- panel: 7d row -->
-<g transform="translate(96,90)">
-  <g transform="scale(0.9)" fill="#f5a623" opacity="0.22">
-    <path d="M 12,2 C 12,6.5 13.5,8 18,8 C 13.5,8 12,9.5 12,14 C 12,9.5 10.5,8 6,8 C 10.5,8 12,6.5 12,2 Z" transform="scale(0.65) translate(2.5,2.5)"/>
-  </g>
-  <g transform="scale(0.9)" fill="#f5a623">
-    <path d="M 12,2 C 12,6.5 13.5,8 18,8 C 13.5,8 12,9.5 12,14 C 12,9.5 10.5,8 6,8 C 10.5,8 12,6.5 12,2 Z" transform="scale(0.5) translate(5,5)"/>
-  </g>
-  <text x="18" y="10" font-family="monospace" font-size="11" font-weight="bold" fill="#f5a623">100%</text>
-</g>
-
-<text x="88" y="136" text-anchor="middle" font-family="sans-serif" font-size="8" fill="rgba(255,255,255,0.2)">updated 21:18</text>
-
-<!-- ── Popup (right) ── -->
-<rect x="192" y="16" width="312" height="168" rx="10" fill="url(#panelBg)" stroke="rgba(255,255,255,0.09)" stroke-width="1"/>
-
-<!-- header -->
-<g transform="translate(212,36)">
-  <g fill="#cc785c" opacity="0.22">
-    <path d="M 12,2 C 12,6.5 13.5,8 18,8 C 13.5,8 12,9.5 12,14 C 12,9.5 10.5,8 6,8 C 10.5,8 12,6.5 12,2 Z" transform="scale(0.92)"/>
-  </g>
-  <g fill="#cc785c">
-    <path d="M 12,2 C 12,6.5 13.5,8 18,8 C 13.5,8 12,9.5 12,14 C 12,9.5 10.5,8 6,8 C 10.5,8 12,6.5 12,2 Z" transform="scale(0.72) translate(2.5,2.5)"/>
+  <!-- Foreground icon (18px) at opacity 1.0 -->
+  <g fill="#cc785c" transform="scale(0.75) translate(2.7, 2.7)">
+    <path d="M 3.5,10 A 8.5,8.5 0 0,0 20.5,10 M 6.5,10 A 5.5,5.5 0 0,0 17.5,10" fill="none" stroke="#cc785c" stroke-width="1.8" stroke-linecap="round" />
+    <path d="M 12,2 C 12,6.5 13.5,8 18,8 C 13.5,8 12,9.5 12,14 C 12,9.5 10.5,8 6,8 C 10.5,8 12,6.5 12,2 Z" />
+    <path d="M 18.5,1.5 C 18.5,2.7 18.9,3.1 20.1,3.1 C 18.9,3.1 18.5,3.5 18.5,4.7 C 18.5,3.5 18.1,3.1 16.9,3.1 C 18.1,3.1 18.5,2.7 18.5,1.5 Z" />
   </g>
 </g>
-<text x="240" y="41" font-family="sans-serif" font-size="13" font-weight="bold" fill="rgba(255,255,255,0.92)">Claude Usage</text>
-<text x="240" y="53" font-family="sans-serif" font-size="9" fill="rgba(255,255,255,0.35)">API quota tracking</text>
+<text x="48" y="25" font-family="sans-serif" font-size="13" font-weight="bold" fill="rgba(255,255,255,0.92)">Claude Usage</text>
+<text x="48" y="37" font-family="sans-serif" font-size="9" fill="rgba(255,255,255,0.35)">API quota tracking</text>
 
-<!-- refresh btn -->
-<text x="484" y="45" font-family="sans-serif" font-size="14" fill="rgba(255,255,255,0.4)" text-anchor="middle">↻</text>
+<!-- Refresh Button -->
+<text x="292" y="29" font-family="sans-serif" font-size="14" fill="rgba(255,255,255,0.4)" text-anchor="middle">↻</text>
 
-<!-- divider -->
-<rect x="208" y="62" width="280" height="1" fill="rgba(255,255,255,0.07)"/>
+<!-- Divider -->
+<rect x="16" y="46" width="280" height="1" fill="rgba(255,255,255,0.07)"/>
 
-<!-- ── 5 Hours row ── -->
-<text x="212" y="82" font-family="sans-serif" font-size="11" font-weight="bold" fill="rgba(255,255,255,0.9)">5 Hours</text>
-<text x="312" y="82" font-family="sans-serif" font-size="9" fill="rgba(255,255,255,0.35)">· resets 01:40</text>
+<!-- ── 5 Hours Row ── -->
+<text x="20" y="66" font-family="sans-serif" font-size="11" font-weight="bold" fill="rgba(255,255,255,0.9)">5 Hours</text>
+<text x="120" y="66" font-family="sans-serif" font-size="9" fill="rgba(255,255,255,0.35)">· resets 01:40</text>
 
-<!-- countdown badge -->
-<rect x="398" y="71" width="56" height="16" rx="3" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
-<text x="426" y="82" text-anchor="middle" font-family="sans-serif" font-size="8" fill="rgba(255,255,255,0.7)">
+<!-- Countdown Badge -->
+<rect x="206" y="55" width="56" height="16" rx="3" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+<text x="234" y="66" text-anchor="middle" font-family="sans-serif" font-size="8" fill="rgba(255,255,255,0.7)">
   <animate attributeName="opacity" values="1;0.6;1" dur="2s" repeatCount="indefinite"/>
   in 4h 18m
 </text>
 
-<text x="478" y="82" text-anchor="end" font-family="monospace" font-size="13" font-weight="bold" fill="#e05252">10%</text>
+<text x="286" y="66" text-anchor="end" font-family="monospace" font-size="13" font-weight="bold" fill="#e05252">10%</text>
 
-<!-- segmented bar 5h -->
-<g transform="translate(212,88)">
+<!-- Segmented Bar 5h -->
+<g transform="translate(20,72)">
   <!-- 20 segments, 2 filled for 10% -->
   <rect x="0"   y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
   <rect x="0"   y="1" width="8"  height="6" rx="1.5" fill="url(#sessionGrad)"/>
   <rect x="12"  y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
   <rect x="12"  y="1" width="8"  height="6" rx="1.5" fill="url(#sessionGrad)"/>
-  <!-- empty segments -->
+  <!-- Empty segments -->
   <rect x="24"  y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
   <rect x="36"  y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
   <rect x="48"  y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
@@ -138,18 +83,18 @@
   <rect x="228" y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
 </g>
 
-<!-- ── 7 Days row ── -->
-<text x="212" y="122" font-family="sans-serif" font-size="11" font-weight="bold" fill="rgba(255,255,255,0.9)">7 Days</text>
-<text x="298" y="122" font-family="sans-serif" font-size="9" fill="rgba(255,255,255,0.35)">· resets May 23, 11:00</text>
+<!-- ── 7 Days Row ── -->
+<text x="20" y="106" font-family="sans-serif" font-size="11" font-weight="bold" fill="rgba(255,255,255,0.9)">7 Days</text>
+<text x="106" y="106" font-family="sans-serif" font-size="9" fill="rgba(255,255,255,0.35)">· resets May 23, 11:00</text>
 
-<!-- countdown badge -->
-<rect x="398" y="111" width="56" height="16" rx="3" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
-<text x="426" y="122" text-anchor="middle" font-family="sans-serif" font-size="8" fill="rgba(255,255,255,0.7)">in 13h 38m</text>
+<!-- Countdown Badge -->
+<rect x="206" y="95" width="56" height="16" rx="3" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+<text x="234" y="106" text-anchor="middle" font-family="sans-serif" font-size="8" fill="rgba(255,255,255,0.7)">in 13h 38m</text>
 
-<text x="478" y="122" text-anchor="end" font-family="monospace" font-size="13" font-weight="bold" fill="#f5a623">100%</text>
+<text x="286" y="106" text-anchor="end" font-family="monospace" font-size="13" font-weight="bold" fill="#f5a623">100%</text>
 
-<!-- segmented bar 7d -->
-<g transform="translate(212,128)">
+<!-- Segmented Bar 7d -->
+<g transform="translate(20,112)">
   <!-- 20 segments, 20 filled for 100% -->
   <rect x="0"   y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
   <rect x="0"   y="1" width="8"  height="6" rx="1.5" fill="url(#weeklyGrad)"/>
@@ -193,7 +138,7 @@
   <rect x="228" y="1" width="8"  height="6" rx="1.5" fill="url(#weeklyGrad)"/>
 </g>
 
-<!-- footer -->
-<text x="480" y="170" text-anchor="end" font-family="sans-serif" font-size="8" fill="rgba(255,255,255,0.25)">updated 21:18</text>
+<!-- Footer -->
+<text x="296" y="154" text-anchor="end" font-family="sans-serif" font-size="8" fill="rgba(255,255,255,0.25)">updated 21:18</text>
 
 </svg>
