@@ -80,6 +80,27 @@ To remove the test copy:
 kpackagetool6 -t Plasma/Applet -r org.muddyblack.aiUsageWidgetTest
 ```
 
+### NixOS (flake)
+
+```nix
+# flake.nix
+{
+  inputs.ai-usage.url = "github:Muddyblack/kde-ai-usage";
+
+  outputs = { self, nixpkgs, ai-usage, ... }: {
+    nixosConfigurations.mybox = nixpkgs.lib.nixosSystem {
+      modules = [
+        ({ pkgs, ... }: {
+          environment.systemPackages = [
+            ai-usage.packages.${pkgs.system}.default
+          ];
+        })
+      ];
+    };
+  };
+}
+```
+
 ### Package as `.plasmoid`
 
 ```bash
