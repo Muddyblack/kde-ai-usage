@@ -2,6 +2,7 @@
   <img src="./readme/icon.svg" width="120" alt="AI Usage Widget Logo">
 </p>
 
+
 <h1 align="center">AI Usage Widget</h1>
 
 <p align="center">
