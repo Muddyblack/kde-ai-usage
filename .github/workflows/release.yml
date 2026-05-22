@@ -1,0 +1,56 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build .plasmoid
+        run: bash pack.sh
+
+      - name: Get version and artifact path
+        id: info
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          NAME="$(basename "$PWD")"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "artifact=${NAME}-${VERSION}.plasmoid" >> "$GITHUB_OUTPUT"
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          PREV_TAG="$(git tag --sort=-creatordate | grep -E '^v' | sed -n '2p')"
+          if [ -n "$PREV_TAG" ]; then
+            NOTES="$(git log "${PREV_TAG}..HEAD" --pretty=format:'- %s' --no-merges)"
+          else
+            NOTES="$(git log --pretty=format:'- %s' --no-merges)"
+          fi
+          echo "notes<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$NOTES" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ steps.info.outputs.version }}
+          body: |
+            ## Changes
+            ${{ steps.notes.outputs.notes }}
+
+            ---
+            Install by downloading the `.plasmoid` file and running:
+            ```
+            plasmapkg2 -i ${{ steps.info.outputs.artifact }}
+            ```
+          files: ${{ steps.info.outputs.artifact }}

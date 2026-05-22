@@ -1,0 +1,20 @@
+{
+  "KPackageStructure": "Plasma/Applet",
+  "KPlugin": {
+    "Id": "org.muddyblack.aiUsageWidget",
+    "Name": "AI Usage",
+    "Description": "Session & weekly token usage bars (currently supports Claude)",
+    "Icon": "org.muddyblack.aiUsageWidget",
+    "Category": "Utilities",
+    "Version": "0.0.1",
+    "Website": "https://github.com/Muddyblack/kde-ai-usage",
+    "Authors": [
+      {
+        "Name": "muddyblack"
+      }
+    ],
+    "License": "MIT",
+    "EnabledByDefault": true
+  },
+  "X-Plasma-API-Minimum-Version": "6.0"
+}

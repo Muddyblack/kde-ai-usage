@@ -1,0 +1,16 @@
+repos:
+  - repo: local
+    hooks:
+      - id: qmlformat
+        name: qmlformat
+        entry: nix develop --command qmlformat
+        args: ["-i"]
+        language: system
+        files: \.qml$
+
+      - id: qmllint
+        name: qmllint
+        entry: nix develop --command qmllint
+        args: ["--unresolved-type", "info"]
+        language: system
+        files: \.qml$
