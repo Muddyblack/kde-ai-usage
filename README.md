@@ -17,7 +17,9 @@
 </p>
 
 <p align="center">
-  <img src="./readme/demo.svg?v=2" alt="Widget demo" width="312"/>
+  <img src="./readme/panel.svg?v=2" alt="Panel view" width="128" valign="middle"/>
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="./readme/demo.svg?v=3" alt="Popup view" width="312" valign="middle"/>
 </p>
 
 A KDE Plasma 6 panel widget for tracking AI API quota usage. Shows your **5-hour session** and **7-day weekly** usage at a glance with animated segmented bars and live countdown timers. Currently supports Claude (Anthropic).

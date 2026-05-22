@@ -50,20 +50,21 @@
 <rect x="206" y="55" width="56" height="16" rx="3" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
 <text x="234" y="66" text-anchor="middle" font-family="sans-serif" font-size="8" fill="rgba(255,255,255,0.7)">
   <animate attributeName="opacity" values="1;0.6;1" dur="2s" repeatCount="indefinite"/>
-  in 4h 18m
+  in 4h 11m
 </text>
 
-<text x="286" y="66" text-anchor="end" font-family="monospace" font-size="13" font-weight="bold" fill="#e05252">10%</text>
+<text x="286" y="66" text-anchor="end" font-family="monospace" font-size="13" font-weight="bold" fill="#e05252">13%</text>
 
 <!-- Segmented Bar 5h -->
 <g transform="translate(20,72)">
-  <!-- 20 segments, 2 filled for 10% -->
+  <!-- 20 segments, 3 filled for 13% -->
   <rect x="0"   y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
   <rect x="0"   y="1" width="8"  height="6" rx="1.5" fill="url(#sessionGrad)"/>
   <rect x="12"  y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
   <rect x="12"  y="1" width="8"  height="6" rx="1.5" fill="url(#sessionGrad)"/>
-  <!-- Empty segments -->
   <rect x="24"  y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+  <rect x="24"  y="1" width="8"  height="6" rx="1.5" fill="url(#sessionGrad)"/>
+  <!-- Empty segments -->
   <rect x="36"  y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
   <rect x="48"  y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
   <rect x="60"  y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
@@ -89,9 +90,10 @@
 
 <!-- Countdown Badge -->
 <rect x="206" y="95" width="56" height="16" rx="3" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
-<text x="234" y="106" text-anchor="middle" font-family="sans-serif" font-size="8" fill="rgba(255,255,255,0.7)">in 13h 38m</text>
+<text x="234" y="106" text-anchor="middle" font-family="sans-serif" font-size="8" fill="rgba(255,255,255,0.7)">in 13h 31m</text>
 
-<text x="286" y="106" text-anchor="end" font-family="monospace" font-size="13" font-weight="bold" fill="#f5a623">100%</text>
+<!-- Text is red because 100% >= 90% danger threshold -->
+<text x="286" y="106" text-anchor="end" font-family="monospace" font-size="13" font-weight="bold" fill="#e05252">100%</text>
 
 <!-- Segmented Bar 7d -->
 <g transform="translate(20,112)">
@@ -139,6 +141,6 @@
 </g>
 
 <!-- Footer -->
-<text x="296" y="154" text-anchor="end" font-family="sans-serif" font-size="8" fill="rgba(255,255,255,0.25)">updated 21:18</text>
+<text x="296" y="154" text-anchor="end" font-family="sans-serif" font-size="8" fill="rgba(255,255,255,0.25)">updated 21:28</text>
 
 </svg>
