@@ -3,10 +3,16 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 METADATA="$HERE/package/metadata.json"
-TOOL=/run/current-system/sw/bin/kpackagetool6
 
-if [ ! -x "$TOOL" ]; then
-    echo "kpackagetool6 not found at $TOOL" >&2
+# Find kpackagetool6 anywhere on PATH (works on NixOS, Arch, Ubuntu, Fedora, etc.)
+TOOL="$(command -v kpackagetool6 2>/dev/null || true)"
+if [ -z "$TOOL" ] || [ ! -x "$TOOL" ]; then
+    echo "error: kpackagetool6 not found in PATH" >&2
+    echo "       Install the KDE Plasma SDK for your distro:" >&2
+    echo "         NixOS/nix: nix shell nixpkgs#kdePackages.plasma-sdk" >&2
+    echo "         Arch:      sudo pacman -S plasma-sdk" >&2
+    echo "         Ubuntu:    sudo apt install plasma-sdk" >&2
+    echo "         Fedora:    sudo dnf install plasma-sdk" >&2
     exit 1
 fi
 

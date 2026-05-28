@@ -22,19 +22,37 @@
   <img src="./readme/demo.svg?v=4" alt="Popup view" width="312" valign="middle"/>
 </p>
 
-A KDE Plasma 6 panel widget for tracking AI API quota usage. Shows your **5-hour session** and **7-day weekly** usage at a glance with animated segmented bars and live countdown timers. Currently supports Claude (Anthropic).
+A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple services. Monitor your **Claude** (5-hour session & 7-day weekly) and **Antigravity/Google AI Studio** usage at a glance with animated segmented bars, live countdown timers, and per-model breakdowns.
 
 ---
 
 ## Features
 
-- **Panel view** — two compact percentage readouts in the taskbar, color-coded by usage level
-- **Popup view** — segmented bars showing exact fill level for both windows, with reset times and countdowns
-- **Live countdowns** — ticks down in real time, shows "resetting..." when the window flips
-- **Color thresholds** — amber at 70%, red at 90%
-- **Auto-refresh** — polls every 5 minutes, reads credentials directly from `~/.claude/.credentials.json`
-- **Stale indicator** — dims if the last fetch failed, shows error inline
-- **Rate-limit backoff** — respects `retry-after` headers, won't hammer the API
+- **Multi-service support** — Switch between Claude and Antigravity tabs in the popup
+- **Panel view** — Compact percentage readouts in the taskbar, color-coded by usage level
+- **Popup view** — Segmented bars showing exact fill level with reset times and countdowns
+- **Model breakdown** — See usage per model (Sonnet, Opus, Haiku for Claude; Gemini models for Antigravity)
+- **Live countdowns** — Ticks down in real time, shows "resetting..." when the window flips
+- **Color thresholds** — Amber at 70%, red at 90%
+- **Auto-refresh** — Polls every 5 minutes, reads credentials from local config files
+- **Stale indicator** — Dims if the last fetch failed, shows error inline
+- **Rate-limit backoff** — Respects `retry-after` headers, won't hammer the API
+
+---
+
+## Supported Services
+
+### Claude (Anthropic)
+- **5-hour session window** — Rolling 5-hour usage limit
+- **7-day weekly window** — Rolling 7-day usage limit
+- **Auto-detection** — Reads credentials from `~/.claude/.credentials.json`
+- **Model tracking** — Opus, Sonnet, Haiku usage breakdown (coming soon)
+
+### Antigravity (Google AI Studio)
+- **Overall quota** — Combined usage across all models
+- **Per-model breakdown** — Individual Gemini model usage
+- **Multi-account support** — Works with `antigravity-usage` CLI
+- **Reset tracking** — Shows when quota resets
 
 ---
 
@@ -44,7 +62,20 @@ A KDE Plasma 6 panel widget for tracking AI API quota usage. Shows your **5-hour
 |---|---|
 | KDE Plasma 6.0+ | `X-Plasma-API-Minimum-Version: 6.0` |
 | `plasma5support` | Provides the `executable` DataEngine for reading credentials |
+
+### For Claude Support
+| Dependency | Notes |
+|---|---|
 | Claude Code | Logged-in session required — credentials read from `~/.claude/.credentials.json` |
+
+### For Antigravity Support
+| Dependency | Notes |
+|---|---|
+| Node.js 18+ | Required to run `antigravity-usage` CLI |
+| `antigravity-usage` | Install with `npm install -g antigravity-usage` |
+| Google Account | With AI Studio / Antigravity access |
+
+See [SETUP.md](SETUP.md) for detailed configuration instructions.
 
 ---
 
@@ -114,9 +145,13 @@ kpackagetool6 -t Plasma/Applet -r org.muddyblack.aiUsageWidgetTest
 
 ## How it works
 
+### Claude
 On each refresh cycle the widget reads `~/.claude/.credentials.json` to get the OAuth access token, then calls the Anthropic usage API. The response contains two rolling windows — a 5-hour session window and a 7-day weekly window — each with a utilization percentage and a reset timestamp.
 
-No credentials are stored or transmitted anywhere other than the official Anthropic API endpoint.
+### Antigravity
+The widget reads credentials from the `antigravity-usage` CLI configuration (stored in `~/.config/antigravity-usage/` or `~/Library/Application Support/antigravity-usage/`), then calls the Google Cloud Code API to fetch quota information for all available models.
+
+**Privacy:** No credentials are stored or transmitted anywhere other than the official API endpoints (Anthropic and Google).
 
 ---
 

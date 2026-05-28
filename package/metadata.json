@@ -2,11 +2,11 @@
   "KPackageStructure": "Plasma/Applet",
   "KPlugin": {
     "Id": "org.muddyblack.aiUsageWidget",
-    "Name": "AI Usage",
-    "Description": "Session & weekly token usage bars (currently supports Claude)",
+    "Name": "AI Usage Monitor",
+    "Description": "Multi-service AI quota tracker with cost breakdown (Claude & Antigravity)",
     "Icon": "org.muddyblack.aiUsageWidget",
     "Category": "Utilities",
-    "Version": "0.0.1",
+    "Version": "0.0.2",
     "Website": "https://github.com/Muddyblack/kde-ai-usage",
     "Authors": [
       {

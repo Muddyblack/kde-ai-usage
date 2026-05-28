@@ -43,6 +43,31 @@
           };
         });
 
+      apps = forAllSystems (system:
+        let pkgs = import nixpkgs { inherit system; };
+        in {
+          view = {
+            type = "app";
+            program = toString (pkgs.writeShellScript "view" ''
+              exec nix shell nixpkgs#kdePackages.plasma-sdk nixpkgs#kdePackages.plasma-desktop -c plasmoidviewer \
+                -a "$PWD/package" -f "''${1:-planar}"
+            '');
+          };
+          pack = {
+            type = "app";
+            program = toString (pkgs.writeShellScript "pack" ''
+              set -euo pipefail
+              here="$PWD"
+              ver="$(grep -oE '"Version":[[:space:]]*"[^"]+"' "$here/package/metadata.json" | head -1 | sed -E 's/.*"([^"]+)"$/\1/')"
+              name="$(basename "$here")"
+              out="$here/$name-$ver.plasmoid"
+              rm -f "$out"
+              (cd "$here/package" && ${pkgs.zip}/bin/zip -r "$out" . -x '*.swp' '*~')
+              echo "wrote $out"
+            '');
+          };
+        });
+
       devShells = forAllSystems (system:
         let pkgs = import nixpkgs { inherit system; };
         in {
@@ -51,14 +76,14 @@
             packages = with pkgs; [
               qt6.qtdeclarative
               kdePackages.kpackage
+              kdePackages.plasma-sdk
               pre-commit
               zip
             ];
             shellHook = ''
               pre-commit install -f --install-hooks
               echo "ai-usage-widget dev shell ready"
-              echo "  test_install.sh  — install to local Plasma session"
-              echo "  pack.sh          — produce .plasmoid archive"
+              echo "  make help        — list targets (view, install, pack, tag)"
             '';
           };
         });
