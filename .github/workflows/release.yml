@@ -17,7 +17,7 @@ jobs:
           fetch-depth: 0
 
       - name: Build .plasmoid
-        run: bash pack.sh
+        run: make pack
 
       - name: Get version and artifact path
         id: info
