@@ -17,9 +17,16 @@
 </p>
 
 <p align="center">
-  <img src="./readme/panel.svg?v=4" alt="Panel view" width="128" valign="middle"/>
-  &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="./readme/demo.svg?v=4" alt="Popup view" width="312" valign="middle"/>
+  <b>Panel Applet Views (Pill / Compact modes)</b><br/>
+  <img src="./readme/panel.svg?v=4" alt="Pill Panel view" width="160" valign="middle"/>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="./readme/panel_2.svg?v=4" alt="Compact Panel view" width="90" valign="middle"/>
+</p>
+
+<p align="center">
+  <img src="./readme/demo.svg?v=4" alt="Claude view" width="312" valign="top"/>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="./readme/demo_2.svg?v=4" alt="Antigravity view" width="380" valign="top"/>
 </p>
 
 A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple services. Monitor your **Claude** (5-hour session & 7-day weekly) and **Antigravity/Google AI Studio** usage at a glance with animated segmented bars, live countdown timers, and per-model breakdowns.
