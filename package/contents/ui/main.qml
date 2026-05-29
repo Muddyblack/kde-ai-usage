@@ -261,7 +261,7 @@ PlasmoidItem {
                 var credits = res.promptCredits || {};
                 root.antigravityPromptCreditsMonthly = credits.monthly || 0;
                 root.antigravityPromptCreditsAvailable = credits.available || 0;
-                root.antigravityPlanType = res.method === "local" ? "LOCAL" : (res.planType || "CLOUD");
+                root.antigravityPlanType = res.planType || (res.method === "local" ? "LOCAL" : "CLOUD");
 
                 // Parse models
                 var modelsList = res.models || [];
