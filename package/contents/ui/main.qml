@@ -19,6 +19,10 @@ PlasmoidItem {
             if (root.sessionTokenLimit > 0)
                 lines.push("  " + root.formatTokens(root.sessionTokensUsed) + " / " + root.formatTokens(root.sessionTokenLimit) + " tokens");
             lines.push("Claude 7D: " + Math.round(root.weeklyPct) + "%" + sCountdown);
+            if (root.claudeExtraTokens > 0)
+                lines.push("Extra budget: " + root.formatTokens(root.claudeExtraTokens) + " tokens left");
+            if (root.claudeExtraUsageEnabled && root.claudeExtraUsageLimit > 0)
+                lines.push("Extra usage: " + root.claudeExtraUsageUsed.toFixed(2) + " / " + root.claudeExtraUsageLimit.toFixed(2) + " " + root.claudeExtraUsageCurrency);
             if (root.claudeTotalCostUSD > 0)
                 lines.push("API Cost (30d): $" + root.claudeTotalCostUSD.toFixed(2));
         } else {
