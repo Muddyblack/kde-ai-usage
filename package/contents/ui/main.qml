@@ -35,9 +35,30 @@ PlasmoidItem {
             if (root.antigravityResetTime)
                 lines.push("Resets: " + root.antigravityResetTime);
         } else if (tab === "openai") {
+            if (root.openaiEmail)
+                lines.push(root.openaiEmail);
+            if (root.openaiPlanType)
+                lines.push("Plan: " + root.openaiPlanType);
             if (root.openaiTotalCostUSD > 0)
-                lines.push("OpenAI Cost (30d): $" + root.openaiTotalCostUSD.toFixed(2));
-            lines.push("In: " + root.formatTokens(root.openaiTotalInputTokens) + "  Out: " + root.formatTokens(root.openaiTotalOutputTokens));
+                lines.push("Cost (30d): $" + root.openaiTotalCostUSD.toFixed(2));
+            else if (root._openaiAccessToken && !root._openaiApiKey)
+                lines.push("Add org API key for usage stats");
+        } else if (tab === "mistral") {
+            if (root.mistralKeyValid)
+                lines.push("API key: configured");
+            if (root.mistralAvailableModels.length > 0)
+                lines.push(root.mistralAvailableModels.length + " models available");
+            if (root.mistralError)
+                lines.push("⚠ " + root.mistralError);
+        } else if (tab === "openrouter") {
+            if (root.openrouterLabel)
+                lines.push(root.openrouterLabel);
+            if (root.openrouterUsageUSD > 0)
+                lines.push("Spent: $" + root.openrouterUsageUSD.toFixed(4));
+            if (root.openrouterLimitUSD !== null)
+                lines.push("Limit: $" + root.openrouterLimitUSD.toFixed(2));
+            if (root.openrouterIsFreeTier)
+                lines.push("Free tier");
         }
         if (root.errorMsg !== "")
             lines.push("⚠ " + root.errorMsg);
@@ -46,10 +67,12 @@ PlasmoidItem {
         return lines.join("\n");
     }
 
-    // ── Settings: which tabs are enabled ─────────────────────────────────────
-    property bool claudeEnabled: true
-    property bool antigravityEnabled: true
-    property bool openaiEnabled: true
+    // ── Settings: which tabs are enabled (persisted via Plasmoid.configuration) ─
+    property bool claudeEnabled: Plasmoid.configuration.claudeEnabled
+    property bool antigravityEnabled: Plasmoid.configuration.antigravityEnabled
+    property bool openaiEnabled: Plasmoid.configuration.openaiEnabled
+    property bool mistralEnabled: Plasmoid.configuration.mistralEnabled
+    property bool openrouterEnabled: Plasmoid.configuration.openrouterEnabled
 
     // Computed list of enabled tab IDs in display order
     property var enabledTabs: {
@@ -60,6 +83,10 @@ PlasmoidItem {
             t.push("antigravity");
         if (root.openaiEnabled)
             t.push("openai");
+        if (root.mistralEnabled)
+            t.push("mistral");
+        if (root.openrouterEnabled)
+            t.push("openrouter");
         return t;
     }
 
@@ -115,22 +142,50 @@ PlasmoidItem {
 
     // ── OpenAI data ───────────────────────────────────────────────────────────
     property string _openaiApiKey: ""
+    property string _openaiAccessToken: ""   // Codex OAuth token (no org key needed)
+    property string openaiEmail: ""
+    property string openaiPlanType: ""
+    property string openaiOrgId: ""
+    property string openaiAuthMode: ""       // "chatgpt" | "api_key" | ""
     property var openaiModels: ({})
     property real openaiTotalCostUSD: 0
     property real openaiTotalInputTokens: 0
     property real openaiTotalOutputTokens: 0
+
+    // ── Google AI / Gemini API data ───────────────────────────────────────────
+    property string _googleApiKey: ""
+
+    // ── Mistral data ──────────────────────────────────────────────────────────
+    property string _mistralApiKey: ""
+    property bool mistralKeyValid: false
+    property var mistralAvailableModels: []
+    property string mistralError: ""
+
+    // ── OpenRouter data ───────────────────────────────────────────────────────
+    property string _openrouterApiKey: ""
+    property bool openrouterKeyValid: false
+    property string openrouterLabel: ""
+    property real openrouterUsageUSD: 0
+    property var openrouterLimitUSD: null     // null = unlimited
+    property var openrouterLimitRemainingUSD: null
+    property bool openrouterIsFreeTier: false
+    property var openrouterRateLimit: ({})
+    property string openrouterError: ""
 
     // ── Common ────────────────────────────────────────────────────────────────
     property string errorMsg: ""
     property bool stale: false
     property string lastUpdate: ""
     property int backoffMs: 0
+    property bool showSettings: false
 
     // ── Colors ────────────────────────────────────────────────────────────────
     readonly property color claudeOrange: "#cc785c"
     readonly property color googleBlue: "#4285f4"
     readonly property color googleGreen: "#34a853"
     readonly property color openaiGreen: "#10a37f"
+    readonly property color mistralOrange: "#ff7000"
+    readonly property color openrouterPurple: "#9333ea"
     readonly property color sessionColor: "#e05252"
     readonly property color weeklyColor: "#f5a623"
     readonly property color warningColor: "#ffa64d"
@@ -143,6 +198,10 @@ PlasmoidItem {
             return root.googleBlue;
         if (tabId === "openai")
             return root.openaiGreen;
+        if (tabId === "mistral")
+            return root.mistralOrange;
+        if (tabId === "openrouter")
+            return root.openrouterPurple;
         return Kirigami.Theme.textColor;
     }
 
@@ -153,6 +212,10 @@ PlasmoidItem {
             return "Antigravity";
         if (tabId === "openai")
             return "OpenAI";
+        if (tabId === "mistral")
+            return "Mistral";
+        if (tabId === "openrouter")
+            return "OpenRouter";
         return tabId;
     }
 
@@ -455,13 +518,101 @@ PlasmoidItem {
             try {
                 var creds = JSON.parse((data["stdout"] || "").trim());
                 root._openaiApiKey = creds.openaiApiKey || "";
+                root._openaiAccessToken = creds.codexAccessToken || "";
+                root.openaiEmail = creds.email || "";
+                root.openaiPlanType = creds.planType || "";
+                root.openaiOrgId = creds.orgId || "";
+                root.openaiAuthMode = creds.authMode || "";
             } catch (_) {
                 root._openaiApiKey = "";
+                root._openaiAccessToken = "";
+                root.openaiEmail = "";
+                root.openaiPlanType = "";
             }
             if (root._openaiApiKey) {
                 fetchOpenAIUsage();
+            } else if (root._openaiAccessToken) {
+                // Codex OAuth login — account info shown, usage needs org API key
+                root.errorMsg = "";
+                root.stale = false;
+                root.lastUpdate = Qt.formatTime(new Date(), "hh:mm");
             } else {
-                root.errorMsg = "OpenAI API key not configured";
+                root.errorMsg = "OpenAI: no key or Codex login found";
+            }
+        }
+    }
+
+    Plasma5Support.DataSource {
+        id: mistralCredSource
+        engine: "executable"
+        connectedSources: []
+        onNewData: function (src, data) {
+            disconnectSource(src);
+            if (root.enabledTabs[root.activeTab] !== "mistral")
+                return;
+            var output = (data["stdout"] || "").trim();
+            if (!output || output === "{}") {
+                root.errorMsg = "Mistral: no API key configured";
+                return;
+            }
+            try {
+                var res = JSON.parse(output);
+                if (res.error) {
+                    root.mistralError = res.error;
+                    root.errorMsg = res.error;
+                    root.stale = root.lastUpdate !== "";
+                    return;
+                }
+                root._mistralApiKey = res.mistralApiKey || "";
+                root.mistralKeyValid = res.keyValid === true;
+                root.mistralAvailableModels = res.availableModels || [];
+                root.mistralError = "";
+                root.errorMsg = "";
+                root.stale = false;
+                root.lastUpdate = Qt.formatTime(new Date(), "hh:mm");
+            } catch (e) {
+                root.errorMsg = "Mistral: parse error";
+                root.stale = root.lastUpdate !== "";
+            }
+        }
+    }
+
+    Plasma5Support.DataSource {
+        id: openrouterCredSource
+        engine: "executable"
+        connectedSources: []
+        onNewData: function (src, data) {
+            disconnectSource(src);
+            if (root.enabledTabs[root.activeTab] !== "openrouter")
+                return;
+            var output = (data["stdout"] || "").trim();
+            if (!output || output === "{}") {
+                root.errorMsg = "OpenRouter: no API key configured";
+                return;
+            }
+            try {
+                var res = JSON.parse(output);
+                if (res.error && !res.openrouterApiKey) {
+                    root.openrouterError = res.error;
+                    root.errorMsg = res.error;
+                    root.stale = root.lastUpdate !== "";
+                    return;
+                }
+                root._openrouterApiKey = res.openrouterApiKey || "";
+                root.openrouterKeyValid = res.keyValid === true;
+                root.openrouterLabel = res.label || "";
+                root.openrouterUsageUSD = res.usageUSD || 0;
+                root.openrouterLimitUSD = (res.limitUSD !== undefined && res.limitUSD !== null) ? res.limitUSD : null;
+                root.openrouterLimitRemainingUSD = (res.limitRemainingUSD !== undefined && res.limitRemainingUSD !== null) ? res.limitRemainingUSD : null;
+                root.openrouterIsFreeTier = res.isFreeTier === true;
+                root.openrouterRateLimit = res.rateLimit || {};
+                root.openrouterError = "";
+                root.errorMsg = "";
+                root.stale = false;
+                root.lastUpdate = Qt.formatTime(new Date(), "hh:mm");
+            } catch (e) {
+                root.errorMsg = "OpenRouter: parse error";
+                root.stale = root.lastUpdate !== "";
             }
         }
     }
@@ -470,16 +621,37 @@ PlasmoidItem {
         var tab = root.enabledTabs[root.activeTab];
         if (tab === "claude") {
             var s = Qt.resolvedUrl("get_claude_credentials.sh").toString().replace("file://", "");
-            credSource.disconnectSource("bash " + s);
-            credSource.connectSource("bash " + s);
+            var cfgKey = Plasmoid.configuration.claudeAdminApiKey || "";
+            var envPrefix = cfgKey ? "WIDGET_CLAUDE_ADMIN_KEY=" + cfgKey + " " : "";
+            var cmd = envPrefix + "bash " + s;
+            credSource.disconnectSource(cmd);
+            credSource.connectSource(cmd);
         } else if (tab === "antigravity") {
             var s = Qt.resolvedUrl("get_antigravity_usage.sh").toString().replace("file://", "");
-            antigravityUsageSource.disconnectSource("bash " + s);
-            antigravityUsageSource.connectSource("bash " + s);
+            var cmd = "bash " + s;
+            antigravityUsageSource.disconnectSource(cmd);
+            antigravityUsageSource.connectSource(cmd);
         } else if (tab === "openai") {
             var s = Qt.resolvedUrl("get_openai_usage.sh").toString().replace("file://", "");
-            openaiCredSource.disconnectSource("bash " + s);
-            openaiCredSource.connectSource("bash " + s);
+            var cfgKey = Plasmoid.configuration.openaiApiKey || "";
+            var envPrefix = cfgKey ? "WIDGET_OPENAI_API_KEY=" + cfgKey + " " : "";
+            var cmd = envPrefix + "bash " + s;
+            openaiCredSource.disconnectSource(cmd);
+            openaiCredSource.connectSource(cmd);
+        } else if (tab === "mistral") {
+            var s = Qt.resolvedUrl("get_mistral_usage.sh").toString().replace("file://", "");
+            var cfgKey = Plasmoid.configuration.mistralApiKey || "";
+            var envPrefix = cfgKey ? "WIDGET_MISTRAL_API_KEY=" + cfgKey + " " : "";
+            var cmd = envPrefix + "bash " + s;
+            mistralCredSource.disconnectSource(cmd);
+            mistralCredSource.connectSource(cmd);
+        } else if (tab === "openrouter") {
+            var s = Qt.resolvedUrl("get_openrouter_usage.sh").toString().replace("file://", "");
+            var cfgKey = Plasmoid.configuration.openrouterApiKey || "";
+            var envPrefix = cfgKey ? "WIDGET_OPENROUTER_API_KEY=" + cfgKey + " " : "";
+            var cmd = envPrefix + "bash " + s;
+            openrouterCredSource.disconnectSource(cmd);
+            openrouterCredSource.connectSource(cmd);
         }
     }
 
@@ -814,6 +986,26 @@ PlasmoidItem {
                 costText: root.openaiTotalCostUSD > 0 ? "$" + root.openaiTotalCostUSD.toFixed(2) : "—"
                 tooltipText: "OpenAI API (30d)\nCost: $" + root.openaiTotalCostUSD.toFixed(2) + "\nIn: " + root.formatTokens(root.openaiTotalInputTokens) + "  Out: " + root.formatTokens(root.openaiTotalOutputTokens)
             }
+
+            PanelSlot {
+                pct: 0
+                iconColor: root.mistralOrange
+                stale: root.stale && root.enabledTabs[root.activeTab] === "mistral"
+                visible: root.enabledTabs[root.activeTab] === "mistral"
+                showCost: true
+                costText: root.mistralKeyValid ? "✓ key" : "—"
+                tooltipText: "Mistral AI" + (root.mistralKeyValid ? "\nAPI key configured" : "\nNo key set") + (root.mistralAvailableModels.length > 0 ? "\n" + root.mistralAvailableModels.length + " models" : "")
+            }
+
+            PanelSlot {
+                pct: root.openrouterLimitUSD !== null && root.openrouterLimitUSD > 0 ? Math.min(100, (root.openrouterUsageUSD / root.openrouterLimitUSD) * 100) : 0
+                iconColor: root.openrouterPurple
+                stale: root.stale && root.enabledTabs[root.activeTab] === "openrouter"
+                visible: root.enabledTabs[root.activeTab] === "openrouter" && !root.showSettings
+                showCost: true
+                costText: root.openrouterKeyValid ? (root.openrouterUsageUSD > 0 ? "$" + root.openrouterUsageUSD.toFixed(3) : "✓ key") : "—"
+                tooltipText: "OpenRouter" + (root.openrouterLabel ? "\n" + root.openrouterLabel : "") + (root.openrouterUsageUSD > 0 ? "\nUsed: $" + root.openrouterUsageUSD.toFixed(4) : "") + (root.openrouterLimitUSD !== null ? "\nLimit: $" + root.openrouterLimitUSD.toFixed(2) : "")
+            }
         }
     }
 
@@ -822,9 +1014,16 @@ PlasmoidItem {
         id: popupRoot
         Layout.minimumWidth: Kirigami.Units.gridUnit * 26
         Layout.preferredWidth: Kirigami.Units.gridUnit * 26
+        // Shrinks to fit settings panel; expands to full content height for tabs
         Layout.minimumHeight: mainColumn.implicitHeight + (Kirigami.Units.largeSpacing + 4) * 2
         Layout.preferredHeight: Layout.minimumHeight
         Layout.maximumHeight: Layout.minimumHeight
+        Behavior on Layout.minimumHeight {
+            NumberAnimation {
+                duration: 180
+                easing.type: Easing.OutCubic
+            }
+        }
 
         ColumnLayout {
             id: mainColumn
@@ -867,13 +1066,15 @@ PlasmoidItem {
                     Layout.fillWidth: true
                     spacing: 0
                     PlasmaComponents.Label {
-                        text: "AI Usage Monitor"
+                        text: root.showSettings ? "Settings" : "AI Usage Monitor"
                         font.bold: true
                         font.pixelSize: 15
                         color: Kirigami.Theme.textColor
                     }
                     PlasmaComponents.Label {
                         text: {
+                            if (root.showSettings)
+                                return "Configure API keys and providers";
                             var tab = root.enabledTabs[root.activeTab];
                             if (tab === "claude")
                                 return "Claude API tracking";
@@ -881,6 +1082,10 @@ PlasmoidItem {
                                 return "Gemini / Code Assist quota";
                             if (tab === "openai")
                                 return "OpenAI API usage";
+                            if (tab === "mistral")
+                                return "Mistral AI key status";
+                            if (tab === "openrouter")
+                                return "OpenRouter credits & usage";
                             return "";
                         }
                         font.pixelSize: 10
@@ -890,12 +1095,10 @@ PlasmoidItem {
                 }
 
                 PlasmaComponents.ToolButton {
-                    icon.name: "configure"
+                    icon.name: root.showSettings ? "arrow-left" : "configure"
                     display: PlasmaComponents.AbstractButton.IconOnly
-                    checkable: true
-                    checked: settingsPanel.visible
-                    onClicked: settingsPanel.visible = !settingsPanel.visible
-                    opacity: hovered || checked ? 1.0 : 0.6
+                    onClicked: root.showSettings = !root.showSettings
+                    opacity: hovered ? 1.0 : (root.showSettings ? 1.0 : 0.6)
                     Behavior on opacity {
                         NumberAnimation {
                             duration: 150
@@ -915,120 +1118,11 @@ PlasmoidItem {
                 }
             }
 
-            // ── Settings panel ───────────────────────────────────────────────
-            Rectangle {
-                id: settingsPanel
-                visible: false
-                Layout.fillWidth: true
-                height: settingsCol.implicitHeight + 16
-                radius: 8
-                color: Qt.rgba(1, 1, 1, 0.04)
-                border.width: 1
-                border.color: Qt.rgba(1, 1, 1, 0.10)
-
-                ColumnLayout {
-                    id: settingsCol
-                    anchors {
-                        left: parent.left
-                        right: parent.right
-                        top: parent.top
-                        margins: 10
-                    }
-                    spacing: 6
-
-                    PlasmaComponents.Label {
-                        text: "Enabled services"
-                        font.pixelSize: 10
-                        font.bold: true
-                        opacity: 0.5
-                        color: Kirigami.Theme.textColor
-                    }
-
-                    Repeater {
-                        model: [
-                            {
-                                id: "claude",
-                                label: "Claude",
-                                color: root.claudeOrange,
-                                get: function () {
-                                    return root.claudeEnabled;
-                                },
-                                set: function (v) {
-                                    root.claudeEnabled = v;
-                                }
-                            },
-                            {
-                                id: "antigravity",
-                                label: "Antigravity",
-                                color: root.googleBlue,
-                                get: function () {
-                                    return root.antigravityEnabled;
-                                },
-                                set: function (v) {
-                                    root.antigravityEnabled = v;
-                                }
-                            },
-                            {
-                                id: "openai",
-                                label: "OpenAI",
-                                color: root.openaiGreen,
-                                get: function () {
-                                    return root.openaiEnabled;
-                                },
-                                set: function (v) {
-                                    root.openaiEnabled = v;
-                                }
-                            }
-                        ]
-
-                        RowLayout {
-                            spacing: 8
-
-                            Rectangle {
-                                width: 8
-                                height: 8
-                                radius: 4
-                                color: modelData.color
-                                opacity: modelData.get() ? 1.0 : 0.3
-                                Layout.alignment: Qt.AlignVCenter
-                            }
-                            PlasmaComponents.Label {
-                                text: modelData.label
-                                font.pixelSize: 12
-                                color: Kirigami.Theme.textColor
-                                opacity: modelData.get() ? 1.0 : 0.45
-                                Layout.fillWidth: true
-                            }
-                            QQC2.Switch {
-                                checked: modelData.get()
-                                onToggled: {
-                                    // Prevent disabling the last enabled tab
-                                    var enabled = [root.claudeEnabled, root.antigravityEnabled, root.openaiEnabled];
-                                    var count = enabled.filter(function (x) {
-                                        return x;
-                                    }).length;
-                                    if (!checked && count <= 1) {
-                                        checked = true;
-                                        return;
-                                    }
-                                    modelData.set(checked);
-                                    // Clamp activeTab if needed
-                                    if (root.activeTab >= root.enabledTabs.length)
-                                        root.activeTab = Math.max(0, root.enabledTabs.length - 1);
-                                    root.errorMsg = "";
-                                    root.refresh();
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
             // ── Tab bar ──────────────────────────────────────────────────────
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 4
-                visible: root.enabledTabs.length > 1
+                visible: root.enabledTabs.length > 1 && !root.showSettings
 
                 Repeater {
                     model: root.enabledTabs
@@ -1090,9 +1184,160 @@ PlasmoidItem {
                 color: Qt.rgba(1, 1, 1, 0.08)
             }
 
+            // ── Inline Settings panel ───────────────────────────────────────
+            ColumnLayout {
+                visible: root.showSettings
+                Layout.fillWidth: true
+                spacing: 10
+
+                // ── Services ───────────────────────────────────────────────
+                PlasmaComponents.Label {
+                    text: "Services"
+                    font.bold: true
+                    font.pixelSize: 10
+                    opacity: 0.5
+                    color: Kirigami.Theme.textColor
+                }
+
+                // 2-column grid of toggles
+                GridLayout {
+                    Layout.fillWidth: true
+                    columns: 2
+                    columnSpacing: 12
+                    rowSpacing: 2
+
+                    Repeater {
+                        model: [
+                            {
+                                id: "claude",
+                                label: "Claude",
+                                color: "#cc785c"
+                            },
+                            {
+                                id: "antigravity",
+                                label: "Antigravity",
+                                color: "#4285f4"
+                            },
+                            {
+                                id: "openai",
+                                label: "OpenAI",
+                                color: "#10a37f"
+                            },
+                            {
+                                id: "mistral",
+                                label: "Mistral",
+                                color: "#ff7000"
+                            },
+                            {
+                                id: "openrouter",
+                                label: "OpenRouter",
+                                color: "#9333ea"
+                            },
+                            {
+                                id: "__spacer",
+                                label: "",
+                                color: "transparent"
+                            }
+                        ]
+                        RowLayout {
+                            spacing: 6
+                            visible: modelData.id !== "__spacer"
+                            Rectangle {
+                                width: 7
+                                height: 7
+                                radius: 3.5
+                                color: modelData.color
+                                Layout.alignment: Qt.AlignVCenter
+                            }
+                            PlasmaComponents.Label {
+                                text: modelData.label
+                                font.pixelSize: 11
+                                color: Kirigami.Theme.textColor
+                                Layout.preferredWidth: 80
+                            }
+                            QQC2.Switch {
+                                implicitHeight: 20
+                                checked: {
+                                    if (modelData.id === "claude")
+                                        return Plasmoid.configuration.claudeEnabled;
+                                    if (modelData.id === "antigravity")
+                                        return Plasmoid.configuration.antigravityEnabled;
+                                    if (modelData.id === "openai")
+                                        return Plasmoid.configuration.openaiEnabled;
+                                    if (modelData.id === "mistral")
+                                        return Plasmoid.configuration.mistralEnabled;
+                                    if (modelData.id === "openrouter")
+                                        return Plasmoid.configuration.openrouterEnabled;
+                                    return false;
+                                }
+                                onToggled: {
+                                    if (modelData.id === "claude")
+                                        Plasmoid.configuration.claudeEnabled = checked;
+                                    if (modelData.id === "antigravity")
+                                        Plasmoid.configuration.antigravityEnabled = checked;
+                                    if (modelData.id === "openai")
+                                        Plasmoid.configuration.openaiEnabled = checked;
+                                    if (modelData.id === "mistral")
+                                        Plasmoid.configuration.mistralEnabled = checked;
+                                    if (modelData.id === "openrouter")
+                                        Plasmoid.configuration.openrouterEnabled = checked;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: 1
+                    color: Qt.rgba(1, 1, 1, 0.08)
+                }
+
+                // ── API Keys ───────────────────────────────────────────────
+                PlasmaComponents.Label {
+                    text: "API Keys"
+                    font.bold: true
+                    font.pixelSize: 10
+                    opacity: 0.5
+                    color: Kirigami.Theme.textColor
+                }
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 3
+                    KeyRow {
+                        label: "Claude Admin"
+                        placeholder: "sk-ant-api03-…"
+                        configKey: "claudeAdminApiKey"
+                    }
+                    KeyRow {
+                        label: "OpenAI"
+                        placeholder: "sk-proj-…"
+                        configKey: "openaiApiKey"
+                    }
+                    KeyRow {
+                        label: "Google AI"
+                        placeholder: "AIza…"
+                        configKey: "googleApiKey"
+                    }
+                    KeyRow {
+                        label: "Mistral"
+                        placeholder: "or $MISTRAL_API_KEY"
+                        configKey: "mistralApiKey"
+                        rowVisible: Plasmoid.configuration.mistralEnabled
+                    }
+                    KeyRow {
+                        label: "OpenRouter"
+                        placeholder: "or $OPENROUTER_API_KEY"
+                        configKey: "openrouterApiKey"
+                        rowVisible: Plasmoid.configuration.openrouterEnabled
+                    }
+                }
+            }
+
             // ── Claude tab ───────────────────────────────────────────────────
             ColumnLayout {
-                visible: root.enabledTabs[root.activeTab] === "claude"
+                visible: root.enabledTabs[root.activeTab] === "claude" && !root.showSettings
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 spacing: 14
@@ -1337,7 +1582,7 @@ PlasmoidItem {
 
             // ── Antigravity / Gemini tab ──────────────────────────────────────
             ColumnLayout {
-                visible: root.enabledTabs[root.activeTab] === "antigravity"
+                visible: root.enabledTabs[root.activeTab] === "antigravity" && !root.showSettings
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 spacing: 12
@@ -1589,16 +1834,16 @@ PlasmoidItem {
 
             // ── OpenAI tab ────────────────────────────────────────────────────
             ColumnLayout {
-                visible: root.enabledTabs[root.activeTab] === "openai"
+                visible: root.enabledTabs[root.activeTab] === "openai" && !root.showSettings
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 spacing: 14
 
-                // Header cost row
+                // Account row — shown when logged in via Codex OAuth or API key
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8
-                    visible: root.openaiTotalCostUSD > 0 || Object.keys(root.openaiModels).length > 0
+                    visible: root.openaiEmail !== "" || root._openaiApiKey !== "" || root._openaiAccessToken !== ""
 
                     Kirigami.Icon {
                         source: "user-identity"
@@ -1609,50 +1854,114 @@ PlasmoidItem {
                         opacity: 0.7
                     }
                     PlasmaComponents.Label {
-                        text: "OpenAI API"
+                        text: root.openaiEmail || "OpenAI"
                         font.pixelSize: 10
                         opacity: 0.6
                         color: Kirigami.Theme.textColor
+                        elide: Text.ElideRight
                         Layout.fillWidth: true
                     }
                     Rectangle {
+                        visible: root.openaiPlanType !== "" || root._openaiApiKey !== ""
                         height: 18
                         width: openaiPlanLabel.implicitWidth + 12
                         radius: 4
-                        color: Qt.rgba(0.063, 0.639, 0.498, 0.18)
+                        color: {
+                            if (root._openaiApiKey !== "")
+                                return Qt.rgba(0.063, 0.639, 0.498, 0.18);
+                            if (root.openaiPlanType === "free")
+                                return Qt.rgba(1, 1, 1, 0.06);
+                            return Qt.rgba(0.063, 0.639, 0.498, 0.18);
+                        }
                         border.width: 1
-                        border.color: Qt.rgba(0.063, 0.639, 0.498, 0.35)
+                        border.color: {
+                            if (root._openaiApiKey !== "")
+                                return Qt.rgba(0.063, 0.639, 0.498, 0.35);
+                            if (root.openaiPlanType === "free")
+                                return Qt.rgba(1, 1, 1, 0.12);
+                            return Qt.rgba(0.063, 0.639, 0.498, 0.35);
+                        }
                         PlasmaComponents.Label {
                             id: openaiPlanLabel
                             anchors.centerIn: parent
-                            text: "API"
+                            text: root._openaiApiKey !== "" ? "API KEY" : (root.openaiPlanType ? root.openaiPlanType.toUpperCase() : "CODEX")
                             font.pixelSize: 9
                             font.bold: true
-                            color: root.openaiGreen
+                            color: (root._openaiApiKey !== "" || root.openaiPlanType !== "free") ? root.openaiGreen : Kirigami.Theme.textColor
                         }
                     }
                 }
 
-                // No key configured
-                ColumnLayout {
-                    visible: root._openaiApiKey === "" && root.errorMsg !== ""
+                // Codex logged in but no org API key — usage stats unavailable
+                Rectangle {
+                    visible: root._openaiAccessToken !== "" && root._openaiApiKey === "" && Object.keys(root.openaiModels).length === 0
                     Layout.fillWidth: true
-                    spacing: 6
-                    PlasmaComponents.Label {
-                        text: "Configure OpenAI API key:"
-                        font.pixelSize: 11
-                        opacity: 0.7
-                        color: Kirigami.Theme.textColor
-                    }
-                    PlasmaComponents.Label {
-                        text: "• Set OPENAI_API_KEY env var\n• Or save key to ~/.config/openai-api-key\n• Or save key to ~/.openai/api-key"
-                        font.pixelSize: 10
-                        opacity: 0.5
-                        color: Kirigami.Theme.textColor
+                    height: codexHintCol.implicitHeight + 16
+                    radius: 6
+                    color: Qt.rgba(0.063, 0.639, 0.498, 0.07)
+                    border.width: 1
+                    border.color: Qt.rgba(0.063, 0.639, 0.498, 0.20)
+
+                    ColumnLayout {
+                        id: codexHintCol
+                        anchors {
+                            left: parent.left
+                            right: parent.right
+                            top: parent.top
+                            margins: 10
+                        }
+                        spacing: 4
+
+                        RowLayout {
+                            spacing: 6
+                            Rectangle {
+                                width: 6
+                                height: 6
+                                radius: 3
+                                color: root.openaiGreen
+                                Layout.alignment: Qt.AlignVCenter
+                            }
+                            PlasmaComponents.Label {
+                                text: "Codex / ChatGPT logged in"
+                                font.pixelSize: 11
+                                font.bold: true
+                                color: root.openaiGreen
+                            }
+                        }
+                        PlasmaComponents.Label {
+                            text: "Usage stats require an org-level API key.\nAdd one in ⚙ settings to see token & cost data."
+                            font.pixelSize: 10
+                            opacity: 0.55
+                            color: Kirigami.Theme.textColor
+                            wrapMode: Text.WordWrap
+                            Layout.fillWidth: true
+                        }
                     }
                 }
 
-                // Cost summary
+                // No login and no key
+                ColumnLayout {
+                    visible: root._openaiApiKey === "" && root._openaiAccessToken === "" && root.enabledTabs[root.activeTab] === "openai"
+                    Layout.fillWidth: true
+                    spacing: 6
+                    PlasmaComponents.Label {
+                        text: "Not connected"
+                        font.pixelSize: 12
+                        font.bold: true
+                        color: Kirigami.Theme.textColor
+                        opacity: 0.7
+                    }
+                    PlasmaComponents.Label {
+                        text: "Install Codex CLI and log in, or add an\nOpenAI API key in ⚙ settings."
+                        font.pixelSize: 10
+                        opacity: 0.5
+                        color: Kirigami.Theme.textColor
+                        wrapMode: Text.WordWrap
+                        Layout.fillWidth: true
+                    }
+                }
+
+                // Cost summary (only when org API key is set)
                 ColumnLayout {
                     Layout.fillWidth: true
                     spacing: 8
@@ -1784,9 +2093,419 @@ PlasmoidItem {
                 }
             }
 
+            // ── Mistral tab ─────────────────────────────────────────────────
+            ColumnLayout {
+                visible: root.enabledTabs[root.activeTab] === "mistral" && !root.showSettings
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                spacing: 14
+
+                // Status badge row
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    Kirigami.Icon {
+                        source: "dialog-password"
+                        width: 14
+                        height: 14
+                        color: root.mistralOrange
+                        isMask: true
+                        opacity: 0.7
+                    }
+                    PlasmaComponents.Label {
+                        text: "Mistral AI"
+                        font.pixelSize: 10
+                        opacity: 0.6
+                        color: Kirigami.Theme.textColor
+                        elide: Text.ElideRight
+                        Layout.fillWidth: true
+                    }
+                    Rectangle {
+                        height: 18
+                        width: mistralBadgeLabel.implicitWidth + 12
+                        radius: 4
+                        color: root.mistralKeyValid ? Qt.rgba(1.0, 0.44, 0.0, 0.18) : Qt.rgba(1, 1, 1, 0.06)
+                        border.width: 1
+                        border.color: root.mistralKeyValid ? Qt.rgba(1.0, 0.44, 0.0, 0.35) : Qt.rgba(1, 1, 1, 0.12)
+                        PlasmaComponents.Label {
+                            id: mistralBadgeLabel
+                            anchors.centerIn: parent
+                            text: root.mistralKeyValid ? "ACTIVE" : (root._mistralApiKey ? "INVALID" : "NO KEY")
+                            font.pixelSize: 9
+                            font.bold: true
+                            color: root.mistralKeyValid ? root.mistralOrange : Kirigami.Theme.textColor
+                        }
+                    }
+                }
+
+                // No key message
+                ColumnLayout {
+                    visible: !root._mistralApiKey && !root.mistralKeyValid
+                    Layout.fillWidth: true
+                    spacing: 6
+                    PlasmaComponents.Label {
+                        text: "Not connected"
+                        font.pixelSize: 12
+                        font.bold: true
+                        color: Kirigami.Theme.textColor
+                        opacity: 0.7
+                    }
+                    PlasmaComponents.Label {
+                        text: "Set a Mistral API key in ⚙ settings or via\n$MISTRAL_API_KEY / ~/.config/mistral/api-key"
+                        font.pixelSize: 10
+                        opacity: 0.5
+                        color: Kirigami.Theme.textColor
+                        wrapMode: Text.WordWrap
+                        Layout.fillWidth: true
+                    }
+                }
+
+                // Key valid: show model list
+                ColumnLayout {
+                    visible: root.mistralKeyValid && root.mistralAvailableModels.length > 0
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    Rectangle {
+                        Layout.fillWidth: true
+                        height: 1
+                        color: Qt.rgba(1, 1, 1, 0.08)
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 8
+                        PlasmaComponents.Label {
+                            text: "Available Models"
+                            font.bold: true
+                            font.pixelSize: 11
+                            opacity: 0.7
+                            color: Kirigami.Theme.textColor
+                        }
+                        Item {
+                            Layout.fillWidth: true
+                        }
+                        PlasmaComponents.Label {
+                            text: root.mistralAvailableModels.length + " models"
+                            font.bold: true
+                            font.pixelSize: 13
+                            color: root.mistralOrange
+                        }
+                    }
+
+                    Repeater {
+                        model: root.mistralAvailableModels.slice(0, 10)
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+                            Rectangle {
+                                width: 6
+                                height: 6
+                                radius: 3
+                                color: root.mistralOrange
+                                opacity: 0.7
+                                Layout.alignment: Qt.AlignVCenter
+                            }
+                            PlasmaComponents.Label {
+                                text: modelData
+                                font.pixelSize: 10
+                                opacity: 0.65
+                                color: Kirigami.Theme.textColor
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                            }
+                        }
+                    }
+
+                    PlasmaComponents.Label {
+                        visible: root.mistralAvailableModels.length > 10
+                        text: "... and " + (root.mistralAvailableModels.length - 10) + " more"
+                        font.pixelSize: 9
+                        opacity: 0.4
+                        color: Kirigami.Theme.textColor
+                    }
+                }
+
+                // Note about billing
+                Rectangle {
+                    visible: root.mistralKeyValid
+                    Layout.fillWidth: true
+                    height: mistralNoteCol.implicitHeight + 16
+                    radius: 6
+                    color: Qt.rgba(1.0, 0.44, 0.0, 0.07)
+                    border.width: 1
+                    border.color: Qt.rgba(1.0, 0.44, 0.0, 0.20)
+                    ColumnLayout {
+                        id: mistralNoteCol
+                        anchors {
+                            left: parent.left
+                            right: parent.right
+                            top: parent.top
+                            margins: 10
+                        }
+                        spacing: 4
+                        RowLayout {
+                            spacing: 6
+                            Rectangle {
+                                width: 6
+                                height: 6
+                                radius: 3
+                                color: root.mistralOrange
+                                Layout.alignment: Qt.AlignVCenter
+                            }
+                            PlasmaComponents.Label {
+                                text: "No public usage API"
+                                font.pixelSize: 11
+                                font.bold: true
+                                color: root.mistralOrange
+                            }
+                        }
+                        PlasmaComponents.Label {
+                            text: "Mistral doesn't expose billing data via REST.\nCheck usage at console.mistral.ai"
+                            font.pixelSize: 10
+                            opacity: 0.55
+                            color: Kirigami.Theme.textColor
+                            wrapMode: Text.WordWrap
+                            Layout.fillWidth: true
+                        }
+                    }
+                }
+
+                Item {
+                    Layout.fillHeight: true
+                }
+            }
+
+            // ── OpenRouter tab ──────────────────────────────────────────────
+            ColumnLayout {
+                visible: root.enabledTabs[root.activeTab] === "openrouter" && !root.showSettings
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                spacing: 14
+
+                // Account row
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+                    visible: root.openrouterKeyValid
+
+                    Kirigami.Icon {
+                        source: "user-identity"
+                        width: 14
+                        height: 14
+                        color: root.openrouterPurple
+                        isMask: true
+                        opacity: 0.7
+                    }
+                    PlasmaComponents.Label {
+                        text: root.openrouterLabel || "OpenRouter"
+                        font.pixelSize: 10
+                        opacity: 0.6
+                        color: Kirigami.Theme.textColor
+                        elide: Text.ElideRight
+                        Layout.fillWidth: true
+                    }
+                    Rectangle {
+                        height: 18
+                        width: orPlanLabel.implicitWidth + 12
+                        radius: 4
+                        color: root.openrouterIsFreeTier ? Qt.rgba(1, 1, 1, 0.06) : Qt.rgba(0.576, 0.2, 0.918, 0.18)
+                        border.width: 1
+                        border.color: root.openrouterIsFreeTier ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(0.576, 0.2, 0.918, 0.35)
+                        PlasmaComponents.Label {
+                            id: orPlanLabel
+                            anchors.centerIn: parent
+                            text: root.openrouterIsFreeTier ? "FREE" : "PAID"
+                            font.pixelSize: 9
+                            font.bold: true
+                            color: root.openrouterIsFreeTier ? Kirigami.Theme.textColor : root.openrouterPurple
+                        }
+                    }
+                }
+
+                // No key message
+                ColumnLayout {
+                    visible: !root.openrouterKeyValid && root._openrouterApiKey === ""
+                    Layout.fillWidth: true
+                    spacing: 6
+                    PlasmaComponents.Label {
+                        text: "Not connected"
+                        font.pixelSize: 12
+                        font.bold: true
+                        color: Kirigami.Theme.textColor
+                        opacity: 0.7
+                    }
+                    PlasmaComponents.Label {
+                        text: "Set an OpenRouter API key in ⚙ settings or via\n$OPENROUTER_API_KEY / ~/.config/openrouter/api-key"
+                        font.pixelSize: 10
+                        opacity: 0.5
+                        color: Kirigami.Theme.textColor
+                        wrapMode: Text.WordWrap
+                        Layout.fillWidth: true
+                    }
+                }
+
+                // Usage stats
+                ColumnLayout {
+                    visible: root.openrouterKeyValid
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    // Usage bar (only when limit is set)
+                    PopupRow {
+                        visible: root.openrouterLimitUSD !== null && root.openrouterLimitUSD > 0
+                        label: "Credit Usage"
+                        value: root.openrouterLimitUSD !== null && root.openrouterLimitUSD > 0 ? Math.min(100, (root.openrouterUsageUSD / root.openrouterLimitUSD) * 100) : 0
+                        barColor: root.openrouterPurple
+                        tokenText: "$" + root.openrouterUsageUSD.toFixed(4) + " / $" + (root.openrouterLimitUSD !== null ? root.openrouterLimitUSD.toFixed(2) : "∞") + " used"
+                        tooltipText: "OpenRouter credit spend\n$" + root.openrouterUsageUSD.toFixed(4) + " of $" + (root.openrouterLimitUSD !== null ? root.openrouterLimitUSD.toFixed(2) : "unlimited") + " limit"
+                    }
+
+                    // Usage summary card
+                    Rectangle {
+                        Layout.fillWidth: true
+                        height: orStatsCol.implicitHeight + 16
+                        radius: 8
+                        color: Qt.rgba(0.576, 0.2, 0.918, 0.08)
+                        border.width: 1
+                        border.color: Qt.rgba(0.576, 0.2, 0.918, 0.22)
+
+                        ColumnLayout {
+                            id: orStatsCol
+                            anchors {
+                                left: parent.left
+                                right: parent.right
+                                top: parent.top
+                                margins: 12
+                            }
+                            spacing: 8
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 8
+                                PlasmaComponents.Label {
+                                    text: "All-time Spend"
+                                    font.pixelSize: 11
+                                    opacity: 0.65
+                                    color: Kirigami.Theme.textColor
+                                    Layout.fillWidth: true
+                                }
+                                PlasmaComponents.Label {
+                                    text: "$" + root.openrouterUsageUSD.toFixed(4)
+                                    font.bold: true
+                                    font.pixelSize: 14
+                                    color: root.openrouterPurple
+                                }
+                            }
+
+                            // Credit limit row
+                            RowLayout {
+                                visible: root.openrouterLimitUSD !== null
+                                Layout.fillWidth: true
+                                spacing: 8
+                                PlasmaComponents.Label {
+                                    text: "Credit Limit"
+                                    font.pixelSize: 11
+                                    opacity: 0.65
+                                    color: Kirigami.Theme.textColor
+                                    Layout.fillWidth: true
+                                }
+                                PlasmaComponents.Label {
+                                    text: root.openrouterLimitUSD !== null ? "$" + root.openrouterLimitUSD.toFixed(2) : "∞"
+                                    font.bold: true
+                                    font.pixelSize: 12
+                                    color: Kirigami.Theme.textColor
+                                    opacity: 0.85
+                                }
+                            }
+
+                            // Remaining row
+                            RowLayout {
+                                visible: root.openrouterLimitRemainingUSD !== null
+                                Layout.fillWidth: true
+                                spacing: 8
+                                PlasmaComponents.Label {
+                                    text: "Remaining"
+                                    font.pixelSize: 11
+                                    opacity: 0.65
+                                    color: Kirigami.Theme.textColor
+                                    Layout.fillWidth: true
+                                }
+                                PlasmaComponents.Label {
+                                    text: root.openrouterLimitRemainingUSD !== null ? "$" + root.openrouterLimitRemainingUSD.toFixed(4) : "—"
+                                    font.bold: true
+                                    font.pixelSize: 12
+                                    color: {
+                                        if (root.openrouterLimitRemainingUSD === null)
+                                            return Kirigami.Theme.textColor;
+                                        var pct = root.openrouterLimitUSD > 0 ? ((root.openrouterLimitUSD - root.openrouterLimitRemainingUSD) / root.openrouterLimitUSD) * 100 : 0;
+                                        return root.usageColor(pct);
+                                    }
+                                }
+                            }
+
+                            // Rate limit info
+                            RowLayout {
+                                visible: root.openrouterRateLimit && root.openrouterRateLimit.requests !== undefined
+                                Layout.fillWidth: true
+                                spacing: 8
+                                PlasmaComponents.Label {
+                                    text: "Rate Limit"
+                                    font.pixelSize: 11
+                                    opacity: 0.65
+                                    color: Kirigami.Theme.textColor
+                                    Layout.fillWidth: true
+                                }
+                                PlasmaComponents.Label {
+                                    text: root.openrouterRateLimit.requests !== undefined ? root.openrouterRateLimit.requests + " req / " + (root.openrouterRateLimit.interval || "min") : ""
+                                    font.pixelSize: 10
+                                    opacity: 0.65
+                                    color: Kirigami.Theme.textColor
+                                }
+                            }
+                        }
+                    }
+
+                    // Free tier note
+                    Rectangle {
+                        visible: root.openrouterIsFreeTier
+                        Layout.fillWidth: true
+                        height: orFreeCol.implicitHeight + 12
+                        radius: 6
+                        color: Qt.rgba(1, 1, 1, 0.04)
+                        border.width: 1
+                        border.color: Qt.rgba(1, 1, 1, 0.10)
+                        ColumnLayout {
+                            id: orFreeCol
+                            anchors {
+                                left: parent.left
+                                right: parent.right
+                                top: parent.top
+                                margins: 10
+                            }
+                            spacing: 3
+                            PlasmaComponents.Label {
+                                text: "Free tier active — rate limits apply"
+                                font.pixelSize: 10
+                                opacity: 0.5
+                                color: Kirigami.Theme.textColor
+                                wrapMode: Text.WordWrap
+                                Layout.fillWidth: true
+                            }
+                        }
+                    }
+                }
+
+                Item {
+                    Layout.fillHeight: true
+                }
+            }
+
             // ── Footer ─────────────────────────────────────────────────────────
             RowLayout {
                 Layout.fillWidth: true
+                visible: !root.showSettings
 
                 Rectangle {
                     visible: root.errorMsg !== ""
@@ -1813,6 +2532,67 @@ PlasmoidItem {
                     font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                 }
             }
+        }
+    }
+
+    component KeyRow: RowLayout {
+        id: kr
+        property string label: ""
+        property string placeholder: ""
+        property string configKey: ""
+        property bool rowVisible: true
+        Layout.fillWidth: true
+        spacing: 4
+        visible: rowVisible
+
+        PlasmaComponents.Label {
+            text: kr.label
+            font.pixelSize: 10
+            opacity: 0.6
+            color: Kirigami.Theme.textColor
+            Layout.preferredWidth: 76
+            elide: Text.ElideRight
+        }
+        QQC2.TextField {
+            id: kf
+            Layout.fillWidth: true
+            placeholderText: kr.placeholder
+            font.pixelSize: 10
+            implicitHeight: 26
+            echoMode: krReveal.checked ? TextInput.Normal : TextInput.Password
+            text: {
+                if (kr.configKey === "claudeAdminApiKey")
+                    return Plasmoid.configuration.claudeAdminApiKey || "";
+                if (kr.configKey === "openaiApiKey")
+                    return Plasmoid.configuration.openaiApiKey || "";
+                if (kr.configKey === "googleApiKey")
+                    return Plasmoid.configuration.googleApiKey || "";
+                if (kr.configKey === "mistralApiKey")
+                    return Plasmoid.configuration.mistralApiKey || "";
+                if (kr.configKey === "openrouterApiKey")
+                    return Plasmoid.configuration.openrouterApiKey || "";
+                return "";
+            }
+            onEditingFinished: {
+                if (kr.configKey === "claudeAdminApiKey")
+                    Plasmoid.configuration.claudeAdminApiKey = text;
+                if (kr.configKey === "openaiApiKey")
+                    Plasmoid.configuration.openaiApiKey = text;
+                if (kr.configKey === "googleApiKey")
+                    Plasmoid.configuration.googleApiKey = text;
+                if (kr.configKey === "mistralApiKey")
+                    Plasmoid.configuration.mistralApiKey = text;
+                if (kr.configKey === "openrouterApiKey")
+                    Plasmoid.configuration.openrouterApiKey = text;
+            }
+        }
+        QQC2.ToolButton {
+            id: krReveal
+            checkable: true
+            implicitWidth: 26
+            implicitHeight: 26
+            icon.name: checked ? "password-show-off" : "password-show-on"
+            display: QQC2.AbstractButton.IconOnly
         }
     }
 

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0 http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
+  <kcfgfile name=""/>
+  <group name="General">
+    <entry name="claudeEnabled" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="antigravityEnabled" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="openaiEnabled" type="Bool">
+      <default>true</default>
+    </entry>
+    <!-- API keys stored in plasmoid config (user's KDE wallet area, not world-readable) -->
+    <entry name="claudeAdminApiKey" type="String">
+      <default></default>
+    </entry>
+    <entry name="openaiApiKey" type="String">
+      <default></default>
+    </entry>
+    <entry name="googleApiKey" type="String">
+      <default></default>
+    </entry>
+    <entry name="mistralEnabled" type="Bool">
+      <default>false</default>
+    </entry>
+    <entry name="openrouterEnabled" type="Bool">
+      <default>false</default>
+    </entry>
+    <entry name="mistralApiKey" type="String">
+      <default></default>
+    </entry>
+    <entry name="openrouterApiKey" type="String">
+      <default></default>
+    </entry>
+  </group>
+</kcfg>

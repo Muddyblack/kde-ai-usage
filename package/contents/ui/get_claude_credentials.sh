@@ -6,11 +6,11 @@ if [ -f "$HOME/.claude/.credentials.json" ]; then
     OAUTH_CREDS=$(cat "$HOME/.claude/.credentials.json" 2>/dev/null)
 fi
 
-# Get Claude Admin API key from environment or config file
-ADMIN_KEY=""
+# Get Claude Admin API key — WIDGET_CLAUDE_ADMIN_KEY (set by plasmoid config) takes priority
+ADMIN_KEY="${WIDGET_CLAUDE_ADMIN_KEY:-}"
 
-# Check environment variable
-if [ -n "$CLAUDE_ADMIN_API_KEY" ]; then
+# Fall back to environment variable
+if [ -z "$ADMIN_KEY" ] && [ -n "$CLAUDE_ADMIN_API_KEY" ]; then
     ADMIN_KEY="$CLAUDE_ADMIN_API_KEY"
 fi
 
