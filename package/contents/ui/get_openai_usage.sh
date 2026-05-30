@@ -15,7 +15,9 @@ if [ -z "$API_KEY" ] && [ -f "$HOME/.openai/api-key" ]; then
     API_KEY=$(cat "$HOME/.openai/api-key" 2>/dev/null | tr -d '\n\r ')
 fi
 
-# Read Codex OAuth credentials from ~/.codex/auth.json (like Claude reads ~/.claude/.credentials.json)
+# Read Codex OAuth credentials from ~/.codex/auth.json.
+# Codex/ChatGPT auth is separate from OpenAI API organization usage, but it is
+# useful account status to show alongside API billing data when available.
 CODEX_AUTH=""
 ACCESS_TOKEN=""
 EMAIL=""
@@ -27,9 +29,16 @@ AUTH_MODE=""
 if [ -f "$HOME/.codex/auth.json" ]; then
     CODEX_AUTH=$(cat "$HOME/.codex/auth.json" 2>/dev/null)
     if [ -n "$CODEX_AUTH" ]; then
-        ACCESS_TOKEN=$(echo "$CODEX_AUTH" | jq -r '.tokens.access_token // ""' 2>/dev/null)
-        ACCOUNT_ID=$(echo  "$CODEX_AUTH" | jq -r '.account_id // ""' 2>/dev/null)
+        ACCESS_TOKEN=$(echo "$CODEX_AUTH" | jq -r '.tokens.access_token // .access_token // ""' 2>/dev/null)
+        ACCOUNT_ID=$(echo  "$CODEX_AUTH" | jq -r '.tokens.account_id // .account_id // ""' 2>/dev/null)
         AUTH_MODE=$(echo   "$CODEX_AUTH" | jq -r '.auth_mode // ""' 2>/dev/null)
+
+        if [ -z "$API_KEY" ]; then
+            CODEX_API_KEY=$(echo "$CODEX_AUTH" | jq -r '.OPENAI_API_KEY // ""' 2>/dev/null)
+            if [ -n "$CODEX_API_KEY" ]; then
+                API_KEY="$CODEX_API_KEY"
+            fi
+        fi
 
         # Decode plan/email from JWT payload (no external deps needed, just base64)
         if [ -n "$ACCESS_TOKEN" ]; then
@@ -42,23 +51,25 @@ if [ -f "$HOME/.codex/auth.json" ]; then
 fi
 
 # Build output JSON
-if [ -n "$API_KEY" ]; then
+if [ -n "$API_KEY" ] || [ -n "$ACCESS_TOKEN" ]; then
     jq -n \
         --arg key       "$API_KEY" \
-        --arg email     "$EMAIL" \
-        --arg plan      "$PLAN_TYPE" \
-        --arg orgId     "$ORG_ID" \
-        --arg authMode  "$AUTH_MODE" \
-        '{openaiApiKey: $key, email: $email, planType: $plan, orgId: $orgId, authMode: $authMode}'
-elif [ -n "$ACCESS_TOKEN" ]; then
-    # Logged in via Codex OAuth — no org API key, but can show account info
-    jq -n \
         --arg token     "$ACCESS_TOKEN" \
         --arg email     "$EMAIL" \
         --arg plan      "$PLAN_TYPE" \
         --arg orgId     "$ORG_ID" \
+        --arg accountId "$ACCOUNT_ID" \
         --arg authMode  "$AUTH_MODE" \
-        '{codexAccessToken: $token, email: $email, planType: $plan, orgId: $orgId, authMode: $authMode}'
+        '{
+            openaiApiKey: $key,
+            codexAccessToken: $token,
+            email: $email,
+            planType: $plan,
+            orgId: $orgId,
+            accountId: $accountId,
+            authMode: $authMode,
+            codexLoggedIn: ($token != "")
+        }'
 else
     echo "{}"
 fi

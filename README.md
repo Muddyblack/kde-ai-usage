@@ -29,16 +29,16 @@
   <img src="./readme/demo_2.svg?v=4" alt="Antigravity view" width="380" valign="top"/>
 </p>
 
-A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple services. Monitor your **Claude** (5-hour session & 7-day weekly) and **Antigravity/Google AI Studio** usage at a glance with animated segmented bars, live countdown timers, and per-model breakdowns.
+A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple services. Monitor your **Claude** (5-hour session & 7-day weekly), **Antigravity/Google AI Studio**, and **OpenAI API** usage at a glance with animated segmented bars, live countdown timers, account status, and per-model breakdowns.
 
 ---
 
 ## Features
 
-- **Multi-service support** — Switch between Claude and Antigravity tabs in the popup
+- **Multi-service support** — Switch between Claude, Antigravity, OpenAI, Mistral, and OpenRouter tabs in the popup
 - **Panel view** — Compact percentage readouts in the taskbar, color-coded by usage level
 - **Popup view** — Segmented bars showing exact fill level with reset times and countdowns
-- **Model breakdown** — See usage per model (Sonnet, Opus, Haiku for Claude; Gemini models for Antigravity)
+- **Model breakdown** — See usage per model for providers that expose it
 - **Live countdowns** — Ticks down in real time, shows "resetting..." when the window flips
 - **Color thresholds** — Amber at 70%, red at 90%
 - **Auto-refresh** — Polls every 5 minutes, reads credentials from local config files
@@ -61,6 +61,12 @@ A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple serv
 - **Multi-account support** — Works with `antigravity-usage` CLI
 - **Reset tracking** — Shows when quota resets
 
+### OpenAI
+- **API usage** — Shows 30-day organization token and estimated cost data from the OpenAI Usage API when an API key is configured
+- **Codex account status** — Detects Codex/ChatGPT login from `~/.codex/auth.json`
+- **Separate surfaces** — Codex/ChatGPT plan limits are not the same as OpenAI API organization billing usage
+- **Credential lookup** — Reads the widget setting first, then `$OPENAI_API_KEY`, `~/.config/openai-api-key`, `~/.openai/api-key`, and Codex auth metadata when available
+
 ---
 
 ## Requirements
@@ -81,6 +87,12 @@ A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple serv
 | Node.js 18+ | Required to run `antigravity-usage` CLI |
 | `antigravity-usage` | Install with `npm install -g antigravity-usage` |
 | Google Account | With AI Studio / Antigravity access |
+
+### For OpenAI Support
+| Dependency | Notes |
+|---|---|
+| OpenAI API key | Required for API token and cost usage via the organization Usage API |
+| Codex CLI | Optional; logged-in Codex sessions are shown as account status only |
 
 See [SETUP.md](SETUP.md) for detailed configuration instructions.
 
@@ -158,7 +170,10 @@ On each refresh cycle the widget reads `~/.claude/.credentials.json` to get the 
 ### Antigravity
 The widget reads credentials from the `antigravity-usage` CLI configuration (stored in `~/.config/antigravity-usage/` or `~/Library/Application Support/antigravity-usage/`), then calls the Google Cloud Code API to fetch quota information for all available models.
 
-**Privacy:** No credentials are stored or transmitted anywhere other than the official API endpoints (Anthropic and Google).
+### OpenAI
+The OpenAI tab has two independent sections. API usage is fetched from the official OpenAI organization usage endpoint with an API key and summarized over the last 30 days. Codex account status is read locally from `~/.codex/auth.json`; it confirms the Codex/ChatGPT login and plan metadata when present, but it does not provide API billing usage.
+
+**Privacy:** No credentials are stored or transmitted anywhere other than the official provider endpoints used by each tab.
 
 ---
 

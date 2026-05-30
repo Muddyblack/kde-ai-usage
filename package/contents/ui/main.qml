@@ -35,14 +35,16 @@ PlasmoidItem {
             if (root.antigravityResetTime)
                 lines.push("Resets: " + root.antigravityResetTime);
         } else if (tab === "openai") {
-            if (root.openaiEmail)
-                lines.push(root.openaiEmail);
+            if (root._openaiApiKey)
+                lines.push("API usage: configured");
+            if (root.openaiTotalCostUSD > 0)
+                lines.push("API cost (30d): $" + root.openaiTotalCostUSD.toFixed(2));
+            if (root.openaiCodexLoggedIn)
+                lines.push("Codex: signed in" + (root.openaiEmail ? " as " + root.openaiEmail : ""));
             if (root.openaiPlanType)
                 lines.push("Plan: " + root.openaiPlanType);
-            if (root.openaiTotalCostUSD > 0)
-                lines.push("Cost (30d): $" + root.openaiTotalCostUSD.toFixed(2));
-            else if (root._openaiAccessToken && !root._openaiApiKey)
-                lines.push("Add org API key for usage stats");
+            if (root.openaiCodexLoggedIn && !root._openaiApiKey)
+                lines.push("API usage needs an OpenAI API key");
         } else if (tab === "mistral") {
             if (root.mistralKeyValid)
                 lines.push("API key: configured");
@@ -146,7 +148,9 @@ PlasmoidItem {
     property string openaiEmail: ""
     property string openaiPlanType: ""
     property string openaiOrgId: ""
+    property string openaiAccountId: ""
     property string openaiAuthMode: ""       // "chatgpt" | "api_key" | ""
+    property bool openaiCodexLoggedIn: false
     property var openaiModels: ({})
     property real openaiTotalCostUSD: 0
     property real openaiTotalInputTokens: 0
@@ -522,22 +526,35 @@ PlasmoidItem {
                 root.openaiEmail = creds.email || "";
                 root.openaiPlanType = creds.planType || "";
                 root.openaiOrgId = creds.orgId || "";
+                root.openaiAccountId = creds.accountId || "";
                 root.openaiAuthMode = creds.authMode || "";
+                root.openaiCodexLoggedIn = creds.codexLoggedIn === true || root._openaiAccessToken !== "";
             } catch (_) {
                 root._openaiApiKey = "";
                 root._openaiAccessToken = "";
                 root.openaiEmail = "";
                 root.openaiPlanType = "";
+                root.openaiOrgId = "";
+                root.openaiAccountId = "";
+                root.openaiAuthMode = "";
+                root.openaiCodexLoggedIn = false;
             }
             if (root._openaiApiKey) {
                 fetchOpenAIUsage();
-            } else if (root._openaiAccessToken) {
-                // Codex OAuth login — account info shown, usage needs org API key
+            } else if (root.openaiCodexLoggedIn) {
+                root.openaiModels = ({});
+                root.openaiTotalCostUSD = 0;
+                root.openaiTotalInputTokens = 0;
+                root.openaiTotalOutputTokens = 0;
                 root.errorMsg = "";
                 root.stale = false;
                 root.lastUpdate = Qt.formatTime(new Date(), "hh:mm");
             } else {
-                root.errorMsg = "OpenAI: no key or Codex login found";
+                root.openaiModels = ({});
+                root.openaiTotalCostUSD = 0;
+                root.openaiTotalInputTokens = 0;
+                root.openaiTotalOutputTokens = 0;
+                root.errorMsg = "OpenAI: no API key or Codex login";
             }
         }
     }
@@ -798,7 +815,12 @@ PlasmoidItem {
             if (root.activeTab !== reqTab)
                 return;
             if (xhr.status === 401) {
-                root.errorMsg = "OpenAI key invalid";
+                root.errorMsg = "OpenAI API key invalid";
+                root.stale = root.lastUpdate !== "";
+                return;
+            }
+            if (xhr.status === 403) {
+                root.errorMsg = "OpenAI usage access denied";
                 root.stale = root.lastUpdate !== "";
                 return;
             }
@@ -983,8 +1005,8 @@ PlasmoidItem {
                 stale: root.stale && root.enabledTabs[root.activeTab] === "openai"
                 visible: root.enabledTabs[root.activeTab] === "openai"
                 showCost: true
-                costText: root.openaiTotalCostUSD > 0 ? "$" + root.openaiTotalCostUSD.toFixed(2) : "—"
-                tooltipText: "OpenAI API (30d)\nCost: $" + root.openaiTotalCostUSD.toFixed(2) + "\nIn: " + root.formatTokens(root.openaiTotalInputTokens) + "  Out: " + root.formatTokens(root.openaiTotalOutputTokens)
+                costText: root.openaiTotalCostUSD > 0 ? "$" + root.openaiTotalCostUSD.toFixed(2) : (root._openaiApiKey ? "API" : (root.openaiCodexLoggedIn ? "Codex" : "—"))
+                tooltipText: "OpenAI" + (root._openaiApiKey ? "\nAPI usage configured\nCost (30d): $" + root.openaiTotalCostUSD.toFixed(2) + "\nIn: " + root.formatTokens(root.openaiTotalInputTokens) + "  Out: " + root.formatTokens(root.openaiTotalOutputTokens) : "\nAPI usage needs an OpenAI API key") + (root.openaiCodexLoggedIn ? "\nCodex signed in" + (root.openaiEmail ? ": " + root.openaiEmail : "") : "")
             }
 
             PanelSlot {
@@ -1081,7 +1103,7 @@ PlasmoidItem {
                             if (tab === "antigravity")
                                 return "Gemini / Code Assist quota";
                             if (tab === "openai")
-                                return "OpenAI API usage";
+                                return "OpenAI API & Codex status";
                             if (tab === "mistral")
                                 return "Mistral AI key status";
                             if (tab === "openrouter")
@@ -1311,7 +1333,7 @@ PlasmoidItem {
                         configKey: "claudeAdminApiKey"
                     }
                     KeyRow {
-                        label: "OpenAI"
+                        label: "OpenAI API"
                         placeholder: "sk-proj-…"
                         configKey: "openaiApiKey"
                     }
@@ -1839,71 +1861,101 @@ PlasmoidItem {
                 Layout.fillHeight: true
                 spacing: 14
 
-                // Account row — shown when logged in via Codex OAuth or API key
-                RowLayout {
+                // API usage surface — official OpenAI organization usage data
+                ColumnLayout {
                     Layout.fillWidth: true
                     spacing: 8
-                    visible: root.openaiEmail !== "" || root._openaiApiKey !== "" || root._openaiAccessToken !== ""
+                    visible: root._openaiApiKey !== ""
 
-                    Kirigami.Icon {
-                        source: "user-identity"
-                        width: 14
-                        height: 14
-                        color: root.openaiGreen
-                        isMask: true
-                        opacity: 0.7
-                    }
-                    PlasmaComponents.Label {
-                        text: root.openaiEmail || "OpenAI"
-                        font.pixelSize: 10
-                        opacity: 0.6
-                        color: Kirigami.Theme.textColor
-                        elide: Text.ElideRight
+                    RowLayout {
                         Layout.fillWidth: true
-                    }
-                    Rectangle {
-                        visible: root.openaiPlanType !== "" || root._openaiApiKey !== ""
-                        height: 18
-                        width: openaiPlanLabel.implicitWidth + 12
-                        radius: 4
-                        color: {
-                            if (root._openaiApiKey !== "")
-                                return Qt.rgba(0.063, 0.639, 0.498, 0.18);
-                            if (root.openaiPlanType === "free")
-                                return Qt.rgba(1, 1, 1, 0.06);
-                            return Qt.rgba(0.063, 0.639, 0.498, 0.18);
+                        spacing: 8
+                        PlasmaComponents.Label {
+                            text: "API Usage (30d)"
+                            font.bold: true
+                            font.pixelSize: 11
+                            opacity: 0.7
+                            color: Kirigami.Theme.textColor
                         }
-                        border.width: 1
-                        border.color: {
-                            if (root._openaiApiKey !== "")
-                                return Qt.rgba(0.063, 0.639, 0.498, 0.35);
-                            if (root.openaiPlanType === "free")
-                                return Qt.rgba(1, 1, 1, 0.12);
-                            return Qt.rgba(0.063, 0.639, 0.498, 0.35);
+                        Item {
+                            Layout.fillWidth: true
+                        }
+                        Rectangle {
+                            height: 18
+                            width: apiKeyBadgeLabel.implicitWidth + 12
+                            radius: 4
+                            color: Qt.rgba(0.063, 0.639, 0.498, 0.18)
+                            border.width: 1
+                            border.color: Qt.rgba(0.063, 0.639, 0.498, 0.35)
+                            PlasmaComponents.Label {
+                                id: apiKeyBadgeLabel
+                                anchors.centerIn: parent
+                                text: "API KEY"
+                                font.pixelSize: 9
+                                font.bold: true
+                                color: root.openaiGreen
+                            }
                         }
                         PlasmaComponents.Label {
-                            id: openaiPlanLabel
-                            anchors.centerIn: parent
-                            text: root._openaiApiKey !== "" ? "API KEY" : (root.openaiPlanType ? root.openaiPlanType.toUpperCase() : "CODEX")
-                            font.pixelSize: 9
+                            text: "$" + root.openaiTotalCostUSD.toFixed(2)
                             font.bold: true
-                            color: (root._openaiApiKey !== "" || root.openaiPlanType !== "free") ? root.openaiGreen : Kirigami.Theme.textColor
+                            font.pixelSize: 13
+                            color: root.openaiGreen
                         }
+                    }
+
+                    PlasmaComponents.Label {
+                        text: root.formatTokens(root.openaiTotalInputTokens) + " in  ·  " + root.formatTokens(root.openaiTotalOutputTokens) + " out"
+                        font.pixelSize: 9
+                        opacity: 0.45
+                        color: Kirigami.Theme.textColor
+                    }
+
+                    Rectangle {
+                        visible: Object.keys(root.openaiModels).length === 0 && root.errorMsg === ""
+                        Layout.fillWidth: true
+                        height: noApiUsageLabel.implicitHeight + 16
+                        radius: 6
+                        color: Qt.rgba(1, 1, 1, 0.04)
+                        border.width: 1
+                        border.color: Qt.rgba(1, 1, 1, 0.08)
+                        PlasmaComponents.Label {
+                            id: noApiUsageLabel
+                            anchors {
+                                left: parent.left
+                                right: parent.right
+                                verticalCenter: parent.verticalCenter
+                                leftMargin: 10
+                                rightMargin: 10
+                            }
+                            text: "No API usage returned for the last 30 days."
+                            font.pixelSize: 10
+                            opacity: 0.55
+                            color: Kirigami.Theme.textColor
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+
+                    Rectangle {
+                        visible: Object.keys(root.openaiModels).length > 0
+                        Layout.fillWidth: true
+                        height: 1
+                        color: Qt.rgba(1, 1, 1, 0.08)
                     }
                 }
 
-                // Codex logged in but no org API key — usage stats unavailable
+                // Codex / ChatGPT surface — account status, not API billing
                 Rectangle {
-                    visible: root._openaiAccessToken !== "" && root._openaiApiKey === "" && Object.keys(root.openaiModels).length === 0
+                    visible: root.openaiCodexLoggedIn
                     Layout.fillWidth: true
-                    height: codexHintCol.implicitHeight + 16
+                    height: codexAccountCol.implicitHeight + 16
                     radius: 6
                     color: Qt.rgba(0.063, 0.639, 0.498, 0.07)
                     border.width: 1
                     border.color: Qt.rgba(0.063, 0.639, 0.498, 0.20)
 
                     ColumnLayout {
-                        id: codexHintCol
+                        id: codexAccountCol
                         anchors {
                             left: parent.left
                             right: parent.right
@@ -1922,14 +1974,43 @@ PlasmoidItem {
                                 Layout.alignment: Qt.AlignVCenter
                             }
                             PlasmaComponents.Label {
-                                text: "Codex / ChatGPT logged in"
+                                text: "Codex / ChatGPT account"
                                 font.pixelSize: 11
                                 font.bold: true
                                 color: root.openaiGreen
                             }
+                            Item {
+                                Layout.fillWidth: true
+                            }
+                            Rectangle {
+                                visible: root.openaiPlanType !== ""
+                                height: 18
+                                width: codexPlanLabel.implicitWidth + 12
+                                radius: 4
+                                color: root.openaiPlanType === "free" ? Qt.rgba(1, 1, 1, 0.06) : Qt.rgba(0.063, 0.639, 0.498, 0.18)
+                                border.width: 1
+                                border.color: root.openaiPlanType === "free" ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(0.063, 0.639, 0.498, 0.35)
+                                PlasmaComponents.Label {
+                                    id: codexPlanLabel
+                                    anchors.centerIn: parent
+                                    text: root.openaiPlanType.toUpperCase()
+                                    font.pixelSize: 9
+                                    font.bold: true
+                                    color: root.openaiPlanType === "free" ? Kirigami.Theme.textColor : root.openaiGreen
+                                }
+                            }
                         }
                         PlasmaComponents.Label {
-                            text: "Usage stats require an org-level API key.\nAdd one in ⚙ settings to see token & cost data."
+                            text: root.openaiEmail || (root.openaiAccountId ? root.openaiAccountId : "Signed in with Codex CLI")
+                            font.pixelSize: 10
+                            opacity: 0.70
+                            color: Kirigami.Theme.textColor
+                            elide: Text.ElideRight
+                            Layout.fillWidth: true
+                        }
+                        PlasmaComponents.Label {
+                            visible: root._openaiApiKey === ""
+                            text: "Codex plan limits are separate from OpenAI API billing.\nAdd an OpenAI API key in settings for token and cost data."
                             font.pixelSize: 10
                             opacity: 0.55
                             color: Kirigami.Theme.textColor
@@ -1941,7 +2022,7 @@ PlasmoidItem {
 
                 // No login and no key
                 ColumnLayout {
-                    visible: root._openaiApiKey === "" && root._openaiAccessToken === "" && root.enabledTabs[root.activeTab] === "openai"
+                    visible: root._openaiApiKey === "" && !root.openaiCodexLoggedIn && root.enabledTabs[root.activeTab] === "openai"
                     Layout.fillWidth: true
                     spacing: 6
                     PlasmaComponents.Label {
@@ -1952,7 +2033,7 @@ PlasmoidItem {
                         opacity: 0.7
                     }
                     PlasmaComponents.Label {
-                        text: "Install Codex CLI and log in, or add an\nOpenAI API key in ⚙ settings."
+                        text: "Add an OpenAI API key for API usage, or\nlog in with Codex CLI for account status."
                         font.pixelSize: 10
                         opacity: 0.5
                         color: Kirigami.Theme.textColor
@@ -1961,44 +2042,11 @@ PlasmoidItem {
                     }
                 }
 
-                // Cost summary (only when org API key is set)
+                // Per-model API usage, only returned by the API usage endpoint
                 ColumnLayout {
                     Layout.fillWidth: true
                     spacing: 8
                     visible: Object.keys(root.openaiModels).length > 0
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 8
-                        PlasmaComponents.Label {
-                            text: "API Usage (30d)"
-                            font.bold: true
-                            font.pixelSize: 11
-                            opacity: 0.7
-                            color: Kirigami.Theme.textColor
-                        }
-                        Item {
-                            Layout.fillWidth: true
-                        }
-                        PlasmaComponents.Label {
-                            text: "$" + root.openaiTotalCostUSD.toFixed(2)
-                            font.bold: true
-                            font.pixelSize: 13
-                            color: root.openaiGreen
-                        }
-                    }
-                    PlasmaComponents.Label {
-                        text: root.formatTokens(root.openaiTotalInputTokens) + " in  ·  " + root.formatTokens(root.openaiTotalOutputTokens) + " out"
-                        font.pixelSize: 9
-                        opacity: 0.45
-                        color: Kirigami.Theme.textColor
-                    }
-
-                    Rectangle {
-                        Layout.fillWidth: true
-                        height: 1
-                        color: Qt.rgba(1, 1, 1, 0.08)
-                    }
 
                     Repeater {
                         model: {
