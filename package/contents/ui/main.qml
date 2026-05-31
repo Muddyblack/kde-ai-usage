@@ -182,6 +182,7 @@ PlasmoidItem {
     property string lastUpdate: ""
     property int backoffMs: 0
     property bool showSettings: false
+    property bool _offline: false
 
     // ── Colors ────────────────────────────────────────────────────────────────
     readonly property color claudeOrange: "#cc785c"
@@ -503,6 +504,8 @@ PlasmoidItem {
                 root.errorMsg = "";
                 root.stale = false;
                 root.lastUpdate = Qt.formatTime(new Date(), "hh:mm");
+                root._offline = false;
+                offlineRetryTimer.stop();
             } catch (e) {
                 console.log("Antigravity parse error: " + e);
                 root.errorMsg = "parse error";
@@ -587,6 +590,8 @@ PlasmoidItem {
                 root.errorMsg = "";
                 root.stale = false;
                 root.lastUpdate = Qt.formatTime(new Date(), "hh:mm");
+                root._offline = false;
+                offlineRetryTimer.stop();
             } catch (e) {
                 root.errorMsg = "Mistral: parse error";
                 root.stale = root.lastUpdate !== "";
@@ -627,6 +632,8 @@ PlasmoidItem {
                 root.errorMsg = "";
                 root.stale = false;
                 root.lastUpdate = Qt.formatTime(new Date(), "hh:mm");
+                root._offline = false;
+                offlineRetryTimer.stop();
             } catch (e) {
                 root.errorMsg = "OpenRouter: parse error";
                 root.stale = root.lastUpdate !== "";
@@ -716,6 +723,8 @@ PlasmoidItem {
                     root.errorMsg = "";
                     root.stale = false;
                     root.lastUpdate = Qt.formatTime(new Date(), "hh:mm");
+                    root._offline = false;
+                    offlineRetryTimer.stop();
                 } catch (_) {
                     root.errorMsg = "parse error";
                     root.stale = root.lastUpdate !== "";
@@ -730,6 +739,11 @@ PlasmoidItem {
             } else if (xhr.status === 401) {
                 root.errorMsg = "token expired";
                 root.stale = root.lastUpdate !== "";
+            } else if (xhr.status === 0) {
+                root.errorMsg = "offline";
+                root.stale = root.lastUpdate !== "";
+                root._offline = true;
+                offlineRetryTimer.restart();
             } else {
                 root.errorMsg = "err " + xhr.status;
                 root.stale = root.lastUpdate !== "";
@@ -814,6 +828,13 @@ PlasmoidItem {
                 return;
             if (root.activeTab !== reqTab)
                 return;
+            if (xhr.status === 0) {
+                root.errorMsg = "offline";
+                root.stale = root.lastUpdate !== "";
+                root._offline = true;
+                offlineRetryTimer.restart();
+                return;
+            }
             if (xhr.status === 401) {
                 root.errorMsg = "OpenAI API key invalid";
                 root.stale = root.lastUpdate !== "";
@@ -869,6 +890,8 @@ PlasmoidItem {
                 root.errorMsg = "";
                 root.stale = false;
                 root.lastUpdate = Qt.formatTime(new Date(), "hh:mm");
+                root._offline = false;
+                offlineRetryTimer.stop();
             } catch (e) {
                 console.log("OpenAI usage parse error: " + e);
                 root.errorMsg = "parse error";
@@ -911,6 +934,13 @@ PlasmoidItem {
             root.errorMsg = "";
             root.refresh();
         }
+    }
+    Timer {
+        id: offlineRetryTimer
+        interval: 60000
+        running: false
+        repeat: true
+        onTriggered: root.refresh()
     }
 
     // ── Compact (panel) ───────────────────────────────────────────────────────
