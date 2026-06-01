@@ -184,6 +184,38 @@ PlasmoidItem {
     property bool showSettings: false
     property bool _offline: false
 
+    property bool showUsageChart: Plasmoid.configuration.showUsageChart
+    property var weeklyUsageHistory: []
+
+    function loadUsageHistory() {
+        var raw = Plasmoid.configuration.weeklyUsageHistory || "";
+        if (raw) {
+            try {
+                root.weeklyUsageHistory = JSON.parse(raw);
+            } catch (_) {
+                root.weeklyUsageHistory = [];
+            }
+        }
+    }
+
+    function recordWeeklyUsage(pct) {
+        var history = root.weeklyUsageHistory.slice();
+        var now = new Date().getTime();
+        if (history.length > 0) {
+            var last = history[history.length - 1];
+            if (now - last.t < 60000)
+                return;
+        }
+        history.push({
+            t: now,
+            v: pct
+        });
+        if (history.length > 200)
+            history = history.slice(history.length - 200);
+        root.weeklyUsageHistory = history;
+        Plasmoid.configuration.weeklyUsageHistory = JSON.stringify(history);
+    }
+
     // ── Colors ────────────────────────────────────────────────────────────────
     readonly property color claudeOrange: "#cc785c"
     readonly property color googleBlue: "#4285f4"
@@ -725,6 +757,7 @@ PlasmoidItem {
                     root.lastUpdate = Qt.formatTime(new Date(), "hh:mm");
                     root._offline = false;
                     offlineRetryTimer.stop();
+                    root.recordWeeklyUsage(root.weeklyPct);
                 } catch (_) {
                     root.errorMsg = "parse error";
                     root.stale = root.lastUpdate !== "";
@@ -942,6 +975,8 @@ PlasmoidItem {
         repeat: true
         onTriggered: root.refresh()
     }
+
+    Component.onCompleted: root.loadUsageHistory()
 
     // ── Compact (panel) ───────────────────────────────────────────────────────
     compactRepresentation: Item {
@@ -1339,6 +1374,29 @@ PlasmoidItem {
                     }
                 }
 
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 6
+                    Rectangle {
+                        width: 7
+                        height: 7
+                        radius: 3.5
+                        color: root.weeklyColor
+                        Layout.alignment: Qt.AlignVCenter
+                    }
+                    PlasmaComponents.Label {
+                        text: "Usage chart"
+                        font.pixelSize: 11
+                        color: Kirigami.Theme.textColor
+                        Layout.preferredWidth: 80
+                    }
+                    QQC2.Switch {
+                        implicitHeight: 20
+                        checked: Plasmoid.configuration.showUsageChart
+                        onToggled: Plasmoid.configuration.showUsageChart = checked
+                    }
+                }
+
                 Rectangle {
                     Layout.fillWidth: true
                     height: 1
@@ -1451,6 +1509,200 @@ PlasmoidItem {
                     barColor: root.weeklyColor
                     tokenText: root.weeklyTokenLimit > 0 ? root.formatTokens(root.weeklyTokensUsed) + " / " + root.formatTokens(root.weeklyTokenLimit) + " tokens" : ""
                     tooltipText: "Claude 7-day rolling window\nUsage: " + Math.round(root.weeklyPct) + "%" + (root.weeklyTokenLimit > 0 ? "\n" + root.formatTokens(root.weeklyTokensUsed) + " / " + root.formatTokens(root.weeklyTokenLimit) + " tokens" : "") + (root.weeklyResetTime ? "\nResets: " + root.weeklyResetTime : "")
+                }
+
+                Rectangle {
+                    id: usageChartContainer
+                    visible: root.showUsageChart && root.weeklyUsageHistory.length >= 1
+                    Layout.fillWidth: true
+                    height: 160
+                    radius: 8
+                    color: Qt.rgba(0.08, 0.05, 0.05, 0.85)
+                    border.width: 1
+                    border.color: Qt.rgba(1, 1, 1, 0.10)
+                    clip: true
+
+                    // Y-axis labels
+                    PlasmaComponents.Label {
+                        anchors.right: chartCanvas.left
+                        anchors.rightMargin: 4
+                        y: chartCanvas.y + 2
+                        text: "100%"
+                        font.pixelSize: 9
+                        opacity: 0.45
+                        color: Kirigami.Theme.textColor
+                    }
+                    PlasmaComponents.Label {
+                        anchors.right: chartCanvas.left
+                        anchors.rightMargin: 4
+                        y: chartCanvas.y + chartCanvas.height / 2 - 6
+                        text: "50%"
+                        font.pixelSize: 9
+                        opacity: 0.45
+                        color: Kirigami.Theme.textColor
+                    }
+                    PlasmaComponents.Label {
+                        anchors.right: chartCanvas.left
+                        anchors.rightMargin: 4
+                        y: chartCanvas.y + chartCanvas.height - 14
+                        text: "0%"
+                        font.pixelSize: 9
+                        opacity: 0.45
+                        color: Kirigami.Theme.textColor
+                    }
+
+                    Canvas {
+                        id: chartCanvas
+                        anchors.top: parent.top
+                        anchors.bottom: xAxisRow.top
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.leftMargin: 36
+                        anchors.rightMargin: 6
+                        anchors.topMargin: 8
+                        anchors.bottomMargin: 2
+
+                        property var history: root.weeklyUsageHistory
+                        onHistoryChanged: requestPaint()
+                        onVisibleChanged: if (visible)
+                            requestPaint()
+                        onWidthChanged: requestPaint()
+                        onHeightChanged: requestPaint()
+
+                        onPaint: {
+                            var ctx = getContext("2d");
+                            ctx.clearRect(0, 0, width, height);
+                            var pts = history;
+                            if (!pts || pts.length < 1)
+                                return;
+
+                            var minT = pts[0].t, maxT = pts[pts.length - 1].t;
+                            var tRange = maxT - minT;
+                            if (tRange === 0)
+                                tRange = 1;
+
+                            if (pts.length === 1) {
+                                var sx = w / 2, sy = py(pts[0].v);
+                                ctx.beginPath();
+                                ctx.arc(sx, sy, 4, 0, Math.PI * 2);
+                                ctx.fillStyle = "#3ecf8e";
+                                ctx.fill();
+                                ctx.beginPath();
+                                ctx.arc(sx, sy, 2, 0, Math.PI * 2);
+                                ctx.fillStyle = "#fff";
+                                ctx.fill();
+                                return;
+                            }
+
+                            var w = width, h = height;
+                            function px(i) {
+                                return ((pts[i].t - minT) / tRange) * w;
+                            }
+                            function py(v) {
+                                return h - (v / 100) * h;
+                            }
+
+                            // horizontal grid lines at 0%, 50%, 100%
+                            ctx.strokeStyle = "rgba(255,255,255,0.07)";
+                            ctx.lineWidth = 1;
+                            [0, 50, 100].forEach(function (pct) {
+                                var y = py(pct);
+                                ctx.beginPath();
+                                ctx.moveTo(0, y);
+                                ctx.lineTo(w, y);
+                                ctx.stroke();
+                            });
+
+                            // filled area
+                            var grad = ctx.createLinearGradient(0, 0, 0, h);
+                            grad.addColorStop(0, "rgba(62,207,142,0.40)");
+                            grad.addColorStop(1, "rgba(62,207,142,0.02)");
+                            ctx.beginPath();
+                            ctx.moveTo(px(0), py(pts[0].v));
+                            for (var i = 1; i < pts.length; i++)
+                                ctx.lineTo(px(i), py(pts[i].v));
+                            ctx.lineTo(px(pts.length - 1), h);
+                            ctx.lineTo(px(0), h);
+                            ctx.closePath();
+                            ctx.fillStyle = grad;
+                            ctx.fill();
+
+                            // line
+                            ctx.beginPath();
+                            ctx.moveTo(px(0), py(pts[0].v));
+                            for (var j = 1; j < pts.length; j++)
+                                ctx.lineTo(px(j), py(pts[j].v));
+                            ctx.strokeStyle = "#3ecf8e";
+                            ctx.lineWidth = 2;
+                            ctx.lineJoin = "round";
+                            ctx.stroke();
+
+                            // dot at latest point
+                            var lx = px(pts.length - 1);
+                            var ly = py(pts[pts.length - 1].v);
+                            ctx.beginPath();
+                            ctx.arc(lx, ly, 4, 0, Math.PI * 2);
+                            ctx.fillStyle = "#3ecf8e";
+                            ctx.fill();
+                            ctx.beginPath();
+                            ctx.arc(lx, ly, 2, 0, Math.PI * 2);
+                            ctx.fillStyle = "#fff";
+                            ctx.fill();
+                        }
+                    }
+
+                    // X-axis date labels
+                    RowLayout {
+                        id: xAxisRow
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        anchors.leftMargin: 36
+                        anchors.rightMargin: 6
+                        anchors.bottomMargin: 5
+                        spacing: 0
+
+                        PlasmaComponents.Label {
+                            text: {
+                                var pts = root.weeklyUsageHistory;
+                                if (!pts || pts.length < 1)
+                                    return "";
+                                return Qt.formatDate(new Date(pts[0].t), "MMM d");
+                            }
+                            font.pixelSize: 9
+                            opacity: 0.45
+                            color: Kirigami.Theme.textColor
+                        }
+                        Item {
+                            Layout.fillWidth: true
+                        }
+                        PlasmaComponents.Label {
+                            text: {
+                                var pts = root.weeklyUsageHistory;
+                                if (!pts || pts.length < 2)
+                                    return "";
+                                var mid = pts[Math.floor(pts.length / 2)];
+                                return Qt.formatDate(new Date(mid.t), "MMM d");
+                            }
+                            font.pixelSize: 9
+                            opacity: 0.45
+                            color: Kirigami.Theme.textColor
+                        }
+                        Item {
+                            Layout.fillWidth: true
+                        }
+                        PlasmaComponents.Label {
+                            text: {
+                                var pts = root.weeklyUsageHistory;
+                                if (!pts || pts.length < 1)
+                                    return "";
+                                return Qt.formatDate(new Date(pts[pts.length - 1].t), "MMM d");
+                            }
+                            font.pixelSize: 9
+                            opacity: 0.45
+                            color: Kirigami.Theme.textColor
+                        }
+                    }
                 }
 
                 Rectangle {
