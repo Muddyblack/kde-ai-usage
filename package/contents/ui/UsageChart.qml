@@ -229,6 +229,32 @@ Rectangle {
             return chartMaxRaw > 0 ? "$" + (chartMaxRaw * fraction).toFixed(2) : "";
         return Math.round(fraction * 100) + "%";
     }
+
+    // Timestamps where a reset happened inside the visible window — detected as
+    // a sharp downward step in the plotted curve (usage only climbs, then drops
+    // to ~0 at a reset). Shared by the canvas (draws the dashed line + dot) and
+    // the x-axis row (renders the time label under each line). Only the
+    // session/rolling-window curves reset this way: Claude (s/w) and Codex
+    // (cp/cw). Antigravity / OpenRouter / Mistral are monthly credit/spend
+    // curves, so a drop there isn't a reset and we skip them.
+    readonly property bool windowHasResets: {
+        var tab = rootItem.enabledTabs[rootItem.activeTab];
+        if (tab === "claude")
+            return true;
+        if (tab === "openai")
+            return rootItem.chartWindow === "codex_primary" || rootItem.chartWindow === "codex_day" || rootItem.chartWindow === "codex_weekly";
+        return false;
+    }
+    readonly property var resetTimestamps: {
+        if (!windowHasResets)
+            return [];
+        var pts = rootItem.weeklyUsageHistory;
+        var out = [];
+        for (var i = 1; i < pts.length; i++)
+            if (pts[i - 1].v - pts[i].v > 6)
+                out.push(pts[i].t);
+        return out;
+    }
     PlasmaComponents.Label {
         anchors.right: chartCanvas.left
         anchors.rightMargin: 4
@@ -441,6 +467,54 @@ Rectangle {
             ctx.fillStyle = "rgba(255,255,255,0.9)";
             ctx.fill();
 
+            // ── Reset-boundary markers ───────────────────────────
+            // Draw a dashed vertical line wherever a reset actually happened in
+            // the plotted data. Session/weekly usage only climbs within a window
+            // and drops to ~0 at a reset, so a sharp downward step between two
+            // consecutive points marks a reset — placed at the first post-reset
+            // point, i.e. exactly where the curve falls. This is data-driven so
+            // it lands on the real boundary instead of guessing a fixed grid.
+            function drawResetLine(resetMs, label, drawLabel) {
+                var rx = ((resetMs - minT) / tRange) * w;
+                ctx.save();
+                ctx.setLineDash([2, 4]);
+                ctx.strokeStyle = "rgba(255,255,255,0.22)";
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(rx, 12);
+                ctx.lineTo(rx, h);
+                ctx.stroke();
+                ctx.restore();
+                if (drawLabel) {
+                    ctx.save();
+                    ctx.font = "9px sans-serif";
+                    ctx.fillStyle = "rgba(255,255,255,0.45)";
+                    var tw = ctx.measureText(label).width;
+                    var tx = Math.min(Math.max(rx + 3, 0), w - tw);
+                    ctx.fillText(label, tx, 9);
+                    ctx.restore();
+                }
+                // small accent dot where the line meets the baseline (the time
+                // itself is rendered as a QML label in the x-axis row below)
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(rx, h, 2, 0, Math.PI * 2);
+                ctx.fillStyle = acRgba(0.85);
+                ctx.fill();
+                ctx.restore();
+            }
+            var resets = usageChartContainer.resetTimestamps;
+            var resetLabel = rootItem.chartWindow === "weekly" ? "week reset" : "5h reset";
+            var labelDrawn = false;
+            // walk newest→oldest so the rightmost reset gets the top caption
+            for (var ri = resets.length - 1; ri >= 0; ri--) {
+                var rt = resets[ri];
+                if (rt > minT && rt < maxT) {
+                    drawResetLine(rt, resetLabel, !labelDrawn);
+                    labelDrawn = true;
+                }
+            }
+
             // hover scrub: vertical guide + highlighted point
             if (scrubIndex >= 0 && scrubIndex < pts.length) {
                 var hx = px(scrubIndex);
@@ -562,7 +636,7 @@ Rectangle {
         }
     }
 
-    // X-axis date labels
+    // X-axis date labels — evenly spaced ticks across the window.
     RowLayout {
         id: xAxisRow
         anchors.left: parent.left
@@ -573,51 +647,98 @@ Rectangle {
         anchors.bottomMargin: 5
         spacing: 0
 
+        // Only the two window endpoints are fixed labels; the reset-time labels
+        // drawn on the canvas carry the detail, so interior ticks would just
+        // collide with them. Keeps the axis clean.
+        readonly property int tickCount: 2
+
+        // Hourly windows show time; wide (multi-day) windows show date + time so
+        // a label like "Jun 2" isn't ambiguous about which part of the day it is.
+        readonly property bool hourlyWindow: rootItem.chartWindow === "session" || rootItem.chartWindow === "codex_primary" || rootItem.chartWindow === "day" || rootItem.chartWindow === "codex_day"
+
         function formatLabel(timestamp) {
-            if (rootItem.chartWindow === "session" || rootItem.chartWindow === "codex_primary" || rootItem.chartWindow === "day" || rootItem.chartWindow === "codex_day") {
-                return Qt.formatTime(new Date(timestamp), "hh:mm");
-            }
-            return Qt.formatDate(new Date(timestamp), "MMM d");
+            var d = new Date(timestamp);
+            if (hourlyWindow)
+                return Qt.formatTime(d, "hh:mm");
+            // wide window: stack date over time so labels stay narrow
+            return Qt.formatDate(d, "MMM d") + "\n" + Qt.formatTime(d, "hh:mm");
         }
 
-        PlasmaComponents.Label {
-            text: {
-                var now_ms = new Date().getTime();
-                var maxT = now_ms - rootItem.chartTimeOffset;
-                var minT = maxT - rootItem.getChartWindowSize();
-                return xAxisRow.formatLabel(minT);
+        // True when a reset label sits within ~10% of this endpoint's position,
+        // so the endpoint hides and the (more meaningful) reset time wins.
+        function endpointCrowded(endpointFrac) {
+            var resets = usageChartContainer.resetTimestamps;
+            var now_ms = new Date().getTime();
+            var winSize = rootItem.getChartWindowSize();
+            var minT = (now_ms - rootItem.chartTimeOffset) - winSize;
+            for (var i = 0; i < resets.length; i++) {
+                var f = (resets[i] - minT) / winSize;
+                if (f > 0 && f < 1 && Math.abs(f - endpointFrac) < 0.1)
+                    return true;
             }
-            font.pixelSize: 9
-            opacity: 0.40
-            color: Kirigami.Theme.textColor
+            return false;
         }
-        Item {
-            Layout.fillWidth: true
-        }
-        PlasmaComponents.Label {
-            text: {
-                var now_ms = new Date().getTime();
-                var maxT = now_ms - rootItem.chartTimeOffset;
-                var winSize = rootItem.getChartWindowSize();
-                var minT = maxT - winSize;
-                return xAxisRow.formatLabel(minT + winSize / 2);
+
+        Repeater {
+            model: xAxisRow.tickCount
+            delegate: RowLayout {
+                readonly property real frac: index / (xAxisRow.tickCount - 1)
+                Layout.fillWidth: index > 0
+                spacing: 0
+                // spacer pushes each label to its proportional position
+                Item {
+                    Layout.fillWidth: index > 0
+                }
+                PlasmaComponents.Label {
+                    visible: !xAxisRow.endpointCrowded(parent.frac)
+                    text: {
+                        var now_ms = new Date().getTime();
+                        var maxT = now_ms - rootItem.chartTimeOffset;
+                        var winSize = rootItem.getChartWindowSize();
+                        var minT = maxT - winSize;
+                        return xAxisRow.formatLabel(minT + winSize * parent.frac);
+                    }
+                    font.pixelSize: 9
+                    opacity: 0.40
+                    horizontalAlignment: Text.AlignHCenter
+                    lineHeight: 0.9
+                    color: Kirigami.Theme.textColor
+                }
             }
-            font.pixelSize: 9
-            opacity: 0.40
-            color: Kirigami.Theme.textColor
         }
-        Item {
-            Layout.fillWidth: true
-        }
-        PlasmaComponents.Label {
-            text: {
-                var now_ms = new Date().getTime();
-                var maxT = now_ms - rootItem.chartTimeOffset;
-                return xAxisRow.formatLabel(maxT);
+    }
+
+    // Reset-time labels — sit on the same baseline as the endpoint labels, each
+    // centered under its reset line on the chart. Accent-colored so they read as
+    // the meaningful markers rather than the dim endpoint times.
+    Item {
+        id: resetLabelsRow
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.leftMargin: 36
+        anchors.rightMargin: 8
+        anchors.bottomMargin: 5
+        height: xAxisRow.height
+
+        Repeater {
+            model: usageChartContainer.resetTimestamps
+            delegate: PlasmaComponents.Label {
+                readonly property real frac: {
+                    var now_ms = new Date().getTime();
+                    var winSize = rootItem.getChartWindowSize();
+                    var maxT = now_ms - rootItem.chartTimeOffset;
+                    var minT = maxT - winSize;
+                    return (modelData - minT) / winSize;
+                }
+                visible: frac > 0 && frac < 1
+                text: rootItem.chartWindow === "weekly" ? Qt.formatDate(new Date(modelData), "MMM d") : Qt.formatTime(new Date(modelData), "hh:mm")
+                font.pixelSize: 9
+                color: rootItem.activeAccent
+                opacity: 0.85
+                // center under the reset line, clamped inside the row
+                x: Math.max(0, Math.min(frac * resetLabelsRow.width - implicitWidth / 2, resetLabelsRow.width - implicitWidth))
             }
-            font.pixelSize: 9
-            opacity: 0.40
-            color: Kirigami.Theme.textColor
         }
     }
 }
