@@ -1,5 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 312 168" width="312" height="168">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 290" width="400" height="290">
 <defs>
+  <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#181922"/>
+    <stop offset="100%" stop-color="#111218"/>
+  </linearGradient>
   <linearGradient id="sessionGrad" x1="0" y1="0" x2="1" y2="0">
     <stop offset="0%"   stop-color="#e87272"/>
     <stop offset="100%" stop-color="#e05252"/>
@@ -8,139 +12,135 @@
     <stop offset="0%"   stop-color="#f7bc50"/>
     <stop offset="100%" stop-color="#f5a623"/>
   </linearGradient>
-  <linearGradient id="panelBg" x1="0" y1="0" x2="0" y2="1">
-    <stop offset="0%"   stop-color="#1e1e2e"/>
-    <stop offset="100%" stop-color="#18181f"/>
-  </linearGradient>
 </defs>
 
 <!-- Card Background -->
-<rect width="312" height="168" rx="10" fill="url(#panelBg)"/>
-<rect width="312" height="168" rx="10" fill="none" stroke="rgba(255,255,255,0.09)" stroke-width="1"/>
+<rect width="400" height="290" rx="12" fill="url(#bgGrad)"/>
+<rect width="400" height="290" rx="12" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1.2"/>
 
-<!-- Header -->
-<g transform="translate(18,18)">
-  <!-- Background icon (22px) at opacity 0.22 -->
-  <g opacity="0.22" fill="#cc785c" transform="scale(0.92)">
+<!-- Header Section -->
+<g transform="translate(16, 16)">
+  <!-- Official Widget Logo (Orange version) -->
+  <g transform="scale(0.85)">
     <path d="M 3.5,10 A 8.5,8.5 0 0,0 20.5,10 M 6.5,10 A 5.5,5.5 0 0,0 17.5,10" fill="none" stroke="#cc785c" stroke-width="1.8" stroke-linecap="round" />
-    <path d="M 12,2 C 12,6.5 13.5,8 18,8 C 13.5,8 12,9.5 12,14 C 12,9.5 10.5,8 6,8 C 10.5,8 12,6.5 12,2 Z" />
-    <path d="M 18.5,1.5 C 18.5,2.7 18.9,3.1 20.1,3.1 C 18.9,3.1 18.5,3.5 18.5,4.7 C 18.5,3.5 18.1,3.1 16.9,3.1 C 18.1,3.1 18.5,2.7 18.5,1.5 Z" />
+    <path d="M 12,2 C 12,6.5 13.5,8 18,8 C 13.5,8 12,9.5 12,14 C 12,9.5 10.5,8 6,8 C 10.5,8 12,6.5 12,2 Z" fill="#cc785c" />
+    <path d="M 18.5,1.5 C 18.5,2.7 18.9,3.1 20.1,3.1 C 18.9,3.1 18.5,3.5 18.5,4.7 C 18.5,3.5 18.1,3.1 16.9,3.1 C 18.1,3.1 18.5,2.7 18.5,1.5 Z" fill="#cc785c" />
   </g>
-  <!-- Foreground icon (18px) at opacity 1.0 -->
-  <g fill="#cc785c" transform="scale(0.75) translate(2.7, 2.7)">
-    <path d="M 3.5,10 A 8.5,8.5 0 0,0 20.5,10 M 6.5,10 A 5.5,5.5 0 0,0 17.5,10" fill="none" stroke="#cc785c" stroke-width="1.8" stroke-linecap="round" />
-    <path d="M 12,2 C 12,6.5 13.5,8 18,8 C 13.5,8 12,9.5 12,14 C 12,9.5 10.5,8 6,8 C 10.5,8 12,6.5 12,2 Z" />
-    <path d="M 18.5,1.5 C 18.5,2.7 18.9,3.1 20.1,3.1 C 18.9,3.1 18.5,3.5 18.5,4.7 C 18.5,3.5 18.1,3.1 16.9,3.1 C 18.1,3.1 18.5,2.7 18.5,1.5 Z" />
-  </g>
+  <text x="28" y="15" font-family="system-ui,-apple-system,sans-serif" font-size="14.5" font-weight="700" fill="#ffffff">Claude Usage</text>
 </g>
-<text x="48" y="25" font-family="sans-serif" font-size="13" font-weight="bold" fill="rgba(255,255,255,0.92)">Claude Usage</text>
-<text x="48" y="37" font-family="sans-serif" font-size="9" fill="rgba(255,255,255,0.35)">API quota tracking</text>
 
 <!-- Refresh Button -->
-<text x="292" y="29" font-family="sans-serif" font-size="14" fill="rgba(255,255,255,0.4)" text-anchor="middle">↻</text>
-
-<!-- Divider -->
-<rect x="16" y="46" width="280" height="1" fill="rgba(255,255,255,0.07)"/>
-
-<!-- ── 5 Hours Row ── -->
-<text x="20" y="66" font-family="sans-serif" font-size="11" font-weight="bold" fill="rgba(255,255,255,0.9)">5 Hours</text>
-<text x="120" y="66" font-family="sans-serif" font-size="9" fill="rgba(255,255,255,0.35)">· resets 01:40</text>
-
-<!-- Countdown Badge -->
-<rect x="206" y="55" width="56" height="16" rx="3" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
-<text x="234" y="66" text-anchor="middle" font-family="sans-serif" font-size="8" fill="rgba(255,255,255,0.7)">
-  <animate attributeName="opacity" values="1;0.6;1" dur="2s" repeatCount="indefinite"/>
-  in 4h 11m
-</text>
-
-<text x="286" y="66" text-anchor="end" font-family="monospace" font-size="13" font-weight="bold" fill="#e05252">13%</text>
-
-<!-- Segmented Bar 5h -->
-<g transform="translate(20,72)">
-  <!-- 20 segments, 3 filled for 13% -->
-  <rect x="0"   y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="0"   y="1" width="8"  height="6" rx="1.5" fill="url(#sessionGrad)"/>
-  <rect x="12"  y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="12"  y="1" width="8"  height="6" rx="1.5" fill="url(#sessionGrad)"/>
-  <rect x="24"  y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="24"  y="1" width="8"  height="6" rx="1.5" fill="url(#sessionGrad)"/>
-  <!-- Empty segments -->
-  <rect x="36"  y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="48"  y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="60"  y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="72"  y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="84"  y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="96"  y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="108" y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="120" y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="132" y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="144" y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="156" y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="168" y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="180" y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="192" y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="204" y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="216" y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="228" y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+<g transform="translate(366, 17) scale(0.9)">
+  <path d="M13.65 2.35A7 7 0 1 0 16 8h-2a5 5 0 1 1-1.7-3.43L10 7h6V1l-2.35 2.35z" fill="#9ca3af"/>
 </g>
 
-<!-- ── 7 Days Row ── -->
-<text x="20" y="106" font-family="sans-serif" font-size="11" font-weight="bold" fill="rgba(255,255,255,0.9)">7 Days</text>
-<text x="106" y="106" font-family="sans-serif" font-size="9" fill="rgba(255,255,255,0.35)">· resets May 23, 11:00</text>
+<!-- Tab Bar -->
+<g transform="translate(0, 0)">
+  <!-- Claude Tab (Active) -->
+  <rect x="16" y="52" width="117" height="28" rx="6" fill="#2d221e" stroke="#cc785c" stroke-width="1.2"/>
+  <circle cx="52" cy="66" r="3" fill="#cc785c"/>
+  <text x="62" y="70" font-family="system-ui,-apple-system,sans-serif" font-size="11.5" font-weight="700" fill="#ffffff">Claude</text>
 
-<!-- Countdown Badge -->
-<rect x="206" y="95" width="56" height="16" rx="3" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
-<text x="234" y="106" text-anchor="middle" font-family="sans-serif" font-size="8" fill="rgba(255,255,255,0.7)">in 13h 31m</text>
+  <!-- Antigravity Tab (Inactive) -->
+  <rect x="141" y="52" width="117" height="28" rx="6" fill="#1b202a" stroke="rgba(59,130,246,0.15)" stroke-width="1"/>
+  <circle cx="165" cy="66" r="3" fill="#3b82f6"/>
+  <text x="175" y="70" font-family="system-ui,-apple-system,sans-serif" font-size="11.5" font-weight="600" fill="#3b82f6">Antigravity</text>
 
-<!-- Text is red because 100% >= 90% danger threshold -->
-<text x="286" y="106" text-anchor="end" font-family="monospace" font-size="13" font-weight="bold" fill="#e05252">100%</text>
+  <!-- OpenAI Tab (Inactive) -->
+  <rect x="266" y="52" width="118" height="28" rx="6" fill="#1c2420" stroke="rgba(16,163,127,0.15)" stroke-width="1"/>
+  <circle cx="301" cy="66" r="3" fill="#10a37f"/>
+  <text x="311" y="70" font-family="system-ui,-apple-system,sans-serif" font-size="11.5" font-weight="600" fill="#10a37f">OpenAI</text>
+</g>
 
-<!-- Segmented Bar 7d -->
-<g transform="translate(20,112)">
-  <!-- 20 segments, 20 filled for 100% -->
-  <rect x="0"   y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="0"   y="1" width="8"  height="6" rx="1.5" fill="url(#weeklyGrad)"/>
-  <rect x="12"  y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="12"  y="1" width="8"  height="6" rx="1.5" fill="url(#weeklyGrad)"/>
-  <rect x="24"  y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="24"  y="1" width="8"  height="6" rx="1.5" fill="url(#weeklyGrad)"/>
-  <rect x="36"  y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="36"  y="1" width="8"  height="6" rx="1.5" fill="url(#weeklyGrad)"/>
-  <rect x="48"  y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="48"  y="1" width="8"  height="6" rx="1.5" fill="url(#weeklyGrad)"/>
-  <rect x="60"  y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="60"  y="1" width="8"  height="6" rx="1.5" fill="url(#weeklyGrad)"/>
-  <rect x="72"  y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="72"  y="1" width="8"  height="6" rx="1.5" fill="url(#weeklyGrad)"/>
-  <rect x="84"  y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="84"  y="1" width="8"  height="6" rx="1.5" fill="url(#weeklyGrad)"/>
-  <rect x="96"  y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="96"  y="1" width="8"  height="6" rx="1.5" fill="url(#weeklyGrad)"/>
-  <rect x="108" y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="108" y="1" width="8"  height="6" rx="1.5" fill="url(#weeklyGrad)"/>
-  <rect x="120" y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="120" y="1" width="8"  height="6" rx="1.5" fill="url(#weeklyGrad)"/>
-  <rect x="132" y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="132" y="1" width="8"  height="6" rx="1.5" fill="url(#weeklyGrad)"/>
-  <rect x="144" y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="144" y="1" width="8"  height="6" rx="1.5" fill="url(#weeklyGrad)"/>
-  <rect x="156" y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="156" y="1" width="8"  height="6" rx="1.5" fill="url(#weeklyGrad)"/>
-  <rect x="168" y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="168" y="1" width="8"  height="6" rx="1.5" fill="url(#weeklyGrad)"/>
-  <rect x="180" y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="180" y="1" width="8"  height="6" rx="1.5" fill="url(#weeklyGrad)"/>
-  <rect x="192" y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="192" y="1" width="8"  height="6" rx="1.5" fill="url(#weeklyGrad)"/>
-  <rect x="204" y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="204" y="1" width="8"  height="6" rx="1.5" fill="url(#weeklyGrad)"/>
-  <rect x="216" y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="216" y="1" width="8"  height="6" rx="1.5" fill="url(#weeklyGrad)"/>
-  <rect x="228" y="0" width="10" height="8" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-  <rect x="228" y="1" width="8"  height="6" rx="1.5" fill="url(#weeklyGrad)"/>
+<!-- User Row -->
+<g transform="translate(16, 96)">
+  <!-- User Profile Icon -->
+  <g fill="none" stroke="#cc785c" stroke-width="1.5">
+    <circle cx="10" cy="6" r="3"/>
+    <path d="M3,15 C3,11 6,10 10,10 C14,10 17,11 17,15" stroke-linecap="round"/>
+  </g>
+  <text x="28" y="13" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#9ca3af">Claude Code User</text>
+</g>
+
+<!-- PRO Badge -->
+<rect x="344" y="94" width="40" height="18" rx="4" fill="rgba(204,120,92,0.12)" stroke="rgba(204,120,92,0.3)" stroke-width="1"/>
+<text x="364" y="106" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="8.5" font-weight="700" fill="#cc785c">PRO</text>
+
+<!-- 5 Hours Row -->
+<g transform="translate(16, 126)">
+  <text x="0" y="11" font-family="system-ui,-apple-system,sans-serif" font-size="11.5" font-weight="700" fill="#ffffff">5 Hours</text>
+  <text x="56" y="10" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#9ca3af">· resets 01:50</text>
+  
+  <rect x="254" y="0" width="60" height="16" rx="3" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+  <text x="284" y="11" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="8" fill="rgba(255,255,255,0.7)">in 2h 24m</text>
+  
+  <text x="368" y="11" text-anchor="end" font-family="system-ui,-apple-system,sans-serif" font-size="12" font-weight="700" fill="#e05252">67%</text>
+
+  <!-- Segmented Bar (13 filled, 7 empty) -->
+  <g transform="translate(0, 20)">
+    <!-- 20 segments spanning exactly 0 to 368 -->
+    <rect x="0" y="0" width="15.5" height="6" rx="1.5" fill="url(#sessionGrad)"/>
+    <rect x="18.5" y="0" width="15.5" height="6" rx="1.5" fill="url(#sessionGrad)"/>
+    <rect x="37" y="0" width="15.5" height="6" rx="1.5" fill="url(#sessionGrad)"/>
+    <rect x="55.5" y="0" width="15.5" height="6" rx="1.5" fill="url(#sessionGrad)"/>
+    <rect x="74" y="0" width="15.5" height="6" rx="1.5" fill="url(#sessionGrad)"/>
+    <rect x="92.5" y="0" width="15.5" height="6" rx="1.5" fill="url(#sessionGrad)"/>
+    <rect x="111" y="0" width="15.5" height="6" rx="1.5" fill="url(#sessionGrad)"/>
+    <rect x="129.5" y="0" width="15.5" height="6" rx="1.5" fill="url(#sessionGrad)"/>
+    <rect x="148" y="0" width="15.5" height="6" rx="1.5" fill="url(#sessionGrad)"/>
+    <rect x="166.5" y="0" width="15.5" height="6" rx="1.5" fill="url(#sessionGrad)"/>
+    <rect x="185" y="0" width="15.5" height="6" rx="1.5" fill="url(#sessionGrad)"/>
+    <rect x="203.5" y="0" width="15.5" height="6" rx="1.5" fill="url(#sessionGrad)"/>
+    <rect x="222" y="0" width="15.5" height="6" rx="1.5" fill="url(#sessionGrad)"/>
+    
+    <!-- Empty segments -->
+    <rect x="240.5" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="259" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="277.5" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="296" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="314.5" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="333" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="351.5" y="0" width="16.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+  </g>
+</g>
+
+<!-- 7 Days Row -->
+<g transform="translate(16, 186)">
+  <text x="0" y="11" font-family="system-ui,-apple-system,sans-serif" font-size="11.5" font-weight="700" fill="#ffffff">7 Days</text>
+  <text x="48" y="10" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#9ca3af">· resets Jun 6, 11:00</text>
+  
+  <rect x="254" y="0" width="60" height="16" rx="3" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+  <text x="284" y="11" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="8" fill="rgba(255,255,255,0.7)">in 4d 11h</text>
+  
+  <text x="368" y="11" text-anchor="end" font-family="system-ui,-apple-system,sans-serif" font-size="12" font-weight="700" fill="#f5a623">7%</text>
+
+  <!-- Segmented Bar (1 filled, 19 empty) -->
+  <g transform="translate(0, 20)">
+    <rect x="0" y="0" width="15.5" height="6" rx="1.5" fill="url(#weeklyGrad)"/>
+    <!-- Empty segments -->
+    <rect x="18.5" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="37" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="55.5" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="74" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="92.5" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="111" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="129.5" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="148" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="166.5" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="185" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="203.5" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="222" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="240.5" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="259" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="277.5" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="296" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="314.5" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="333" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="351.5" y="0" width="16.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+  </g>
 </g>
 
 <!-- Footer -->
-<text x="296" y="154" text-anchor="end" font-family="sans-serif" font-size="8" fill="rgba(255,255,255,0.25)">updated 21:28</text>
+<text x="384" y="278" text-anchor="end" font-family="system-ui,-apple-system,sans-serif" font-size="9.5" fill="#6b7280">updated 23:23</text>
 
 </svg>

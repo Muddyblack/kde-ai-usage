@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./readme/icon.svg" width="120" alt="AI Usage Widget Logo">
+  <img src="./readme/icon.svg?v=7" width="120" alt="AI Usage Widget Logo">
 </p>
 
 
@@ -18,18 +18,23 @@
 
 <p align="center">
   <b>Panel Applet Views (Pill / Compact modes)</b><br/>
-  <img src="./readme/panel.svg?v=4" alt="Pill Panel view" width="160" valign="middle"/>
+  <img src="./readme/panel.svg?v=7" alt="Pill Panel view" width="160" valign="middle"/>
   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="./readme/panel_2.svg?v=4" alt="Compact Panel view" width="90" valign="middle"/>
+  <img src="./readme/panel_2.svg?v=8" alt="Compact Panel view" width="90" valign="middle"/>
 </p>
 
 <p align="center">
-  <img src="./readme/demo.svg?v=4" alt="Claude view" width="312" valign="top"/>
-  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="./readme/demo_2.svg?v=4" alt="Antigravity view" width="380" valign="top"/>
+  <img src="./readme/demo.svg?v=7" alt="Claude view" width="340" valign="top"/>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="./readme/demo_3.svg?v=7" alt="OpenAI view" width="340" valign="top"/>
+</p>
+<p align="center">
+  <img src="./readme/demo_2.svg?v=7" alt="Antigravity view" width="340" valign="top"/>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="./readme/settings.svg?v=7" alt="Settings view" width="340" valign="top"/>
 </p>
 
-A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple services. Monitor your **Claude** (5-hour session & 7-day weekly), **Antigravity/Google AI Studio**, and **OpenAI API** usage at a glance with animated segmented bars, live countdown timers, account status, and per-model breakdowns.
+A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple services. Monitor your **Claude** (5-hour session & 7-day weekly), **Antigravity/Google AI Studio**, **OpenAI API**, **Mistral AI**, and **OpenRouter** usage at a glance with animated segmented bars, live countdown timers, account status, and per-model breakdowns.
 
 ---
 
@@ -67,6 +72,17 @@ A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple serv
 - **Separate surfaces** — Codex/ChatGPT plan limits are not the same as OpenAI API organization billing usage
 - **Credential lookup** — Reads the widget setting first, then `$OPENAI_API_KEY`, `~/.config/openai-api-key`, `~/.openai/api-key`, and Codex auth metadata when available
 
+### Mistral AI *(untested)*
+- **Key validation** — Confirms the API key is accepted by Mistral
+- **Model list** — Shows how many models are available under the account
+- **Requires** — A Mistral API key set in widget settings
+
+### OpenRouter *(untested)*
+- **Spend tracking** — Shows USD spent against your credit limit (if one is set)
+- **Usage bar** — Fills proportionally to spend vs limit; empty if no limit is set
+- **Account label** — Displays the account name / identifier from the API
+- **Requires** — An OpenRouter API key set in widget settings
+
 ---
 
 ## Requirements
@@ -93,6 +109,16 @@ A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple serv
 |---|---|
 | OpenAI API key | Required for API token and cost usage via the organization Usage API |
 | Codex CLI | Optional; logged-in Codex sessions are shown as account status only |
+
+### For Mistral Support *(untested)*
+| Dependency | Notes |
+|---|---|
+| Mistral API key | Set in widget settings — no local config file is read |
+
+### For OpenRouter Support *(untested)*
+| Dependency | Notes |
+|---|---|
+| OpenRouter API key | Set in widget settings — no local config file is read |
 
 See [SETUP.md](SETUP.md) for detailed configuration instructions.
 
@@ -172,6 +198,12 @@ The widget reads credentials from the `antigravity-usage` CLI configuration (sto
 
 ### OpenAI
 The OpenAI tab has two independent sections. API usage is fetched from the official OpenAI organization usage endpoint with an API key and summarized over the last 30 days. Codex account status is read locally from `~/.codex/auth.json`; it confirms the Codex/ChatGPT login and plan metadata when present, but it does not provide API billing usage.
+
+### Mistral AI *(untested)*
+The widget validates the configured API key against the Mistral API and lists available models. No quota or usage data is currently shown — the tab confirms the key is valid and shows how many models the account can access.
+
+### OpenRouter *(untested)*
+The widget fetches credit usage and limit from the OpenRouter API using the configured key. The popup shows USD spent, the credit limit (if any), and the account label. The usage bar reflects spend as a percentage of the limit; if no limit is set the bar stays empty.
 
 **Privacy:** No credentials are stored or transmitted anywhere other than the official provider endpoints used by each tab.
 

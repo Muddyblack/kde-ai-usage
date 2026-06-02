@@ -1,0 +1,154 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
+<defs>
+  <linearGradient id="panelBg" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%"   stop-color="#181922"/>
+    <stop offset="100%" stop-color="#111218"/>
+  </linearGradient>
+  <linearGradient id="epic-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="#ff007f" />
+    <stop offset="35%" stop-color="#a855f7" />
+    <stop offset="70%" stop-color="#00f0ff" />
+    <stop offset="100%" stop-color="#00ff7f" />
+  </linearGradient>
+</defs>
+
+<!-- Card Background -->
+<rect width="400" height="300" rx="12" fill="url(#panelBg)"/>
+<rect width="400" height="300" rx="12" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1.2"/>
+
+<!-- Header -->
+<g transform="translate(16, 16)">
+  <!-- Settings Header Icon -->
+  <g transform="scale(0.85)">
+    <path d="M 3.5,10 A 8.5,8.5 0 0,0 20.5,10 M 6.5,10 A 5.5,5.5 0 0,0 17.5,10" fill="none" stroke="url(#epic-gradient)" stroke-width="1.8" stroke-linecap="round" />
+    <path d="M 12,2 C 12,6.5 13.5,8 18,8 C 13.5,8 12,9.5 12,14 C 12,9.5 10.5,8 6,8 C 10.5,8 12,6.5 12,2 Z" fill="url(#epic-gradient)" />
+    <path d="M 18.5,1.5 C 18.5,2.7 18.9,3.1 20.1,3.1 C 18.9,3.1 18.5,3.5 18.5,4.7 C 18.5,3.5 18.1,3.1 16.9,3.1 C 18.1,3.1 18.5,2.7 18.5,1.5 Z" fill="url(#epic-gradient)" />
+  </g>
+  <text x="28" y="15" font-family="system-ui,-apple-system,sans-serif" font-size="14.5" font-weight="700" fill="#ffffff">Settings</text>
+</g>
+
+<!-- Back Button (Arrow Left style) -->
+<g transform="translate(340, 16) scale(0.95)" opacity="0.8">
+  <!-- Circle button background -->
+  <rect width="20" height="20" rx="4" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+  <!-- Left arrow path -->
+  <path d="M 13,6 L 8,10 L 13,14 M 8,10 L 15,10" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+
+<!-- Refresh Button (↻) -->
+<g transform="translate(366, 17) scale(0.9)" opacity="0.6">
+  <path d="M13.65 2.35A7 7 0 1 0 16 8h-2a5 5 0 1 1-1.7-3.43L10 7h6V1l-2.35 2.35z" fill="#ffffff"/>
+</g>
+
+<!-- Divider -->
+<rect x="16" y="46" width="368" height="1" fill="rgba(255,255,255,0.08)"/>
+
+<!-- Services Section -->
+<text x="16" y="62" font-family="system-ui,-apple-system,sans-serif" font-size="9" font-weight="bold" fill="rgba(255,255,255,0.4)">SERVICES</text>
+
+<!-- Services Switches Row 1 -->
+<g transform="translate(16, 68)">
+  <!-- Claude Switch (Active) -->
+  <g transform="translate(0, 0)">
+    <circle cx="6" cy="9" r="3.5" fill="#cc785c"/>
+    <text x="14" y="12.5" font-family="system-ui,-apple-system,sans-serif" font-size="10.5" fill="rgba(255,255,255,0.85)">Claude</text>
+    <!-- Switch -->
+    <rect x="76" y="2" width="22" height="12" rx="6" fill="#3a86c8"/>
+    <circle cx="91" cy="8" r="5" fill="#1e2022" stroke="#3a86c8" stroke-width="1.2"/>
+  </g>
+
+  <!-- Antigravity Switch (Active) -->
+  <g transform="translate(122, 0)">
+    <circle cx="6" cy="9" r="3.5" fill="#3b82f6"/>
+    <text x="14" y="12.5" font-family="system-ui,-apple-system,sans-serif" font-size="10.5" fill="rgba(255,255,255,0.85)">Antigravity</text>
+    <!-- Switch -->
+    <rect x="84" y="2" width="22" height="12" rx="6" fill="#3a86c8"/>
+    <circle cx="99" cy="8" r="5" fill="#1e2022" stroke="#3a86c8" stroke-width="1.2"/>
+  </g>
+
+  <!-- OpenAI Switch (Active) -->
+  <g transform="translate(262, 0)">
+    <circle cx="6" cy="9" r="3.5" fill="#10a37f"/>
+    <text x="14" y="12.5" font-family="system-ui,-apple-system,sans-serif" font-size="10.5" fill="rgba(255,255,255,0.85)">OpenAI</text>
+    <!-- Switch -->
+    <rect x="62" y="2" width="22" height="12" rx="6" fill="#3a86c8"/>
+    <circle cx="77" cy="8" r="5" fill="#1e2022" stroke="#3a86c8" stroke-width="1.2"/>
+  </g>
+</g>
+
+<!-- Services Switches Row 2 -->
+<g transform="translate(16, 88)">
+  <!-- Mistral Switch (Inactive) -->
+  <g transform="translate(0, 0)">
+    <circle cx="6" cy="9" r="3.5" fill="#ff7000"/>
+    <text x="14" y="12.5" font-family="system-ui,-apple-system,sans-serif" font-size="10.5" fill="rgba(255,255,255,0.85)">Mistral</text>
+    <!-- Switch -->
+    <rect x="76" y="2" width="22" height="12" rx="6" fill="#31363b"/>
+    <circle cx="82" cy="8" r="5" fill="#1e2022" stroke="#7f8c8d" stroke-width="1.2"/>
+  </g>
+
+  <!-- OpenRouter Switch (Inactive) -->
+  <g transform="translate(122, 0)">
+    <circle cx="6" cy="9" r="3.5" fill="#9333ea"/>
+    <text x="14" y="12.5" font-family="system-ui,-apple-system,sans-serif" font-size="10.5" fill="rgba(255,255,255,0.85)">OpenRouter</text>
+    <!-- Switch -->
+    <rect x="84" y="2" width="22" height="12" rx="6" fill="#31363b"/>
+    <circle cx="90" cy="8" r="5" fill="#1e2022" stroke="#7f8c8d" stroke-width="1.2"/>
+  </g>
+</g>
+
+<!-- Divider -->
+<rect x="16" y="118" width="368" height="1" fill="rgba(255,255,255,0.08)"/>
+
+<!-- API Keys Section -->
+<text x="16" y="134" font-family="system-ui,-apple-system,sans-serif" font-size="9" font-weight="bold" fill="rgba(255,255,255,0.4)">API KEYS</text>
+
+<!-- API Inputs -->
+<g transform="translate(16, 142)">
+  <!-- Claude Admin -->
+  <g transform="translate(0, 0)">
+    <text x="0" y="13" font-family="system-ui,-apple-system,sans-serif" font-size="9.5" fill="rgba(255,255,255,0.6)">Claude Admin</text>
+    <rect x="94" y="0" width="248" height="18" rx="3" fill="#15151c" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+    <text x="100" y="12" font-family="monospace" font-size="9" fill="rgba(255,255,255,0.35)">sk-ant-api03-...</text>
+    <!-- Eye Icon -->
+    <path d="M354,7 C356,4.5 360,4.5 362,7 C360,9.5 356,9.5 354,7 Z M358,7 A 1.5 1.5 0 1 0 358 4 A 1.5 1.5 0 1 0 358 7 Z" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1" transform="translate(0, 2)"/>
+  </g>
+
+  <!-- OpenAI -->
+  <g transform="translate(0, 24)">
+    <text x="0" y="13" font-family="system-ui,-apple-system,sans-serif" font-size="9.5" fill="rgba(255,255,255,0.6)">OpenAI</text>
+    <rect x="94" y="0" width="248" height="18" rx="3" fill="#15151c" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+    <text x="100" y="12" font-family="monospace" font-size="9" fill="rgba(255,255,255,0.35)">sk-proj-...</text>
+    <!-- Eye Icon -->
+    <path d="M354,7 C356,4.5 360,4.5 362,7 C360,9.5 356,9.5 354,7 Z M358,7 A 1.5 1.5 0 1 0 358 4 A 1.5 1.5 0 1 0 358 7 Z" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1" transform="translate(0, 2)"/>
+  </g>
+
+  <!-- Google AI -->
+  <g transform="translate(0, 48)">
+    <text x="0" y="13" font-family="system-ui,-apple-system,sans-serif" font-size="9.5" fill="rgba(255,255,255,0.6)">Google AI</text>
+    <rect x="94" y="0" width="248" height="18" rx="3" fill="#15151c" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+    <text x="100" y="12" font-family="monospace" font-size="9" fill="rgba(255,255,255,0.35)">AIza...</text>
+    <!-- Eye Icon -->
+    <path d="M354,7 C356,4.5 360,4.5 362,7 C360,9.5 356,9.5 354,7 Z M358,7 A 1.5 1.5 0 1 0 358 4 A 1.5 1.5 0 1 0 358 7 Z" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1" transform="translate(0, 2)"/>
+  </g>
+
+  <!-- Mistral -->
+  <g transform="translate(0, 72)">
+    <text x="0" y="13" font-family="system-ui,-apple-system,sans-serif" font-size="9.5" fill="rgba(255,255,255,0.6)">Mistral</text>
+    <rect x="94" y="0" width="248" height="18" rx="3" fill="#15151c" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+    <text x="100" y="12" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="rgba(255,255,255,0.2)">or $MISTRAL_API_KEY</text>
+    <!-- Eye Icon -->
+    <path d="M354,7 C356,4.5 360,4.5 362,7 C360,9.5 356,9.5 354,7 Z M358,7 A 1.5 1.5 0 1 0 358 4 A 1.5 1.5 0 1 0 358 7 Z" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1" transform="translate(0, 2)"/>
+  </g>
+
+  <!-- OpenRouter -->
+  <g transform="translate(0, 96)">
+    <text x="0" y="13" font-family="system-ui,-apple-system,sans-serif" font-size="9.5" fill="rgba(255,255,255,0.6)">OpenRouter</text>
+    <rect x="94" y="0" width="248" height="18" rx="3" fill="#15151c" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+    <text x="100" y="12" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="rgba(255,255,255,0.2)">or $OPENROUTER_API_KEY</text>
+    <!-- Eye Icon -->
+    <path d="M354,7 C356,4.5 360,4.5 362,7 C360,9.5 356,9.5 354,7 Z M358,7 A 1.5 1.5 0 1 0 358 4 A 1.5 1.5 0 1 0 358 7 Z" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1" transform="translate(0, 2)"/>
+  </g>
+</g>
+
+</svg>

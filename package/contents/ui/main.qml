@@ -1130,7 +1130,9 @@ PlasmoidItem {
                 Item {
                     width: 22
                     height: 22
+                    // Masked Kirigami Icons (shown when NOT in Settings)
                     Kirigami.Icon {
+                        visible: !root.showSettings
                         anchors.centerIn: parent
                         width: 22
                         height: 22
@@ -1140,6 +1142,7 @@ PlasmoidItem {
                         opacity: 0.22
                     }
                     Kirigami.Icon {
+                        visible: !root.showSettings
                         anchors.centerIn: parent
                         width: 18
                         height: 18
@@ -1147,34 +1150,56 @@ PlasmoidItem {
                         isMask: true
                         color: root.tabColor(root.enabledTabs[root.activeTab] || "claude")
                     }
+
+                    // Raw Images with Rainbow Gradient (shown when in Settings)
+                    Image {
+                        visible: root.showSettings
+                        anchors.centerIn: parent
+                        width: 22
+                        height: 22
+                        sourceSize.width: 22
+                        sourceSize.height: 22
+                        source: Qt.resolvedUrl("../icons/org.muddyblack.aiUsageWidget.svg")
+                        opacity: 0.15
+                    }
+                    Image {
+                        visible: root.showSettings
+                        anchors.centerIn: parent
+                        width: 18
+                        height: 18
+                        sourceSize.width: 18
+                        sourceSize.height: 18
+                        source: Qt.resolvedUrl("../icons/org.muddyblack.aiUsageWidget.svg")
+                    }
                 }
 
                 ColumnLayout {
                     Layout.fillWidth: true
                     spacing: 0
                     PlasmaComponents.Label {
-                        text: root.showSettings ? "Settings" : "AI Usage Monitor"
+                        text: {
+                            if (root.showSettings)
+                                return "Settings";
+                            var tab = root.enabledTabs[root.activeTab];
+                            if (tab === "claude")
+                                return "Claude Usage";
+                            if (tab === "antigravity")
+                                return "Antigravity Usage";
+                            if (tab === "openai")
+                                return "OpenAI Usage";
+                            if (tab === "mistral")
+                                return "Mistral Usage";
+                            if (tab === "openrouter")
+                                return "OpenRouter Usage";
+                            return "AI Usage Monitor";
+                        }
                         font.bold: true
                         font.pixelSize: 15
                         color: Kirigami.Theme.textColor
                     }
                     PlasmaComponents.Label {
-                        text: {
-                            if (root.showSettings)
-                                return "Configure API keys and providers";
-                            var tab = root.enabledTabs[root.activeTab];
-                            if (tab === "claude")
-                                return "Claude API tracking";
-                            if (tab === "antigravity")
-                                return "Gemini / Code Assist quota";
-                            if (tab === "openai")
-                                return "OpenAI API & Codex status";
-                            if (tab === "mistral")
-                                return "Mistral AI key status";
-                            if (tab === "openrouter")
-                                return "OpenRouter credits & usage";
-                            return "";
-                        }
+                        visible: root.showSettings
+                        text: "Configure API keys and providers"
                         font.pixelSize: 10
                         opacity: 0.5
                         color: Kirigami.Theme.textColor
@@ -1474,8 +1499,9 @@ PlasmoidItem {
                         Layout.fillWidth: true
                     }
                     Rectangle {
-                        height: 18
-                        width: planLabelClaude.implicitWidth + 12
+                        implicitHeight: 18
+                        implicitWidth: planLabelClaude.implicitWidth + 16
+                        Layout.alignment: Qt.AlignVCenter
                         radius: 4
                         color: root.claudeSubscriptionType === "free" ? Qt.rgba(1, 1, 1, 0.06) : Qt.rgba(0.8, 0.47, 0.36, 0.18)
                         border.width: 1
@@ -1484,7 +1510,7 @@ PlasmoidItem {
                             id: planLabelClaude
                             anchors.centerIn: parent
                             text: root.claudeSubscriptionType.toUpperCase()
-                            font.pixelSize: 9
+                            font.pixelSize: 10
                             font.bold: true
                             color: root.claudeSubscriptionType === "free" ? Kirigami.Theme.textColor : root.claudeOrange
                         }
@@ -1516,11 +1542,21 @@ PlasmoidItem {
                     visible: root.showUsageChart && root.weeklyUsageHistory.length >= 1
                     Layout.fillWidth: true
                     height: 160
-                    radius: 8
-                    color: Qt.rgba(0.08, 0.05, 0.05, 0.85)
+                    radius: 10
+                    color: Qt.rgba(0.06, 0.04, 0.10, 0.90)
                     border.width: 1
-                    border.color: Qt.rgba(1, 1, 1, 0.10)
+                    border.color: Qt.rgba(1, 1, 1, 0.08)
                     clip: true
+
+                    // subtle inner top highlight
+                    Rectangle {
+                        anchors.top: parent.top
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        height: 1
+                        color: Qt.rgba(1, 1, 1, 0.10)
+                        radius: 10
+                    }
 
                     // Y-axis labels
                     PlasmaComponents.Label {
@@ -1529,7 +1565,7 @@ PlasmoidItem {
                         y: chartCanvas.y + 2
                         text: "100%"
                         font.pixelSize: 9
-                        opacity: 0.45
+                        opacity: 0.35
                         color: Kirigami.Theme.textColor
                     }
                     PlasmaComponents.Label {
@@ -1538,7 +1574,7 @@ PlasmoidItem {
                         y: chartCanvas.y + chartCanvas.height / 2 - 6
                         text: "50%"
                         font.pixelSize: 9
-                        opacity: 0.45
+                        opacity: 0.35
                         color: Kirigami.Theme.textColor
                     }
                     PlasmaComponents.Label {
@@ -1547,7 +1583,7 @@ PlasmoidItem {
                         y: chartCanvas.y + chartCanvas.height - 14
                         text: "0%"
                         font.pixelSize: 9
-                        opacity: 0.45
+                        opacity: 0.35
                         color: Kirigami.Theme.textColor
                     }
 
@@ -1558,12 +1594,14 @@ PlasmoidItem {
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.leftMargin: 36
-                        anchors.rightMargin: 6
-                        anchors.topMargin: 8
+                        anchors.rightMargin: 8
+                        anchors.topMargin: 10
                         anchors.bottomMargin: 2
 
                         property var history: root.weeklyUsageHistory
+                        property color accentColor: root.tabColor(root.enabledTabs[root.activeTab] || "claude")
                         onHistoryChanged: requestPaint()
+                        onAccentColorChanged: requestPaint()
                         onVisibleChanged: if (visible)
                             requestPaint()
                         onWidthChanged: requestPaint()
@@ -1576,77 +1614,117 @@ PlasmoidItem {
                             if (!pts || pts.length < 1)
                                 return;
 
-                            var minT = pts[0].t, maxT = pts[pts.length - 1].t;
-                            var tRange = maxT - minT;
-                            if (tRange === 0)
-                                tRange = 1;
-
-                            if (pts.length === 1) {
-                                var sx = w / 2, sy = py(pts[0].v);
-                                ctx.beginPath();
-                                ctx.arc(sx, sy, 4, 0, Math.PI * 2);
-                                ctx.fillStyle = "#3ecf8e";
-                                ctx.fill();
-                                ctx.beginPath();
-                                ctx.arc(sx, sy, 2, 0, Math.PI * 2);
-                                ctx.fillStyle = "#fff";
-                                ctx.fill();
-                                return;
-                            }
-
                             var w = width, h = height;
+                            var minT = pts[0].t, maxT = pts[pts.length - 1].t;
+                            var tRange = maxT - minT || 1;
+
                             function px(i) {
                                 return ((pts[i].t - minT) / tRange) * w;
                             }
+                            // small top/bottom margin so the glow dot isn't clipped by the canvas edge
                             function py(v) {
-                                return h - (v / 100) * h;
+                                return h - (v / 100) * h * 0.88 - h * 0.04;
                             }
 
-                            // horizontal grid lines at 0%, 50%, 100%
-                            ctx.strokeStyle = "rgba(255,255,255,0.07)";
+                            // build rgba string from the QML color object (components are 0–1)
+                            var acR = Math.round(accentColor.r * 255);
+                            var acG = Math.round(accentColor.g * 255);
+                            var acB = Math.round(accentColor.b * 255);
+                            function acRgba(a) {
+                                return "rgba(" + acR + "," + acG + "," + acB + "," + a + ")";
+                            }
+
+                            // dashed grid lines at 25 / 50 / 75 / 100%
+                            ctx.save();
+                            ctx.setLineDash([3, 5]);
+                            ctx.strokeStyle = "rgba(255,255,255,0.08)";
                             ctx.lineWidth = 1;
-                            [0, 50, 100].forEach(function (pct) {
+                            [25, 50, 75, 100].forEach(function (pct) {
                                 var y = py(pct);
                                 ctx.beginPath();
                                 ctx.moveTo(0, y);
                                 ctx.lineTo(w, y);
                                 ctx.stroke();
                             });
+                            ctx.restore();
 
-                            // filled area
-                            var grad = ctx.createLinearGradient(0, 0, 0, h);
-                            grad.addColorStop(0, "rgba(62,207,142,0.40)");
-                            grad.addColorStop(1, "rgba(62,207,142,0.02)");
+                            if (pts.length === 1) {
+                                var sx = w / 2, sy = py(pts[0].v);
+                                ctx.beginPath();
+                                ctx.arc(sx, sy, 7, 0, Math.PI * 2);
+                                ctx.fillStyle = acRgba(0.18);
+                                ctx.fill();
+                                ctx.beginPath();
+                                ctx.arc(sx, sy, 4, 0, Math.PI * 2);
+                                ctx.fillStyle = acRgba(1.0);
+                                ctx.fill();
+                                ctx.beginPath();
+                                ctx.arc(sx, sy, 1.8, 0, Math.PI * 2);
+                                ctx.fillStyle = "rgba(255,255,255,0.9)";
+                                ctx.fill();
+                                return;
+                            }
+
+                            // smooth cubic bezier path builder
+                            function buildPath() {
+                                ctx.moveTo(px(0), py(pts[0].v));
+                                for (var i = 0; i < pts.length - 1; i++) {
+                                    var x0 = px(i), y0 = py(pts[i].v);
+                                    var x1 = px(i + 1), y1 = py(pts[i + 1].v);
+                                    var cpx = x0 + (x1 - x0) * 0.5;
+                                    ctx.bezierCurveTo(cpx, y0, cpx, y1, x1, y1);
+                                }
+                            }
+
+                            // glow pass — wide soft stroke behind the crisp line
+                            ctx.save();
+                            ctx.shadowColor = acRgba(0.55);
+                            ctx.shadowBlur = 14;
                             ctx.beginPath();
-                            ctx.moveTo(px(0), py(pts[0].v));
-                            for (var i = 1; i < pts.length; i++)
-                                ctx.lineTo(px(i), py(pts[i].v));
+                            buildPath();
+                            ctx.strokeStyle = acRgba(0.70);
+                            ctx.lineWidth = 4;
+                            ctx.lineJoin = "round";
+                            ctx.lineCap = "round";
+                            ctx.stroke();
+                            ctx.restore();
+
+                            // filled gradient area
+                            var grad = ctx.createLinearGradient(0, 0, 0, h);
+                            grad.addColorStop(0, acRgba(0.28));
+                            grad.addColorStop(0.6, acRgba(0.08));
+                            grad.addColorStop(1, acRgba(0.0));
+                            ctx.beginPath();
+                            buildPath();
                             ctx.lineTo(px(pts.length - 1), h);
                             ctx.lineTo(px(0), h);
                             ctx.closePath();
                             ctx.fillStyle = grad;
                             ctx.fill();
 
-                            // line
+                            // crisp line on top
                             ctx.beginPath();
-                            ctx.moveTo(px(0), py(pts[0].v));
-                            for (var j = 1; j < pts.length; j++)
-                                ctx.lineTo(px(j), py(pts[j].v));
-                            ctx.strokeStyle = "#3ecf8e";
+                            buildPath();
+                            ctx.strokeStyle = acRgba(1.0);
                             ctx.lineWidth = 2;
                             ctx.lineJoin = "round";
+                            ctx.lineCap = "round";
                             ctx.stroke();
 
-                            // dot at latest point
+                            // latest point: halo + dot + white pip
                             var lx = px(pts.length - 1);
                             var ly = py(pts[pts.length - 1].v);
                             ctx.beginPath();
-                            ctx.arc(lx, ly, 4, 0, Math.PI * 2);
-                            ctx.fillStyle = "#3ecf8e";
+                            ctx.arc(lx, ly, 7, 0, Math.PI * 2);
+                            ctx.fillStyle = acRgba(0.18);
                             ctx.fill();
                             ctx.beginPath();
-                            ctx.arc(lx, ly, 2, 0, Math.PI * 2);
-                            ctx.fillStyle = "#fff";
+                            ctx.arc(lx, ly, 4, 0, Math.PI * 2);
+                            ctx.fillStyle = acRgba(1.0);
+                            ctx.fill();
+                            ctx.beginPath();
+                            ctx.arc(lx, ly, 1.8, 0, Math.PI * 2);
+                            ctx.fillStyle = "rgba(255,255,255,0.9)";
                             ctx.fill();
                         }
                     }
@@ -1658,7 +1736,7 @@ PlasmoidItem {
                         anchors.right: parent.right
                         anchors.bottom: parent.bottom
                         anchors.leftMargin: 36
-                        anchors.rightMargin: 6
+                        anchors.rightMargin: 8
                         anchors.bottomMargin: 5
                         spacing: 0
 
@@ -1670,7 +1748,7 @@ PlasmoidItem {
                                 return Qt.formatDate(new Date(pts[0].t), "MMM d");
                             }
                             font.pixelSize: 9
-                            opacity: 0.45
+                            opacity: 0.40
                             color: Kirigami.Theme.textColor
                         }
                         Item {
@@ -1685,7 +1763,7 @@ PlasmoidItem {
                                 return Qt.formatDate(new Date(mid.t), "MMM d");
                             }
                             font.pixelSize: 9
-                            opacity: 0.45
+                            opacity: 0.40
                             color: Kirigami.Theme.textColor
                         }
                         Item {
@@ -1699,7 +1777,7 @@ PlasmoidItem {
                                 return Qt.formatDate(new Date(pts[pts.length - 1].t), "MMM d");
                             }
                             font.pixelSize: 9
-                            opacity: 0.45
+                            opacity: 0.40
                             color: Kirigami.Theme.textColor
                         }
                     }
@@ -1913,8 +1991,9 @@ PlasmoidItem {
                     }
                     Rectangle {
                         visible: root.antigravityPlanType !== ""
-                        height: 18
-                        width: planLabel.implicitWidth + 12
+                        implicitHeight: 18
+                        implicitWidth: planLabel.implicitWidth + 16
+                        Layout.alignment: Qt.AlignVCenter
                         radius: 4
                         color: root.antigravityPlanType === "Free" ? Qt.rgba(1, 1, 1, 0.06) : Qt.rgba(0.26, 0.66, 0.33, 0.18)
                         border.width: 1
@@ -1923,7 +2002,7 @@ PlasmoidItem {
                             id: planLabel
                             anchors.centerIn: parent
                             text: root.antigravityPlanType
-                            font.pixelSize: 9
+                            font.pixelSize: 10
                             font.bold: true
                             color: root.antigravityPlanType === "Free" ? Kirigami.Theme.textColor : root.googleGreen
                         }
@@ -2266,8 +2345,9 @@ PlasmoidItem {
                             }
                             Rectangle {
                                 visible: root.openaiPlanType !== ""
-                                height: 18
-                                width: codexPlanLabel.implicitWidth + 12
+                                implicitHeight: 18
+                                implicitWidth: codexPlanLabel.implicitWidth + 16
+                                Layout.alignment: Qt.AlignVCenter
                                 radius: 4
                                 color: root.openaiPlanType === "free" ? Qt.rgba(1, 1, 1, 0.06) : Qt.rgba(0.063, 0.639, 0.498, 0.18)
                                 border.width: 1
@@ -2276,7 +2356,7 @@ PlasmoidItem {
                                     id: codexPlanLabel
                                     anchors.centerIn: parent
                                     text: root.openaiPlanType.toUpperCase()
-                                    font.pixelSize: 9
+                                    font.pixelSize: 10
                                     font.bold: true
                                     color: root.openaiPlanType === "free" ? Kirigami.Theme.textColor : root.openaiGreen
                                 }

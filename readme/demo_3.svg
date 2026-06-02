@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 290" width="400" height="290">
+<defs>
+  <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#181922"/>
+    <stop offset="100%" stop-color="#111218"/>
+  </linearGradient>
+</defs>
+
+<!-- Card Background -->
+<rect width="400" height="290" rx="12" fill="url(#bgGrad)"/>
+<rect width="400" height="290" rx="12" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1.2"/>
+
+<!-- Header Section -->
+<g transform="translate(16, 16)">
+  <!-- Official Widget Logo (Green version) -->
+  <g transform="scale(0.85)">
+    <path d="M 3.5,10 A 8.5,8.5 0 0,0 20.5,10 M 6.5,10 A 5.5,5.5 0 0,0 17.5,10" fill="none" stroke="#10a37f" stroke-width="1.8" stroke-linecap="round" />
+    <path d="M 12,2 C 12,6.5 13.5,8 18,8 C 13.5,8 12,9.5 12,14 C 12,9.5 10.5,8 6,8 C 10.5,8 12,6.5 12,2 Z" fill="#10a37f" />
+    <path d="M 18.5,1.5 C 18.5,2.7 18.9,3.1 20.1,3.1 C 18.9,3.1 18.5,3.5 18.5,4.7 C 18.5,3.5 18.1,3.1 16.9,3.1 C 18.1,3.1 18.5,2.7 18.5,1.5 Z" fill="#10a37f" />
+  </g>
+  <text x="28" y="15" font-family="system-ui,-apple-system,sans-serif" font-size="14.5" font-weight="700" fill="#ffffff">OpenAI Usage</text>
+</g>
+
+<!-- Refresh Button -->
+<g transform="translate(366, 17) scale(0.9)">
+  <path d="M13.65 2.35A7 7 0 1 0 16 8h-2a5 5 0 1 1-1.7-3.43L10 7h6V1l-2.35 2.35z" fill="#9ca3af"/>
+</g>
+
+<!-- Tab Bar -->
+<g transform="translate(0, 0)">
+  <!-- Claude Tab (Inactive) -->
+  <rect x="16" y="52" width="117" height="28" rx="6" fill="#221e1e" stroke="rgba(204,120,92,0.15)" stroke-width="1"/>
+  <circle cx="52" cy="66" r="3" fill="#cc785c"/>
+  <text x="62" y="70" font-family="system-ui,-apple-system,sans-serif" font-size="11.5" font-weight="600" fill="#cc785c">Claude</text>
+
+  <!-- Antigravity Tab (Inactive) -->
+  <rect x="141" y="52" width="117" height="28" rx="6" fill="#1b202a" stroke="rgba(59,130,246,0.15)" stroke-width="1"/>
+  <circle cx="165" cy="66" r="3" fill="#3b82f6"/>
+  <text x="175" y="70" font-family="system-ui,-apple-system,sans-serif" font-size="11.5" font-weight="600" fill="#3b82f6">Antigravity</text>
+
+  <!-- OpenAI Tab (Active) -->
+  <rect x="266" y="52" width="118" height="28" rx="6" fill="#162721" stroke="#10a37f" stroke-width="1.2"/>
+  <circle cx="301" cy="66" r="3" fill="#10a37f"/>
+  <text x="311" y="70" font-family="system-ui,-apple-system,sans-serif" font-size="11.5" font-weight="700" fill="#ffffff">OpenAI</text>
+</g>
+
+<!-- User Row -->
+<g transform="translate(16, 96)">
+  <!-- User Profile Icon -->
+  <g fill="none" stroke="#10a37f" stroke-width="1.5">
+    <circle cx="10" cy="6" r="3"/>
+    <path d="M3,15 C3,11 6,10 10,10 C14,10 17,11 17,15" stroke-linecap="round"/>
+  </g>
+  <text x="28" y="13" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#9ca3af">sample.user@openai.com</text>
+</g>
+
+<!-- API KEY Badge -->
+<rect x="330" y="94" width="54" height="18" rx="4" fill="rgba(16,163,127,0.12)" stroke="rgba(16,163,127,0.3)" stroke-width="1"/>
+<text x="357" y="106" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="8.5" font-weight="700" fill="#10a37f">API KEY</text>
+
+<!-- API Usage (30d) Row -->
+<g transform="translate(16, 126)">
+  <text x="0" y="11" font-family="system-ui,-apple-system,sans-serif" font-size="11.5" font-weight="700" fill="#ffffff" opacity="0.7">API Usage (30d)</text>
+  <text x="0" y="24" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#9ca3af" opacity="0.45">3.4M in  ·  1.2M out</text>
+  <text x="368" y="12" text-anchor="end" font-family="system-ui,-apple-system,sans-serif" font-size="13" font-weight="700" fill="#10a37f">$3.42</text>
+</g>
+
+<!-- Divider -->
+<rect x="16" y="162" width="368" height="1" fill="rgba(255,255,255,0.08)"/>
+
+<!-- Model Rows -->
+<g transform="translate(16, 172)">
+  <!-- Row 1: gpt-4o -->
+  <g transform="translate(0, 0)">
+    <text x="0" y="10" font-family="system-ui,-apple-system,sans-serif" font-size="9.8" fill="#c0caf5">gpt-4o</text>
+    <text x="140" y="10" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#9ca3af" opacity="0.4">2.1M in</text>
+    <text x="210" y="10" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#9ca3af" opacity="0.4">850K out</text>
+    <text x="368" y="10" text-anchor="end" font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="700" fill="#ffffff">$2.75</text>
+    <rect x="0" y="16" width="368" height="3" rx="1.5" fill="rgba(255,255,255,0.05)"/>
+    <rect x="0" y="16" width="296" height="3" rx="1.5" fill="#10a37f" opacity="0.7"/>
+  </g>
+
+  <!-- Row 2: gpt-3.5-turbo -->
+  <g transform="translate(0, 26)">
+    <text x="0" y="10" font-family="system-ui,-apple-system,sans-serif" font-size="9.8" fill="#c0caf5">gpt-3.5-turbo</text>
+    <text x="140" y="10" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#9ca3af" opacity="0.4">1.2M in</text>
+    <text x="210" y="10" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#9ca3af" opacity="0.4">320K out</text>
+    <text x="368" y="10" text-anchor="end" font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="700" fill="#ffffff">$0.62</text>
+    <rect x="0" y="16" width="368" height="3" rx="1.5" fill="rgba(255,255,255,0.05)"/>
+    <rect x="0" y="16" width="67" height="3" rx="1.5" fill="#10a37f" opacity="0.7"/>
+  </g>
+
+  <!-- Row 3: text-embedding-3-small -->
+  <g transform="translate(0, 52)">
+    <text x="0" y="10" font-family="system-ui,-apple-system,sans-serif" font-size="9.8" fill="#c0caf5">text-embed...</text>
+    <text x="140" y="10" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#9ca3af" opacity="0.4">100K in</text>
+    <text x="210" y="10" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#9ca3af" opacity="0.4">0 out</text>
+    <text x="368" y="10" text-anchor="end" font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="700" fill="#ffffff">$0.05</text>
+    <rect x="0" y="16" width="368" height="3" rx="1.5" fill="rgba(255,255,255,0.05)"/>
+    <rect x="0" y="16" width="5" height="3" rx="1.5" fill="#10a37f" opacity="0.7"/>
+  </g>
+</g>
+
+<!-- Footer -->
+<text x="384" y="278" text-anchor="end" font-family="system-ui,-apple-system,sans-serif" font-size="9.5" fill="#6b7280">updated 23:23</text>
+
+</svg>
