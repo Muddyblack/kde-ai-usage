@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+# History persistence helper for the AI Usage widget.
+#
+# Usage:
+#   history_io.sh autosave   — silently mirror $WIDGET_HISTORY_JSON to the latest file (no timestamped copy)
+#   history_io.sh autoload   — read the latest file for startup restore; delete it if unreadable
+#   history_io.sh export     — write $WIDGET_HISTORY_JSON to a timestamped file + latest, print its path
+#   history_io.sh import     — read the most recent file, print its JSON (delete if corrupt)
+#
+# Output is a single JSON object: {"ok":true,"path":…} | {"ok":true,"data":[…]} |
+#   {"ok":true,"empty":true} | {"error":…}.
+set -euo pipefail
+
+DIR="${XDG_DATA_HOME:-$HOME/.local/share}/ai-usage-widget"
+LATEST="$DIR/usage-history-latest.json"
+mkdir -p "$DIR"
+
+# JSON-escape a string. Prefer jq (a hard dependency of the other scripts); fall back to python3.
+jstr() {
+  if command -v jq >/dev/null 2>&1; then
+    printf '%s' "$1" | jq -Rs .
+  elif command -v python3 >/dev/null 2>&1; then
+    printf '%s' "$1" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))'
+  else
+    printf '"%s"' "$1"
+  fi
+}
+emit_err() { printf '{"error":%s}\n' "$(jstr "$1")"; }
+
+# Validate a file parses as a JSON array; on failure delete it and return non-zero.
+# Uses jq if present, else python3. If neither exists we cannot safely validate, so
+# we KEEP the file (never delete on a missing-tool false negative) and treat it as valid.
+validate_or_delete() {
+  local f="$1"
+  if command -v jq >/dev/null 2>&1; then
+    if jq -e 'type == "array"' "$f" >/dev/null 2>&1; then return 0; fi
+    rm -f "$f"; return 1
+  elif command -v python3 >/dev/null 2>&1; then
+    if python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); assert isinstance(d,list)' "$f" 2>/dev/null; then return 0; fi
+    rm -f "$f"; return 1
+  fi
+  # No validator available — don't risk deleting good data.
+  return 0
+}
+
+# Resolve which file to read: explicit path > latest > newest timestamped.
+resolve_src() {
+  local s="${WIDGET_HISTORY_IMPORT_PATH:-}"
+  if [ -n "$s" ] && [ -f "$s" ]; then printf '%s' "$s"; return; fi
+  if [ -f "$LATEST" ]; then printf '%s' "$LATEST"; return; fi
+  ls -t "$DIR"/usage-history-*.json 2>/dev/null | head -n1 || true
+}
+
+case "${1:-}" in
+  autosave)
+    json="${WIDGET_HISTORY_JSON:-}"
+    if [ -z "$json" ] || [ "$json" = "[]" ]; then
+      printf '{"ok":true,"empty":true}\n'
+      exit 0
+    fi
+    printf '%s' "$json" > "$LATEST"
+    printf '{"ok":true}\n'
+    ;;
+  autoload)
+    src="$(resolve_src)"
+    if [ -z "$src" ] || [ ! -f "$src" ]; then
+      printf '{"ok":true,"empty":true}\n'
+      exit 0
+    fi
+    if ! validate_or_delete "$src"; then
+      # corrupt / unknown format → deleted, start fresh, no error to the user
+      printf '{"ok":true,"empty":true,"deleted":true}\n'
+      exit 0
+    fi
+    printf '{"ok":true,"data":%s}\n' "$(cat "$src")"
+    ;;
+  export)
+    json="${WIDGET_HISTORY_JSON:-}"
+    if [ -z "$json" ] || [ "$json" = "[]" ]; then
+      emit_err "no history to export"
+      exit 0
+    fi
+    ts="$(date +%Y%m%d-%H%M%S)"
+    out="$DIR/usage-history-$ts.json"
+    printf '%s' "$json" > "$out"
+    printf '%s' "$json" > "$LATEST"
+    printf '{"ok":true,"path":%s}\n' "$(jstr "$out")"
+    ;;
+  import)
+    src="$(resolve_src)"
+    if [ -z "$src" ] || [ ! -f "$src" ]; then
+      emit_err "no saved history found in $DIR"
+      exit 0
+    fi
+    if ! validate_or_delete "$src"; then
+      emit_err "file was unreadable and has been removed"
+      exit 0
+    fi
+    printf '{"ok":true,"data":%s}\n' "$(cat "$src")"
+    ;;
+  *)
+    emit_err "unknown command"
+    ;;
+esac

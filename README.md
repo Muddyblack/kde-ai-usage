@@ -26,7 +26,7 @@
 <p align="center">
   <img src="./readme/demo.svg?v=7" alt="Claude view" width="340" valign="top"/>
   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="./readme/demo_3.svg?v=7" alt="OpenAI view" width="340" valign="top"/>
+  <img src="./readme/demo_3.svg?v=8" alt="OpenAI view" width="340" valign="top"/>
 </p>
 <p align="center">
   <img src="./readme/demo_2.svg?v=7" alt="Antigravity view" width="340" valign="top"/>
@@ -41,12 +41,21 @@ A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple serv
 ## Features
 
 - **Multi-service support** — Switch between Claude, Antigravity, OpenAI, Mistral, and OpenRouter tabs in the popup
-- **Panel view** — Compact percentage readouts in the taskbar, color-coded by usage level
+- **Panel view** — Compact percentage readouts in the taskbar, color-coded by usage level, with an inline spark-line trend
 - **Popup view** — Segmented bars showing exact fill level with reset times and countdowns
+- **Usage chart** — Smooth, glowing area chart of historical usage with a 5H / 7D window toggle and hover-scrub (point + timestamp on hover)
+- **Burn-rate ETA** — Estimates time to 100% from your recent trend (e.g. "↗ ~3h to 100%") on both the 5-hour and 7-day windows
+- **Period comparison** — Shows how today/this week compares to the same point last period (e.g. "+12% vs last week")
+- **Cost aggregation** — Combined API spend across Claude, OpenAI, and OpenRouter in the footer
+- **Animated readouts** — Percentages roll up/down smoothly; the chart's latest point pulses when usage is climbing fast
+- **Theme-aware accent** — Follows your Plasma accent color by default, or use per-service brand colors (toggle in settings)
+- **Glassmorphism popup** — Translucent, blurred popup styling
 - **Model breakdown** — See usage per model for providers that expose it
 - **Live countdowns** — Ticks down in real time, shows "resetting..." when the window flips
 - **Color thresholds** — Amber at 70%, red at 90%
-- **Auto-refresh** — Polls every 5 minutes, reads credentials from local config files
+- **Configurable refresh** — Poll interval from 1 to 30 minutes (default 5), reads credentials from local config files
+- **Pin a service** — Pin any tab so the widget opens to it; otherwise it stays on the last-viewed tab
+- **History export / import** — Save and restore usage history as JSON; history is also mirrored to disk so it survives reinstalls
 - **Stale indicator** — Dims if the last fetch failed, shows error inline
 - **Rate-limit backoff** — Respects `retry-after` headers, won't hammer the API
 
@@ -205,7 +214,10 @@ The widget validates the configured API key against the Mistral API and lists av
 ### OpenRouter *(untested)*
 The widget fetches credit usage and limit from the OpenRouter API using the configured key. The popup shows USD spent, the credit limit (if any), and the account label. The usage bar reflects spend as a percentage of the limit; if no limit is set the bar stays empty.
 
-**Privacy:** No credentials are stored or transmitted anywhere other than the official provider endpoints used by each tab.
+### Usage history
+Each refresh appends the current 5-hour and 7-day percentages to a rolling history (the last 500 samples) used by the chart, spark-lines, burn-rate ETA, and period comparison. History is stored in the widget's Plasma config **and** mirrored to `~/.local/share/ai-usage-widget/usage-history-latest.json`, so it survives a full uninstall/reinstall — on first launch with no config history, the widget restores from that file automatically. You can also manually **Export** (writes a timestamped JSON copy) and **Import** from the settings panel. If a saved file is unreadable or in an unrecognized format, it's discarded and history starts fresh rather than erroring out.
+
+**Privacy:** No credentials are stored or transmitted anywhere other than the official provider endpoints used by each tab. Usage history (percentages and timestamps only) is written locally to `~/.local/share/ai-usage-widget/`.
 
 ---
 

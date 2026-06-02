@@ -41,5 +41,25 @@
     <entry name="weeklyUsageHistory" type="String">
       <default></default>
     </entry>
+    <!-- Unified usage history: JSON array of {t, s, w} (session %, weekly %). Migrated from weeklyUsageHistory. -->
+    <entry name="usageHistory" type="String">
+      <default></default>
+    </entry>
+    <!-- Accent color mode: true = follow Plasma accent (highlightColor), false = per-service colors -->
+    <entry name="useThemeAccent" type="Bool">
+      <default>true</default>
+    </entry>
+    <!-- Pinned tab id (e.g. "claude"); empty = auto (show active/first enabled) -->
+    <entry name="pinnedTab" type="String">
+      <default></default>
+    </entry>
+    <!-- Chart window: "weekly" (7d) or "session" (5h) -->
+    <entry name="chartWindow" type="String">
+      <default>weekly</default>
+    </entry>
+    <!-- Poll interval in seconds (applies to all services) -->
+    <entry name="pollIntervalSec" type="Int">
+      <default>300</default>
+    </entry>
   </group>
 </kcfg>
