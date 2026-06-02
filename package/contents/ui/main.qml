@@ -103,6 +103,14 @@ PlasmoidItem {
     }
 
     property int activeTab: 0
+    // Tab shown in the panel (compact) representation. When a service is pinned
+    // the panel always shows that service, regardless of where the popup was last
+    // left. Without a pin it mirrors the in-popup active tab.
+    readonly property string panelTab: {
+        if (root.pinnedTab !== "" && root.enabledTabs.indexOf(root.pinnedTab) >= 0)
+            return root.pinnedTab;
+        return root.enabledTabs[root.activeTab] || "";
+    }
     property real chartTimeOffset: 0
     onChartWindowChanged: {
         root.chartTimeOffset = 0;
@@ -750,6 +758,19 @@ PlasmoidItem {
         // When pinning, jump the active view to that tab.
         if (next !== "") {
             var idx = root.enabledTabs.indexOf(next);
+            if (idx >= 0 && idx !== root.activeTab) {
+                root.activeTab = idx;
+                root.errorMsg = "";
+                root.refresh();
+            }
+        }
+    }
+
+    // When the popup opens, snap back to the pinned service so the user always
+    // lands on it — not wherever they happened to leave the popup last time.
+    onExpandedChanged: {
+        if (root.expanded && root.pinnedTab !== "") {
+            var idx = root.enabledTabs.indexOf(root.pinnedTab);
             if (idx >= 0 && idx !== root.activeTab) {
                 root.activeTab = idx;
                 root.errorMsg = "";
@@ -1760,12 +1781,12 @@ PlasmoidItem {
             PanelSlot {
                 pct: root.sessionPct
                 iconColor: root.sessionColor
-                stale: root.stale && root.enabledTabs[root.activeTab] === "claude"
-                visible: root.enabledTabs[root.activeTab] === "claude"
+                stale: root.stale && root.panelTab === "claude"
+                visible: root.panelTab === "claude"
                 tooltipText: "Claude 5-hour: " + Math.round(root.sessionPct) + "%" + (root.sessionTokenLimit > 0 ? "\n" + root.formatTokens(root.sessionTokensUsed) + " / " + root.formatTokens(root.sessionTokenLimit) : "")
             }
             Rectangle {
-                visible: root.enabledTabs[root.activeTab] === "claude"
+                visible: root.panelTab === "claude"
                 width: 1
                 height: 14
                 color: Qt.rgba(1, 1, 1, 0.16)
@@ -1774,16 +1795,16 @@ PlasmoidItem {
             PanelSlot {
                 pct: root.weeklyPct
                 iconColor: root.weeklyColor
-                stale: root.stale && root.enabledTabs[root.activeTab] === "claude"
-                visible: root.enabledTabs[root.activeTab] === "claude"
+                stale: root.stale && root.panelTab === "claude"
+                visible: root.panelTab === "claude"
                 tooltipText: "Claude 7-day: " + Math.round(root.weeklyPct) + "%" + (root.weeklyTokenLimit > 0 ? "\n" + root.formatTokens(root.weeklyTokensUsed) + " / " + root.formatTokens(root.weeklyTokenLimit) : "")
             }
 
             PanelSlot {
                 pct: root.antigravityPct
                 iconColor: root.googleBlue
-                stale: root.stale && root.enabledTabs[root.activeTab] === "antigravity"
-                visible: root.enabledTabs[root.activeTab] === "antigravity"
+                stale: root.stale && root.panelTab === "antigravity"
+                visible: root.panelTab === "antigravity"
                 tooltipText: "Gemini quota: " + Math.round(root.antigravityPct) + "%" + (root.antigravityPlanType ? "\nPlan: " + root.antigravityPlanType : "") + (root.antigravityEmail ? "\n" + root.antigravityEmail : "")
             }
 
@@ -1792,14 +1813,14 @@ PlasmoidItem {
                 // 5-hour window % so the panel reflects "messages left" at a glance.
                 pct: root.codexUsageAvailable ? root.codexPrimaryPct : (root.openaiTotalCostUSD > 0 ? Math.min(100, (root.openaiTotalCostUSD / 10) * 100) : 0)
                 iconColor: root.openaiGreen
-                stale: root.stale && root.enabledTabs[root.activeTab] === "openai"
-                visible: root.enabledTabs[root.activeTab] === "openai"
+                stale: root.stale && root.panelTab === "openai"
+                visible: root.panelTab === "openai"
                 showCost: !root.codexUsageAvailable
                 costText: root.openaiTotalCostUSD > 0 ? "$" + root.openaiTotalCostUSD.toFixed(2) : (root._openaiApiKey ? "API" : (root.openaiCodexLoggedIn ? "Codex" : "—"))
                 tooltipText: "OpenAI" + (root.codexUsageAvailable ? "\nCodex 5h: " + Math.round(100 - root.codexPrimaryPct) + "% left  ·  weekly: " + Math.round(100 - root.codexSecondaryPct) + "% left" : "") + (root._openaiApiKey ? "\nAPI usage configured\nCost (30d): $" + root.openaiTotalCostUSD.toFixed(2) + "\nIn: " + root.formatTokens(root.openaiTotalInputTokens) + "  Out: " + root.formatTokens(root.openaiTotalOutputTokens) : "\nAPI usage needs an OpenAI API key") + (root.openaiCodexLoggedIn ? "\nCodex signed in" + (root.openaiEmail ? ": " + root.openaiEmail : "") : "")
             }
             Rectangle {
-                visible: root.enabledTabs[root.activeTab] === "openai" && root.codexUsageAvailable
+                visible: root.panelTab === "openai" && root.codexUsageAvailable
                 width: 1
                 height: 14
                 color: Qt.rgba(1, 1, 1, 0.16)
@@ -1808,8 +1829,8 @@ PlasmoidItem {
             PanelSlot {
                 pct: root.codexSecondaryPct
                 iconColor: root.openaiGreen
-                stale: root.stale && root.enabledTabs[root.activeTab] === "openai"
-                visible: root.enabledTabs[root.activeTab] === "openai" && root.codexUsageAvailable
+                stale: root.stale && root.panelTab === "openai"
+                visible: root.panelTab === "openai" && root.codexUsageAvailable
                 showCost: false
                 tooltipText: "OpenAI Codex weekly: " + Math.round(100 - root.codexSecondaryPct) + "% left"
             }
@@ -1817,8 +1838,8 @@ PlasmoidItem {
             PanelSlot {
                 pct: 0
                 iconColor: root.mistralOrange
-                stale: root.stale && root.enabledTabs[root.activeTab] === "mistral"
-                visible: root.enabledTabs[root.activeTab] === "mistral"
+                stale: root.stale && root.panelTab === "mistral"
+                visible: root.panelTab === "mistral"
                 showCost: true
                 costText: root.mistralVibeTotalCost > 0 ? "$" + root.mistralVibeTotalCost.toFixed(2) : (root.mistralKeyValid ? "✓ key" : "—")
                 tooltipText: "Mistral AI" + (root.mistralKeyValid ? "\nAPI key configured" : "\nNo key set") + (root.mistralVibeTotalCost > 0 ? "\nSpend (vibe): $" + root.mistralVibeTotalCost.toFixed(4) : "") + (root.mistralAvailableModels.length > 0 ? "\n" + root.mistralAvailableModels.length + " models" : "")
@@ -1827,8 +1848,8 @@ PlasmoidItem {
             PanelSlot {
                 pct: root.openrouterLimitUSD !== null && root.openrouterLimitUSD > 0 ? Math.min(100, (root.openrouterUsageUSD / root.openrouterLimitUSD) * 100) : 0
                 iconColor: root.openrouterPurple
-                stale: root.stale && root.enabledTabs[root.activeTab] === "openrouter"
-                visible: root.enabledTabs[root.activeTab] === "openrouter" && !root.showSettings
+                stale: root.stale && root.panelTab === "openrouter"
+                visible: root.panelTab === "openrouter" && !root.showSettings
                 showCost: true
                 costText: root.openrouterKeyValid ? (root.openrouterUsageUSD > 0 ? "$" + root.openrouterUsageUSD.toFixed(3) : "✓ key") : "—"
                 tooltipText: "OpenRouter" + (root.openrouterLabel ? "\n" + root.openrouterLabel : "") + (root.openrouterUsageUSD > 0 ? "\nUsed: $" + root.openrouterUsageUSD.toFixed(4) : "") + (root.openrouterLimitUSD !== null ? "\nLimit: $" + root.openrouterLimitUSD.toFixed(2) : "")
