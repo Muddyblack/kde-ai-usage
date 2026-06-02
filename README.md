@@ -6,35 +6,39 @@
 <h1 align="center">AI Usage Widget</h1>
 
 <p align="center">
-  <a href="https://github.com/Muddyblack/kde-ai-usage">
-    <img src="https://img.shields.io/badge/KDE_Store-Coming_Soon-orange?style=for-the-badge&logo=kde&logoColor=white" alt="KDE Store" />
+  <a href="https://www.opendesktop.org/p/2361382/">
+    <img src="https://img.shields.io/badge/KDE_Store-Download-1d99f3?style=for-the-badge&logo=kde&logoColor=white" alt="KDE Store" />
   </a>
   <img src="https://img.shields.io/badge/KDE_Plasma-6.0%2B-1d99f3?style=for-the-badge&logo=kde&logoColor=white" alt="KDE Plasma 6.0+" />
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge" alt="License: MIT" />
   </a>
-  <img src="https://img.shields.io/github/downloads/Muddyblack/kde-ai-usage/total?style=for-the-badge&logo=kdeplasma&logoColor=white&label=Downloads&color=blue" alt="Downloads" />
+  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.pling.com%2Focs%2Fv1%2Fcontent%2Fdata%2F2361382%3Fformat%3Djson&query=%24.data%5B0%5D.downloads&label=KDE%20Downloads&style=for-the-badge&color=1d99f3&logo=kde&logoColor=white" alt="KDE Store Downloads" />
+  <img src="https://img.shields.io/github/downloads/Muddyblack/kde-ai-usage/total?style=for-the-badge&logo=github&logoColor=white&label=GitHub%20Downloads&color=blue" alt="GitHub Downloads" />
 </p>
 
 <p align="center">
-  <b>Panel Applet Views (Pill / Compact modes)</b><br/>
+  <b>Panel — Pill &amp; Compact modes</b><br/><br/>
   <img src="./readme/panel.svg?v=7" alt="Pill Panel view" width="160" valign="middle"/>
   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
   <img src="./readme/panel_2.svg?v=8" alt="Compact Panel view" width="90" valign="middle"/>
 </p>
 
 <p align="center">
-  <img src="./readme/demo.svg?v=7" alt="Claude view" width="340" valign="top"/>
+  <b>Popup — Provider tabs</b><br/><br/>
+  <img src="./readme/demo.svg?v=7" alt="Claude tab" width="340" valign="top"/>
   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="./readme/demo_3.svg?v=8" alt="OpenAI view" width="340" valign="top"/>
+  <img src="./readme/demo_2.svg?v=7" alt="Antigravity tab" width="340" valign="top"/>
 </p>
 <p align="center">
-  <img src="./readme/demo_chart.svg?v=1" alt="Usage Chart view" width="340" valign="top"/>
+  <img src="./readme/demo_3.svg?v=8" alt="OpenAI tab" width="340" valign="top"/>
   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="./readme/settings.svg?v=7" alt="Settings view" width="340" valign="top"/>
+  <img src="./readme/demo_chart.svg?v=1" alt="Usage Chart" width="340" valign="top"/>
 </p>
+
 <p align="center">
-  <img src="./readme/demo_2.svg?v=7" alt="Antigravity view" width="340" valign="top"/>
+  <b>Settings</b><br/><br/>
+  <img src="./readme/settings.svg?v=7" alt="Settings panel" width="340" valign="top"/>
 </p>
 
 A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple services. Monitor your **Claude** (5-hour session & 7-day weekly), **Antigravity/Google AI Studio**, **OpenAI API**, **Mistral AI**, and **OpenRouter** usage at a glance with animated segmented bars, live countdown timers, account status, and per-model breakdowns.
