@@ -50,7 +50,7 @@ A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple serv
 - **Multi-service support** — Switch between Claude, Antigravity, OpenAI, Mistral, and OpenRouter tabs in the popup
 - **Panel view** — Compact percentage readouts in the taskbar, color-coded by usage level, with an inline spark-line trend
 - **Popup view** — Segmented bars showing exact fill level with reset times and countdowns
-- **Usage chart** — Smooth, glowing area chart of historical usage with a 5H / 7D window toggle and hover-scrub (point + timestamp on hover)
+- **Usage chart** — Smooth, glowing area chart of historical usage with a 5H / 24H / 7D window toggle and hover-scrub (point + timestamp on hover). The 24H window plots the session percentage across the whole day, so each 5-hour limit climbing toward 100% and resetting shows up as a sawtooth burn pattern.
 - **Burn-rate ETA** — Estimates time to 100% from your recent trend (e.g. "↗ ~3h to 100%") on both the 5-hour and 7-day windows
 - **Period comparison** — Shows how today/this week compares to the same point last period (e.g. "+12% vs last week")
 - **Cost aggregation** — Combined API spend across Claude, OpenAI, and OpenRouter in the footer

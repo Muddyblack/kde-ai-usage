@@ -151,6 +151,10 @@ Rectangle {
                             label: "5H"
                         },
                         {
+                            id: "codex_day",
+                            label: "24H"
+                        },
+                        {
                             id: "codex_weekly",
                             label: "7D"
                         }
@@ -159,6 +163,10 @@ Rectangle {
                     {
                         id: "session",
                         label: "5H"
+                    },
+                    {
+                        id: "day",
+                        label: "24H"
                     },
                     {
                         id: "weekly",
@@ -192,6 +200,12 @@ Rectangle {
                     onClicked: {
                         rootItem.chartWindow = modelData.id;
                         Plasmoid.configuration.chartWindow = modelData.id;
+                        // Remember the granularity so it carries to other tabs
+                        var gran = rootItem._windowGranularity(modelData.id);
+                        if (gran !== "") {
+                            rootItem.chartGranularity = gran;
+                            Plasmoid.configuration.chartGranularity = gran;
+                        }
                     }
                 }
             }
@@ -560,7 +574,7 @@ Rectangle {
         spacing: 0
 
         function formatLabel(timestamp) {
-            if (rootItem.chartWindow === "session" || rootItem.chartWindow === "codex_primary") {
+            if (rootItem.chartWindow === "session" || rootItem.chartWindow === "codex_primary" || rootItem.chartWindow === "day" || rootItem.chartWindow === "codex_day") {
                 return Qt.formatTime(new Date(timestamp), "hh:mm");
             }
             return Qt.formatDate(new Date(timestamp), "MMM d");

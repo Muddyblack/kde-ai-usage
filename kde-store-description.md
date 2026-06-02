@@ -20,7 +20,7 @@ Switch between tabs in the popup for each service:
 
 - 📊 **Burn-rate ETA** — tells you *"↗ ~3h to 100%"* so you can pace yourself instead of getting surprised
 - ⏱️ **Countdown timers** — ticks down to your next quota reset (refreshes every ~5 min to stay friendly to the APIs)
-- 📈 **Usage chart** — a smooth, glowing trend graph with 5H / 7D toggle and hover-scrub
+- 📈 **Usage chart** — a smooth, glowing trend graph with 5H / 24H / 7D toggle and hover-scrub (24H shows the whole day's session burn as a sawtooth)
 - 📉 **Period comparison** — *"+12% vs last week"* at the same point in the cycle
 - 🎨 **Theme-aware** — follows your Plasma accent by default, or flip on per-service brand colors
 - 🫧 **Glassmorphism popup** — translucent, blurred, and honestly just nice to look at

@@ -108,28 +108,14 @@ PlasmoidItem {
         root.chartTimeOffset = 0;
     }
     onActiveTabChanged: {
-        // Switch chart window to the right series when tabs change so the chart
-        // always shows meaningful data without requiring a manual toggle.
+        // Map the remembered granularity (5h/24h/7d) onto the new tab so the
+        // selected time range carries across services. Single-window tabs just
+        // show their one window without disturbing the remembered granularity.
         var tab = root.enabledTabs[root.activeTab] || "";
-        if (tab === "openai") {
-            if (root.chartWindow !== "codex_primary" && root.chartWindow !== "codex_weekly") {
-                root.chartWindow = "codex_primary";
-                Plasmoid.configuration.chartWindow = "codex_primary";
-            }
-        } else if (tab === "claude") {
-            if (root.chartWindow !== "session" && root.chartWindow !== "weekly") {
-                root.chartWindow = "weekly";
-                Plasmoid.configuration.chartWindow = "weekly";
-            }
-        } else if (tab === "antigravity") {
-            root.chartWindow = "antigravity";
-            Plasmoid.configuration.chartWindow = "antigravity";
-        } else if (tab === "openrouter") {
-            root.chartWindow = "openrouter";
-            Plasmoid.configuration.chartWindow = "openrouter";
-        } else if (tab === "mistral") {
-            root.chartWindow = "mistral";
-            Plasmoid.configuration.chartWindow = "mistral";
+        var win = root._windowForTab(tab, root.chartGranularity);
+        if (root.chartWindow !== win) {
+            root.chartWindow = win;
+            Plasmoid.configuration.chartWindow = win;
         }
         root.chartTimeOffset = 0;
     }
@@ -260,12 +246,53 @@ PlasmoidItem {
     property string chartWindow: Plasmoid.configuration.chartWindow || "weekly"
     readonly property int historyLimit: 500
 
+    // Granularity ("5h" | "24h" | "7d") is remembered across tabs so switching
+    // services keeps the same time range. Tabs with a single fixed window
+    // (antigravity/openrouter/mistral) ignore it but don't clobber it, so you
+    // return to your previous range when you go back to a multi-window tab.
+    property string chartGranularity: {
+        // Prefer a saved granularity; otherwise derive it from the saved window
+        // (so existing users keep whatever range their last chartWindow implied).
+        var saved = Plasmoid.configuration.chartGranularity || "";
+        if (saved !== "")
+            return saved;
+        var fromWin = root._windowGranularity(Plasmoid.configuration.chartWindow || "");
+        return fromWin !== "" ? fromWin : "7d";
+    }
+
+    // Granularity of a given window ID ("" for single-window tabs).
+    function _windowGranularity(win) {
+        if (win === "session" || win === "codex_primary")
+            return "5h";
+        if (win === "day" || win === "codex_day")
+            return "24h";
+        if (win === "weekly" || win === "codex_weekly")
+            return "7d";
+        return "";
+    }
+
+    // Window ID for a tab at the current granularity. Single-window tabs return
+    // their only ID; multi-window tabs fall back to 7d if the granularity is unset.
+    function _windowForTab(tab, gran) {
+        if (tab === "claude")
+            return gran === "5h" ? "session" : gran === "24h" ? "day" : "weekly";
+        if (tab === "openai")
+            return gran === "5h" ? "codex_primary" : gran === "24h" ? "codex_day" : "codex_weekly";
+        if (tab === "antigravity")
+            return "antigravity";
+        if (tab === "openrouter")
+            return "openrouter";
+        if (tab === "mistral")
+            return "mistral";
+        return "weekly";
+    }
+
     function _historyKey() {
-        if (root.chartWindow === "session")
+        if (root.chartWindow === "session" || root.chartWindow === "day")
             return "s";
         if (root.chartWindow === "weekly")
             return "w";
-        if (root.chartWindow === "codex_primary")
+        if (root.chartWindow === "codex_primary" || root.chartWindow === "codex_day")
             return "cp";
         if (root.chartWindow === "codex_weekly")
             return "cw";
@@ -282,6 +309,9 @@ PlasmoidItem {
         var win = root.chartWindow;
         if (win === "session" || win === "codex_primary") {
             return 5 * 3600000; // 5 hours in ms
+        }
+        if (win === "day" || win === "codex_day") {
+            return 24 * 3600000; // 24 hours in ms
         }
         if (win === "weekly" || win === "codex_weekly") {
             return 7 * 24 * 3600000; // 7 days in ms
@@ -302,8 +332,8 @@ PlasmoidItem {
         var minDate = new Date(minT);
         var maxDate = new Date(maxT);
 
-        var is5h = (root.chartWindow === "session" || root.chartWindow === "codex_primary");
-        if (is5h) {
+        var isHourly = (root.chartWindow === "session" || root.chartWindow === "codex_primary" || root.chartWindow === "day" || root.chartWindow === "codex_day");
+        if (isHourly) {
             if (minDate.toDateString() === maxDate.toDateString()) {
                 return Qt.formatDateTime(minDate, "hh:mm") + " - " + Qt.formatDateTime(maxDate, "hh:mm") + " (" + Qt.formatDateTime(maxDate, "MMM d") + ")";
             } else {
@@ -1072,6 +1102,7 @@ PlasmoidItem {
             var output = (data["stdout"] || "").trim();
             if (!output) {
                 root.errorMsg = "Antigravity not configured";
+                root.stale = root.lastUpdate !== "";
                 return;
             }
             try {
@@ -1186,6 +1217,7 @@ PlasmoidItem {
                 root.openaiTotalInputTokens = 0;
                 root.openaiTotalOutputTokens = 0;
                 root.errorMsg = "OpenAI: no API key or Codex login";
+                root.stale = root.lastUpdate !== "";
             }
         }
     }
@@ -1201,6 +1233,7 @@ PlasmoidItem {
             var output = (data["stdout"] || "").trim();
             if (!output || output === "{}") {
                 root.errorMsg = "Mistral: no API key configured";
+                root.stale = root.lastUpdate !== "";
                 return;
             }
             try {
@@ -1250,6 +1283,7 @@ PlasmoidItem {
             var output = (data["stdout"] || "").trim();
             if (!output || output === "{}") {
                 root.errorMsg = "OpenRouter: no API key configured";
+                root.stale = root.lastUpdate !== "";
                 return;
             }
             try {
@@ -1786,8 +1820,8 @@ PlasmoidItem {
                 stale: root.stale && root.enabledTabs[root.activeTab] === "mistral"
                 visible: root.enabledTabs[root.activeTab] === "mistral"
                 showCost: true
-                costText: root.mistralKeyValid ? "✓ key" : "—"
-                tooltipText: "Mistral AI" + (root.mistralKeyValid ? "\nAPI key configured" : "\nNo key set") + (root.mistralAvailableModels.length > 0 ? "\n" + root.mistralAvailableModels.length + " models" : "")
+                costText: root.mistralVibeTotalCost > 0 ? "$" + root.mistralVibeTotalCost.toFixed(2) : (root.mistralKeyValid ? "✓ key" : "—")
+                tooltipText: "Mistral AI" + (root.mistralKeyValid ? "\nAPI key configured" : "\nNo key set") + (root.mistralVibeTotalCost > 0 ? "\nSpend (vibe): $" + root.mistralVibeTotalCost.toFixed(4) : "") + (root.mistralAvailableModels.length > 0 ? "\n" + root.mistralAvailableModels.length + " models" : "")
             }
 
             PanelSlot {

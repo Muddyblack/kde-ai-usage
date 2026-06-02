@@ -53,9 +53,13 @@
     <entry name="pinnedTab" type="String">
       <default></default>
     </entry>
-    <!-- Chart window: "weekly" (7d) or "session" (5h) -->
+    <!-- Chart window: "weekly" (7d), "day" (24h) or "session" (5h); codex_* variants for the OpenAI tab -->
     <entry name="chartWindow" type="String">
       <default>weekly</default>
+    </entry>
+    <!-- Remembered chart granularity ("5h" | "24h" | "7d"), shared across tabs so the time range carries when switching services -->
+    <entry name="chartGranularity" type="String">
+      <default>7d</default>
     </entry>
     <!-- Poll interval in seconds (applies to all services) -->
     <entry name="pollIntervalSec" type="Int">
