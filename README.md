@@ -136,7 +136,7 @@ A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple serv
 |---|---|
 | OpenRouter API key | Set in widget settings — no local config file is read |
 
-See [SETUP.md](SETUP.md) for detailed configuration instructions.
+All configuration is done in the widget's settings panel (right-click the widget → *Configure*). See [How it works](#how-it-works) below for what each tab reads and where credentials are resolved from.
 
 ---
 

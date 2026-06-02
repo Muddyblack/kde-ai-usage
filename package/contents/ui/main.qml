@@ -1287,7 +1287,9 @@ PlasmoidItem {
         var tab = root.enabledTabs[root.activeTab];
         if (tab === "claude") {
             var cfgKey = Plasmoid.configuration.claudeAdminApiKey || "";
-            var envPrefix = cfgKey ? "WIDGET_CLAUDE_ADMIN_KEY=" + cfgKey + " " : "";
+            // base64-encode the key so shell metacharacters in it can't break out
+            // of the command string (decoded back in the env assignment).
+            var envPrefix = cfgKey ? "WIDGET_CLAUDE_ADMIN_KEY=\"$(printf %s '" + Qt.btoa(cfgKey) + "' | base64 -d)\" " : "";
             var cmd = envPrefix + root.scriptDir + "get-claude-credentials";
             credSource.disconnectSource(cmd);
             credSource.connectSource(cmd);
@@ -1301,19 +1303,19 @@ PlasmoidItem {
             antigravityUsageSource.connectSource(cmd);
         } else if (tab === "openai") {
             var cfgKey = Plasmoid.configuration.openaiApiKey || "";
-            var envPrefix = cfgKey ? "WIDGET_OPENAI_API_KEY=" + cfgKey + " " : "";
+            var envPrefix = cfgKey ? "WIDGET_OPENAI_API_KEY=\"$(printf %s '" + Qt.btoa(cfgKey) + "' | base64 -d)\" " : "";
             var cmd = envPrefix + root.scriptDir + "get-openai-usage";
             openaiCredSource.disconnectSource(cmd);
             openaiCredSource.connectSource(cmd);
         } else if (tab === "mistral") {
             var cfgKey = Plasmoid.configuration.mistralApiKey || "";
-            var envPrefix = cfgKey ? "WIDGET_MISTRAL_API_KEY=" + cfgKey + " " : "";
+            var envPrefix = cfgKey ? "WIDGET_MISTRAL_API_KEY=\"$(printf %s '" + Qt.btoa(cfgKey) + "' | base64 -d)\" " : "";
             var cmd = envPrefix + root.scriptDir + "get-mistral-usage";
             mistralCredSource.disconnectSource(cmd);
             mistralCredSource.connectSource(cmd);
         } else if (tab === "openrouter") {
             var cfgKey = Plasmoid.configuration.openrouterApiKey || "";
-            var envPrefix = cfgKey ? "WIDGET_OPENROUTER_API_KEY=" + cfgKey + " " : "";
+            var envPrefix = cfgKey ? "WIDGET_OPENROUTER_API_KEY=\"$(printf %s '" + Qt.btoa(cfgKey) + "' | base64 -d)\" " : "";
             var cmd = envPrefix + root.scriptDir + "get-openrouter-usage";
             openrouterCredSource.disconnectSource(cmd);
             openrouterCredSource.connectSource(cmd);
