@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# get_openrouter_usage.sh — Resolve OpenRouter API key and fetch usage/credits.
+# get-openrouter-usage — Resolve OpenRouter API key and fetch usage/credits.
 #   GET https://openrouter.ai/api/v1/key → usage, limit, rate_limit info
 
 API_KEY="${WIDGET_OPENROUTER_API_KEY:-}"

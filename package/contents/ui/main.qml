@@ -76,6 +76,9 @@ PlasmoidItem {
         return lines.join("\n");
     }
 
+    // ── Script directory ──────────────────────────────────────────────────────
+    readonly property string scriptDir: Qt.resolvedUrl("../tools/sh/").toString().replace("file://", "")
+
     // ── Settings: which tabs are enabled (persisted via Plasmoid.configuration) ─
     property bool claudeEnabled: Plasmoid.configuration.claudeEnabled
     property bool antigravityEnabled: Plasmoid.configuration.antigravityEnabled
@@ -124,6 +127,9 @@ PlasmoidItem {
         } else if (tab === "openrouter") {
             root.chartWindow = "openrouter";
             Plasmoid.configuration.chartWindow = "openrouter";
+        } else if (tab === "mistral") {
+            root.chartWindow = "mistral";
+            Plasmoid.configuration.chartWindow = "mistral";
         }
         root.chartTimeOffset = 0;
     }
@@ -215,6 +221,16 @@ PlasmoidItem {
     property bool mistralKeyValid: false
     property var mistralAvailableModels: []
     property string mistralError: ""
+    property int mistralVibeSessionCount: 0
+    property real mistralVibeTotalCost: 0
+    property int mistralVibeTotalTokens: 0
+    property int mistralVibePromptTokens: 0
+    property int mistralVibeCompletionTokens: 0
+    property int mistralVibeTotalSteps: 0
+    property int mistralVibeToolOk: 0
+    property int mistralVibeToolFail: 0
+    property string mistralVibeActiveModel: ""
+    property var mistralVibeRecent: []
 
     // ── OpenRouter data ───────────────────────────────────────────────────────
     property string _openrouterApiKey: ""
@@ -257,6 +273,8 @@ PlasmoidItem {
             return "ag";
         if (root.chartWindow === "openrouter")
             return "or";
+        if (root.chartWindow === "mistral")
+            return "mv";
         return "w";
     }
 
@@ -268,7 +286,7 @@ PlasmoidItem {
         if (win === "weekly" || win === "codex_weekly") {
             return 7 * 24 * 3600000; // 7 days in ms
         }
-        if (win === "antigravity" || win === "openrouter") {
+        if (win === "antigravity" || win === "openrouter" || win === "mistral") {
             return 30 * 24 * 3600000; // 30 days in ms
         }
         return 7 * 24 * 3600000;
@@ -315,6 +333,21 @@ PlasmoidItem {
                     v: v
                 });
             }
+        }
+        // The mistral series stores raw USD; auto-scale to its own max so the
+        // spend curve fills the chart (the canvas expects a 0-100 value).
+        if (key === "mv" && out.length > 0) {
+            var maxV = 0;
+            for (var j = 0; j < out.length; j++)
+                if (out[j].v > maxV)
+                    maxV = out[j].v;
+            if (maxV > 0)
+                for (var k = 0; k < out.length; k++)
+                    out[k] = {
+                        t: out[k].t,
+                        v: (out[k].v / maxV) * 100,
+                        raw: out[k].v
+                    };
         }
         return out;
     }
@@ -418,6 +451,32 @@ PlasmoidItem {
         root.autosaveHistory(json);
     }
 
+    // Record vibe CLI cumulative cost as a history point. We store the raw USD
+    // value in `mv`; the chart view auto-scales it to the window's own max so the
+    // spend-growth curve is always visible (no meaningful fixed quota to scale to).
+    function recordMistralVibeUsage(costUSD) {
+        if (costUSD <= 0)
+            return;
+        var history = root.usageHistory.slice();
+        var now = new Date().getTime();
+        if (history.length > 0 && now - history[history.length - 1].t < 120000) {
+            var last = history[history.length - 1];
+            last.mv = costUSD;
+            history[history.length - 1] = last;
+        } else {
+            history.push({
+                t: now,
+                mv: costUSD
+            });
+        }
+        if (history.length > root.historyLimit)
+            history = history.slice(history.length - root.historyLimit);
+        root.usageHistory = history;
+        var json = JSON.stringify(history);
+        Plasmoid.configuration.usageHistory = json;
+        root.autosaveHistory(json);
+    }
+
     // Merge Codex windows into the most recent history point (or create one).
     // Called after fetchCodexUsage() succeeds, separate from recordUsage() since
     // Claude and Codex refresh on different tabs at different times.
@@ -447,16 +506,14 @@ PlasmoidItem {
 
     // Silently mirror history JSON to ~/.local/share/ai-usage-widget/usage-history-latest.json
     function autosaveHistory(json) {
-        var s = Qt.resolvedUrl("history_io.sh").toString().replace("file://", "");
-        var cmd = "WIDGET_HISTORY_JSON=\"$(printf %s '" + Qt.btoa(json) + "' | base64 -d)\" bash " + s + " autosave";
+        var cmd = "WIDGET_HISTORY_JSON=\"$(printf %s '" + Qt.btoa(json) + "' | base64 -d)\" " + root.scriptDir + "history-io autosave";
         historyIOSource.disconnectSource(cmd);
         historyIOSource.connectSource(cmd);
     }
 
     // Restore from the mirror file when plasmoid config has no history (e.g. fresh install).
     function autoloadHistory() {
-        var s = Qt.resolvedUrl("history_io.sh").toString().replace("file://", "");
-        var cmd = "bash " + s + " autoload";
+        var cmd = root.scriptDir + "history-io autoload";
         historyIOSource.disconnectSource(cmd);
         historyIOSource.connectSource(cmd);
     }
@@ -483,18 +540,16 @@ PlasmoidItem {
     property string historyIOMsg: ""
 
     function exportHistory() {
-        var s = Qt.resolvedUrl("history_io.sh").toString().replace("file://", "");
         var json = JSON.stringify(root.usageHistory);
         // Pass the payload base64-encoded and decode it inside the shell, so the JSON
         // (quotes, brackets) never has to survive command-line quoting.
-        var cmd = "WIDGET_HISTORY_JSON=\"$(printf %s '" + Qt.btoa(json) + "' | base64 -d)\" bash " + s + " export";
+        var cmd = "WIDGET_HISTORY_JSON=\"$(printf %s '" + Qt.btoa(json) + "' | base64 -d)\" " + root.scriptDir + "history-io export";
         historyIOSource.disconnectSource(cmd);
         historyIOSource.connectSource(cmd);
     }
 
     function importHistory() {
-        var s = Qt.resolvedUrl("history_io.sh").toString().replace("file://", "");
-        var cmd = "bash " + s + " import";
+        var cmd = root.scriptDir + "history-io import";
         historyIOSource.disconnectSource(cmd);
         historyIOSource.connectSource(cmd);
     }
@@ -540,6 +595,23 @@ PlasmoidItem {
                     }
                     if (norm.length > root.historyLimit)
                         norm = norm.slice(norm.length - root.historyLimit);
+                    // Merge autoload data with any points already recorded since startup
+                    // (poll timer fires immediately and may beat the async shell).
+                    if (op === "autoload" && root.usageHistory.length > 0) {
+                        var existing = root.usageHistory;
+                        var merged = norm.slice();
+                        var lastNormT = norm.length > 0 ? norm[norm.length - 1].t : 0;
+                        for (var j = 0; j < existing.length; j++) {
+                            if (existing[j].t > lastNormT)
+                                merged.push(existing[j]);
+                        }
+                        if (merged.length > root.historyLimit)
+                            merged = merged.slice(merged.length - root.historyLimit);
+                        root.usageHistory = merged;
+                        Plasmoid.configuration.usageHistory = JSON.stringify(merged);
+                        root.autosaveHistory(JSON.stringify(merged));
+                        return;
+                    }
                     root.usageHistory = norm;
                     Plasmoid.configuration.usageHistory = JSON.stringify(norm);
                     // Only the manual Import button announces a count; autoload is silent.
@@ -1133,6 +1205,17 @@ PlasmoidItem {
             }
             try {
                 var res = JSON.parse(output);
+                // always harvest vibe stats regardless of key validity
+                root.mistralVibeSessionCount = res.vibeSessionCount || 0;
+                root.mistralVibeTotalCost = res.vibeTotalCost || 0;
+                root.mistralVibeTotalTokens = res.vibeTotalTokens || 0;
+                root.mistralVibePromptTokens = res.vibePromptTokens || 0;
+                root.mistralVibeCompletionTokens = res.vibeCompletionTokens || 0;
+                root.mistralVibeTotalSteps = res.vibeTotalSteps || 0;
+                root.mistralVibeToolOk = res.vibeToolOk || 0;
+                root.mistralVibeToolFail = res.vibeToolFail || 0;
+                root.mistralVibeActiveModel = res.vibeActiveModel || "";
+                root.mistralVibeRecent = res.vibeRecent || [];
                 if (res.error) {
                     root.mistralError = res.error;
                     root.errorMsg = res.error;
@@ -1148,6 +1231,7 @@ PlasmoidItem {
                 root.lastUpdate = Qt.formatTime(new Date(), "hh:mm");
                 root._offline = false;
                 offlineRetryTimer.stop();
+                root.recordMistralVibeUsage(root.mistralVibeTotalCost);
             } catch (e) {
                 root.errorMsg = "Mistral: parse error";
                 root.stale = root.lastUpdate !== "";
@@ -1202,10 +1286,9 @@ PlasmoidItem {
     function loadCreds() {
         var tab = root.enabledTabs[root.activeTab];
         if (tab === "claude") {
-            var s = Qt.resolvedUrl("get_claude_credentials.sh").toString().replace("file://", "");
             var cfgKey = Plasmoid.configuration.claudeAdminApiKey || "";
             var envPrefix = cfgKey ? "WIDGET_CLAUDE_ADMIN_KEY=" + cfgKey + " " : "";
-            var cmd = envPrefix + "bash " + s;
+            var cmd = envPrefix + root.scriptDir + "get-claude-credentials";
             credSource.disconnectSource(cmd);
             credSource.connectSource(cmd);
             // Read effort level + dream mode from ~/.claude/settings.json
@@ -1213,29 +1296,25 @@ PlasmoidItem {
             claudeSettingsSource.disconnectSource(settingsCmd);
             claudeSettingsSource.connectSource(settingsCmd);
         } else if (tab === "antigravity") {
-            var s = Qt.resolvedUrl("get_antigravity_usage.sh").toString().replace("file://", "");
-            var cmd = "bash " + s;
+            var cmd = root.scriptDir + "get-antigravity-usage";
             antigravityUsageSource.disconnectSource(cmd);
             antigravityUsageSource.connectSource(cmd);
         } else if (tab === "openai") {
-            var s = Qt.resolvedUrl("get_openai_usage.sh").toString().replace("file://", "");
             var cfgKey = Plasmoid.configuration.openaiApiKey || "";
             var envPrefix = cfgKey ? "WIDGET_OPENAI_API_KEY=" + cfgKey + " " : "";
-            var cmd = envPrefix + "bash " + s;
+            var cmd = envPrefix + root.scriptDir + "get-openai-usage";
             openaiCredSource.disconnectSource(cmd);
             openaiCredSource.connectSource(cmd);
         } else if (tab === "mistral") {
-            var s = Qt.resolvedUrl("get_mistral_usage.sh").toString().replace("file://", "");
             var cfgKey = Plasmoid.configuration.mistralApiKey || "";
             var envPrefix = cfgKey ? "WIDGET_MISTRAL_API_KEY=" + cfgKey + " " : "";
-            var cmd = envPrefix + "bash " + s;
+            var cmd = envPrefix + root.scriptDir + "get-mistral-usage";
             mistralCredSource.disconnectSource(cmd);
             mistralCredSource.connectSource(cmd);
         } else if (tab === "openrouter") {
-            var s = Qt.resolvedUrl("get_openrouter_usage.sh").toString().replace("file://", "");
             var cfgKey = Plasmoid.configuration.openrouterApiKey || "";
             var envPrefix = cfgKey ? "WIDGET_OPENROUTER_API_KEY=" + cfgKey + " " : "";
-            var cmd = envPrefix + "bash " + s;
+            var cmd = envPrefix + root.scriptDir + "get-openrouter-usage";
             openrouterCredSource.disconnectSource(cmd);
             openrouterCredSource.connectSource(cmd);
         }
@@ -1724,16 +1803,38 @@ PlasmoidItem {
     // ── Popup ─────────────────────────────────────────────────────────────────
     fullRepresentation: Item {
         id: popupRoot
-        Layout.minimumWidth: Kirigami.Units.gridUnit * 26
-        Layout.preferredWidth: Kirigami.Units.gridUnit * 26
-        // Shrinks to fit settings panel; expands to full content height for tabs
-        Layout.minimumHeight: mainColumn.implicitHeight + (Kirigami.Units.largeSpacing + 4) * 2
-        Layout.preferredHeight: Layout.minimumHeight
-        Layout.maximumHeight: Layout.minimumHeight
-        Behavior on Layout.minimumHeight {
-            NumberAnimation {
-                duration: 180
-                easing.type: Easing.OutCubic
+        readonly property int popupMargin: Kirigami.Units.largeSpacing + 4
+        readonly property int targetHeight: Math.ceil(mainColumn.implicitHeight + popupMargin * 2)
+
+        implicitWidth: Kirigami.Units.gridUnit * 26
+        implicitHeight: targetHeight
+        Layout.minimumWidth: implicitWidth
+        Layout.preferredWidth: implicitWidth
+        Layout.minimumHeight: implicitHeight
+        Layout.preferredHeight: implicitHeight
+        Layout.maximumHeight: implicitHeight
+
+        // PlasmaCore.Dialog latches the popup to the largest size it has seen and
+        // won't shrink back when a tab swap reduces mainColumn.implicitHeight — it
+        // samples the size mid-transition (old, taller content still tearing down).
+        // Nudge the binding one frame later so the dialog re-samples the smaller value.
+        Connections {
+            target: root
+            function onActiveTabChanged() {
+                relayoutTimer.restart();
+            }
+            function onShowSettingsChanged() {
+                relayoutTimer.restart();
+            }
+        }
+        Timer {
+            id: relayoutTimer
+            interval: 0
+            onTriggered: {
+                popupRoot.implicitHeight = 0;
+                popupRoot.implicitHeight = Qt.binding(function () {
+                    return popupRoot.targetHeight;
+                });
             }
         }
 
@@ -1742,7 +1843,7 @@ PlasmoidItem {
         // through, plus a faint accent glow and inner highlight for the "glass" look.
         Rectangle {
             anchors.fill: parent
-            anchors.margins: -(Kirigami.Units.largeSpacing + 4)
+            anchors.margins: -popupRoot.popupMargin
             radius: 12
             gradient: Gradient {
                 GradientStop {
@@ -1794,7 +1895,7 @@ PlasmoidItem {
         // Custom background tint overlay (defaults to 0 opacity, i.e. invisible/glassy)
         Rectangle {
             anchors.fill: parent
-            anchors.margins: -(Kirigami.Units.largeSpacing + 4)
+            anchors.margins: -popupRoot.popupMargin
             radius: 12
             color: root.resolvedPopupBg
             visible: root.popupBgOpacity > 0
@@ -1805,9 +1906,10 @@ PlasmoidItem {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            anchors.leftMargin: Kirigami.Units.largeSpacing + 4
-            anchors.rightMargin: Kirigami.Units.largeSpacing + 4
-            anchors.topMargin: Kirigami.Units.largeSpacing + 4
+            anchors.leftMargin: popupRoot.popupMargin
+            anchors.rightMargin: popupRoot.popupMargin
+            anchors.topMargin: popupRoot.popupMargin
+            height: implicitHeight
             spacing: Kirigami.Units.largeSpacing
 
             // ── Header ──────────────────────────────────────────────────────
@@ -2020,2313 +2122,32 @@ PlasmoidItem {
                 color: Qt.rgba(1, 1, 1, 0.08)
             }
 
-            // ── Inline Settings panel ───────────────────────────────────────
-            ColumnLayout {
-                visible: root.showSettings
-                Layout.fillWidth: true
-                spacing: 10
-
-                // ── Services ───────────────────────────────────────────────
-                PlasmaComponents.Label {
-                    text: "Services"
-                    font.bold: true
-                    font.pixelSize: 10
-                    opacity: 0.5
-                    color: Kirigami.Theme.textColor
-                }
-
-                // 2-column grid of toggles
-                GridLayout {
-                    Layout.fillWidth: true
-                    columns: 2
-                    columnSpacing: 12
-                    rowSpacing: 2
-
-                    Repeater {
-                        model: [
-                            {
-                                id: "claude",
-                                label: "Claude",
-                                color: "#cc785c"
-                            },
-                            {
-                                id: "antigravity",
-                                label: "Antigravity",
-                                color: "#4285f4"
-                            },
-                            {
-                                id: "openai",
-                                label: "OpenAI",
-                                color: "#10a37f"
-                            },
-                            {
-                                id: "mistral",
-                                label: "Mistral",
-                                color: "#ff7000"
-                            },
-                            {
-                                id: "openrouter",
-                                label: "OpenRouter",
-                                color: "#9333ea"
-                            },
-                            {
-                                id: "__spacer",
-                                label: "",
-                                color: "transparent"
-                            }
-                        ]
-                        RowLayout {
-                            spacing: 6
-                            visible: modelData.id !== "__spacer"
-                            Rectangle {
-                                width: 7
-                                height: 7
-                                radius: 3.5
-                                color: modelData.color
-                                Layout.alignment: Qt.AlignVCenter
-                            }
-                            PlasmaComponents.Label {
-                                text: modelData.label
-                                font.pixelSize: 11
-                                color: Kirigami.Theme.textColor
-                                Layout.preferredWidth: 80
-                            }
-                            QQC2.Switch {
-                                implicitHeight: 20
-                                checked: {
-                                    if (modelData.id === "claude")
-                                        return Plasmoid.configuration.claudeEnabled;
-                                    if (modelData.id === "antigravity")
-                                        return Plasmoid.configuration.antigravityEnabled;
-                                    if (modelData.id === "openai")
-                                        return Plasmoid.configuration.openaiEnabled;
-                                    if (modelData.id === "mistral")
-                                        return Plasmoid.configuration.mistralEnabled;
-                                    if (modelData.id === "openrouter")
-                                        return Plasmoid.configuration.openrouterEnabled;
-                                    return false;
-                                }
-                                onToggled: {
-                                    if (modelData.id === "claude")
-                                        Plasmoid.configuration.claudeEnabled = checked;
-                                    if (modelData.id === "antigravity")
-                                        Plasmoid.configuration.antigravityEnabled = checked;
-                                    if (modelData.id === "openai")
-                                        Plasmoid.configuration.openaiEnabled = checked;
-                                    if (modelData.id === "mistral")
-                                        Plasmoid.configuration.mistralEnabled = checked;
-                                    if (modelData.id === "openrouter")
-                                        Plasmoid.configuration.openrouterEnabled = checked;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 6
-                    Rectangle {
-                        width: 7
-                        height: 7
-                        radius: 3.5
-                        color: root.weeklyColor
-                        Layout.alignment: Qt.AlignVCenter
-                    }
-                    PlasmaComponents.Label {
-                        text: "Usage chart"
-                        font.pixelSize: 11
-                        color: Kirigami.Theme.textColor
-                        Layout.preferredWidth: 80
-                    }
-                    QQC2.Switch {
-                        implicitHeight: 20
-                        checked: Plasmoid.configuration.showUsageChart
-                        onToggled: Plasmoid.configuration.showUsageChart = checked
-                    }
-                }
-
-                // Theme accent toggle
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 6
-                    Rectangle {
-                        width: 7
-                        height: 7
-                        radius: 3.5
-                        color: Kirigami.Theme.highlightColor
-                        Layout.alignment: Qt.AlignVCenter
-                    }
-                    PlasmaComponents.Label {
-                        text: "Theme accent"
-                        font.pixelSize: 11
-                        color: Kirigami.Theme.textColor
-                        Layout.preferredWidth: 80
-                    }
-                    QQC2.Switch {
-                        implicitHeight: 20
-                        checked: Plasmoid.configuration.useThemeAccent
-                        onToggled: {
-                            Plasmoid.configuration.useThemeAccent = checked;
-                            root.useThemeAccent = checked;
-                        }
-                    }
-                    PlasmaComponents.Label {
-                        text: "Use Plasma accent color"
-                        font.pixelSize: 9
-                        opacity: 0.45
-                        color: Kirigami.Theme.textColor
-                        Layout.fillWidth: true
-                        elide: Text.ElideRight
-                    }
-                }
-
-                // Poll interval
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 6
-                    Rectangle {
-                        width: 7
-                        height: 7
-                        radius: 3.5
-                        color: Qt.rgba(1, 1, 1, 0.3)
-                        Layout.alignment: Qt.AlignVCenter
-                    }
-                    PlasmaComponents.Label {
-                        text: "Refresh"
-                        font.pixelSize: 11
-                        color: Kirigami.Theme.textColor
-                        Layout.preferredWidth: 80
-                    }
-                    QQC2.ComboBox {
-                        id: pollCombo
-                        implicitHeight: 24
-                        Layout.preferredWidth: 120
-                        font.pixelSize: 10
-                        readonly property var secs: [60, 120, 300, 600, 900, 1800]
-                        model: ["1 min", "2 min", "5 min", "10 min", "15 min", "30 min"]
-                        currentIndex: Math.max(0, secs.indexOf(Plasmoid.configuration.pollIntervalSec || 300))
-                        onActivated: {
-                            var s = secs[currentIndex];
-                            Plasmoid.configuration.pollIntervalSec = s;
-                            root.pollIntervalSec = s;
-                        }
-                    }
-                    Item {
-                        Layout.fillWidth: true
-                    }
-                }
-
-                // ── Appearance ──────────────────────────────────────────────
-                Rectangle {
-                    Layout.fillWidth: true
-                    height: 1
-                    color: Qt.rgba(1, 1, 1, 0.08)
-                }
-                PlasmaComponents.Label {
-                    text: "Appearance"
-                    font.bold: true
-                    font.pixelSize: 10
-                    opacity: 0.5
-                    color: Kirigami.Theme.textColor
-                }
-
-                // Grid of appearance settings
-                GridLayout {
-                    Layout.fillWidth: true
-                    columns: 3
-                    columnSpacing: 8
-                    rowSpacing: 6
-
-                    // Row 1: Popup Background Color & Opacity
-                    PlasmaComponents.Label {
-                        text: "Popup BG"
-                        font.pixelSize: 11
-                        color: Kirigami.Theme.textColor
-                        Layout.preferredWidth: 80
-                    }
-                    RowLayout {
-                        spacing: 4
-                        Layout.fillWidth: true
-                        Rectangle {
-                            width: 12
-                            height: 12
-                            radius: 2
-                            color: root.resolvedPopupBg
-                            border.width: 1
-                            border.color: Qt.rgba(1, 1, 1, 0.2)
-
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                hoverEnabled: true
-                                onClicked: {
-                                    root.colorTarget = "popup";
-                                    colorDialog.selectedColor = root.popupBgColor;
-                                    colorDialog.open();
-                                }
-                                QQC2.ToolTip.delay: 400
-                                QQC2.ToolTip.visible: containsMouse
-                                QQC2.ToolTip.text: "Click to open color picker"
-                            }
-                        }
-                        QQC2.TextField {
-                            text: Plasmoid.configuration.popupBgColor || "#000000"
-                            placeholderText: "#000000"
-                            implicitHeight: 22
-                            Layout.fillWidth: true
-                            font.pixelSize: 9
-                            onTextEdited: {
-                                if (/^#[0-9A-Fa-f]{6}$/.test(text)) {
-                                    Plasmoid.configuration.popupBgColor = text;
-                                    root.popupBgColor = text;
-                                }
-                            }
-                        }
-                    }
-                    RowLayout {
-                        spacing: 4
-                        PlasmaComponents.Label {
-                            text: "Opacity:"
-                            font.pixelSize: 10
-                            opacity: 0.6
-                        }
-                        QQC2.TextField {
-                            text: Math.round(root.popupBgOpacity * 100)
-                            placeholderText: "0"
-                            implicitHeight: 22
-                            Layout.preferredWidth: 32
-                            font.pixelSize: 9
-                            validator: IntValidator {
-                                bottom: 0
-                                top: 100
-                            }
-                            onTextEdited: {
-                                var val = parseInt(text);
-                                if (!isNaN(val) && val >= 0 && val <= 100) {
-                                    var opacityVal = val / 100.0;
-                                    Plasmoid.configuration.popupBgOpacity = opacityVal;
-                                    root.popupBgOpacity = opacityVal;
-                                }
-                            }
-                        }
-                        PlasmaComponents.Label {
-                            text: "%"
-                            font.pixelSize: 10
-                            opacity: 0.6
-                        }
-                    }
-
-                    // Row 2: Card Background Color & Opacity
-                    PlasmaComponents.Label {
-                        text: "Card BG"
-                        font.pixelSize: 11
-                        color: Kirigami.Theme.textColor
-                        Layout.preferredWidth: 80
-                    }
-                    RowLayout {
-                        spacing: 4
-                        Layout.fillWidth: true
-                        Rectangle {
-                            width: 12
-                            height: 12
-                            radius: 2
-                            color: root.resolvedCardBg
-                            border.width: 1
-                            border.color: Qt.rgba(1, 1, 1, 0.2)
-
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                hoverEnabled: true
-                                onClicked: {
-                                    root.colorTarget = "card";
-                                    colorDialog.selectedColor = root.cardBgColor;
-                                    colorDialog.open();
-                                }
-                                QQC2.ToolTip.delay: 400
-                                QQC2.ToolTip.visible: containsMouse
-                                QQC2.ToolTip.text: "Click to open color picker"
-                            }
-                        }
-                        QQC2.TextField {
-                            text: Plasmoid.configuration.cardBgColor || "#100a1a"
-                            placeholderText: "#100a1a"
-                            implicitHeight: 22
-                            Layout.fillWidth: true
-                            font.pixelSize: 9
-                            onTextEdited: {
-                                if (/^#[0-9A-Fa-f]{6}$/.test(text)) {
-                                    Plasmoid.configuration.cardBgColor = text;
-                                    root.cardBgColor = text;
-                                }
-                            }
-                        }
-                    }
-                    RowLayout {
-                        spacing: 4
-                        PlasmaComponents.Label {
-                            text: "Opacity:"
-                            font.pixelSize: 10
-                            opacity: 0.6
-                        }
-                        QQC2.TextField {
-                            text: Math.round(root.cardBgOpacity * 100)
-                            placeholderText: "90"
-                            implicitHeight: 22
-                            Layout.preferredWidth: 32
-                            font.pixelSize: 9
-                            validator: IntValidator {
-                                bottom: 0
-                                top: 100
-                            }
-                            onTextEdited: {
-                                var val = parseInt(text);
-                                if (!isNaN(val) && val >= 0 && val <= 100) {
-                                    var opacityVal = val / 100.0;
-                                    Plasmoid.configuration.cardBgOpacity = opacityVal;
-                                    root.cardBgOpacity = opacityVal;
-                                }
-                            }
-                        }
-                        PlasmaComponents.Label {
-                            text: "%"
-                            font.pixelSize: 10
-                        }
-                    }
-
-                    // Row 3: Widget Background Style
-                    PlasmaComponents.Label {
-                        text: "Bg Style"
-                        font.pixelSize: 11
-                        color: Kirigami.Theme.textColor
-                        Layout.preferredWidth: 80
-                    }
-                    QQC2.ComboBox {
-                        Layout.columnSpan: 2
-                        Layout.fillWidth: true
-                        implicitHeight: 22
-                        font.pixelSize: 10
-                        model: ["Plasma Native", "Translucent (Flat)", "Glassmorphic (Shadow + Blur)"]
-                        currentIndex: {
-                            var val = root.backgroundHints;
-                            if (val === 0)
-                                return 0;
-                            if (val === 1)
-                                return 1;
-                            if (val === 2)
-                                return 2;
-                            return 1;
-                        }
-                        onActivated: {
-                            var hints = 1;
-                            if (index === 0)
-                                hints = 0;
-                            else if (index === 1)
-                                hints = 1;
-                            else if (index === 2)
-                                hints = 2;
-                            Plasmoid.configuration.backgroundHints = hints;
-                            root.backgroundHints = hints;
-                        }
-                    }
-                }
-
-                // History export / import
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 6
-                    Rectangle {
-                        width: 7
-                        height: 7
-                        radius: 3.5
-                        color: root.activeAccent
-                        Layout.alignment: Qt.AlignVCenter
-                    }
-                    PlasmaComponents.Label {
-                        text: "History"
-                        font.pixelSize: 11
-                        color: Kirigami.Theme.textColor
-                        Layout.preferredWidth: 80
-                    }
-                    PlasmaComponents.Button {
-                        text: "Export"
-                        icon.name: "document-export"
-                        implicitHeight: 26
-                        font.pixelSize: 10
-                        onClicked: root.exportHistory()
-                    }
-                    PlasmaComponents.Button {
-                        text: "Import"
-                        icon.name: "document-import"
-                        implicitHeight: 26
-                        font.pixelSize: 10
-                        onClicked: root.importHistory()
-                    }
-                    Item {
-                        Layout.fillWidth: true
-                    }
-                }
-
-                PlasmaComponents.Label {
-                    visible: root.historyIOMsg !== ""
-                    text: root.historyIOMsg
-                    font.pixelSize: 9
-                    opacity: 0.6
-                    color: Kirigami.Theme.textColor
-                    Layout.fillWidth: true
-                    wrapMode: Text.WordWrap
-                }
-
-                Rectangle {
-                    Layout.fillWidth: true
-                    height: 1
-                    color: Qt.rgba(1, 1, 1, 0.08)
-                }
-
-                // ── API Keys ───────────────────────────────────────────────
-                PlasmaComponents.Label {
-                    text: "API Keys"
-                    font.bold: true
-                    font.pixelSize: 10
-                    opacity: 0.5
-                    color: Kirigami.Theme.textColor
-                }
-
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 3
-                    KeyRow {
-                        label: "Claude Admin"
-                        placeholder: "sk-ant-api03-…"
-                        configKey: "claudeAdminApiKey"
-                    }
-                    KeyRow {
-                        label: "OpenAI API"
-                        placeholder: "sk-proj-…"
-                        configKey: "openaiApiKey"
-                    }
-                    KeyRow {
-                        label: "Google AI"
-                        placeholder: "AIza…"
-                        configKey: "googleApiKey"
-                    }
-                    KeyRow {
-                        label: "Mistral"
-                        placeholder: "or $MISTRAL_API_KEY"
-                        configKey: "mistralApiKey"
-                        rowVisible: Plasmoid.configuration.mistralEnabled
-                    }
-                    KeyRow {
-                        label: "OpenRouter"
-                        placeholder: "or $OPENROUTER_API_KEY"
-                        configKey: "openrouterApiKey"
-                        rowVisible: Plasmoid.configuration.openrouterEnabled
-                    }
-                }
+            SettingsPanel {
+                rootItem: root
             }
 
-            // ── Claude tab ───────────────────────────────────────────────────
-            ColumnLayout {
-                visible: root.enabledTabs[root.activeTab] === "claude" && !root.showSettings
-                Layout.fillWidth: true
-                spacing: 14
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
-                    visible: root.claudeSubscriptionType !== ""
-
-                    Kirigami.Icon {
-                        source: "user-identity"
-                        width: 14
-                        height: 14
-                        color: root.claudeOrange
-                        isMask: true
-                        opacity: 0.7
-                    }
-                    PlasmaComponents.Label {
-                        text: {
-                            // Prettify rateLimitTier: "default_claude_ai" → "Default"
-                            // "pro_claude_ai" → "Pro", etc.
-                            var tier = root.claudeRateLimitTier.replace(/_claude_ai$/i, "").replace(/_/g, " ").replace(/\b\w/g, function (c) {
-                                return c.toUpperCase();
-                            });
-                            if (tier)
-                                return tier;
-                            // Fall back to abbreviated org UUID or generic label
-                            return root.claudeOrganizationUuid ? root.claudeOrganizationUuid.slice(0, 8) + "…" : "Claude Code User";
-                        }
-                        font.pixelSize: 10
-                        opacity: 0.6
-                        color: Kirigami.Theme.textColor
-                        elide: Text.ElideRight
-                        Layout.fillWidth: true
-                    }
-
-                    // Effort chip
-                    Rectangle {
-                        visible: root.claudeEffortLevel !== ""
-                        implicitHeight: 16
-                        implicitWidth: effortChipLabel.implicitWidth + 12
-                        radius: 3
-                        readonly property color effortColor: {
-                            if (root.claudeEffortLevel === "high")
-                                return Qt.rgba(0.8, 0.47, 0.36, 0.85);
-                            if (root.claudeEffortLevel === "low")
-                                return Qt.rgba(0.4, 0.7, 0.4, 0.7);
-                            return Qt.rgba(1, 1, 1, 0.55);
-                        }
-                        color: Qt.rgba(effortColor.r, effortColor.g, effortColor.b, 0.15)
-                        border.width: 1
-                        border.color: Qt.rgba(effortColor.r, effortColor.g, effortColor.b, 0.35)
-                        QQC2.ToolTip.visible: effortMA.containsMouse
-                        QQC2.ToolTip.text: "Thinking budget: " + root.claudeEffortLevel
-                        QQC2.ToolTip.delay: 400
-                        MouseArea {
-                            id: effortMA
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            propagateComposedEvents: true
-                        }
-                        PlasmaComponents.Label {
-                            id: effortChipLabel
-                            anchors.centerIn: parent
-                            text: "effort: " + root.claudeEffortLevel
-                            font.pixelSize: 9
-                            font.bold: true
-                            color: parent.effortColor
-                        }
-                    }
-
-                    // Dream (extended thinking) chip
-                    Rectangle {
-                        visible: true
-                        implicitHeight: 16
-                        implicitWidth: dreamChipLabel.implicitWidth + 12
-                        radius: 3
-                        readonly property color dreamColor: root.claudeAutoDream ? Qt.rgba(0.43, 0.35, 0.78, 0.9) : Qt.rgba(1, 1, 1, 0.3)
-                        color: Qt.rgba(dreamColor.r, dreamColor.g, dreamColor.b, 0.15)
-                        border.width: 1
-                        border.color: Qt.rgba(dreamColor.r, dreamColor.g, dreamColor.b, 0.35)
-                        QQC2.ToolTip.visible: dreamMA.containsMouse
-                        QQC2.ToolTip.text: root.claudeAutoDream ? "Extended thinking (dream mode): ON\nClaude will reason longer on complex tasks" : "Extended thinking (dream mode): OFF"
-                        QQC2.ToolTip.delay: 400
-                        MouseArea {
-                            id: dreamMA
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            propagateComposedEvents: true
-                        }
-                        PlasmaComponents.Label {
-                            id: dreamChipLabel
-                            anchors.centerIn: parent
-                            text: root.claudeAutoDream ? "dream: on" : "dream: off"
-                            font.pixelSize: 9
-                            font.bold: root.claudeAutoDream
-                            color: parent.dreamColor
-                        }
-                    }
-
-                    Rectangle {
-                        implicitHeight: 18
-                        implicitWidth: planLabelClaude.implicitWidth + 16
-                        Layout.alignment: Qt.AlignVCenter
-                        radius: 4
-                        color: root.claudeSubscriptionType === "free" ? Qt.rgba(1, 1, 1, 0.06) : Qt.rgba(0.8, 0.47, 0.36, 0.18)
-                        border.width: 1
-                        border.color: root.claudeSubscriptionType === "free" ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(0.8, 0.47, 0.36, 0.35)
-                        PlasmaComponents.Label {
-                            id: planLabelClaude
-                            anchors.centerIn: parent
-                            text: root.claudeSubscriptionType.toUpperCase()
-                            font.pixelSize: 10
-                            font.bold: true
-                            color: root.claudeSubscriptionType === "free" ? Kirigami.Theme.textColor : root.claudeOrange
-                        }
-                    }
-                }
-
-                PopupRow {
-                    label: "5 Hours"
-                    resetText: root.sessionResetTime ? "resets " + root.sessionResetTime : ""
-                    countdownText: root.sessionCountdown === "resetting..." ? "resetting..." : (root.sessionCountdown ? "in " + root.sessionCountdown : "")
-                    value: root.sessionPct
-                    barColor: root.sessionColor
-                    // referencing usageHistory.length makes these bindings re-evaluate on new samples
-                    etaText: root.usageHistory.length >= 0 ? root.etaToFull("s", root.sessionPct) : ""
-                    deltaText: root.usageHistory.length >= 0 ? root.periodDelta("s", root.sessionPct, 24 * 3600000, "yesterday") : ""
-                    tokenText: root.sessionTokenLimit > 0 ? root.formatTokens(root.sessionTokensUsed) + " / " + root.formatTokens(root.sessionTokenLimit) + " tokens" : ""
-                    tooltipText: "Claude 5-hour rolling window\nUsage: " + Math.round(root.sessionPct) + "%" + (root.sessionTokenLimit > 0 ? "\n" + root.formatTokens(root.sessionTokensUsed) + " / " + root.formatTokens(root.sessionTokenLimit) + " tokens" : "") + (root.sessionResetTime ? "\nResets: " + root.sessionResetTime : "")
-                }
-
-                PopupRow {
-                    label: "7 Days"
-                    resetText: root.weeklyResetTime ? "resets " + root.weeklyResetTime : ""
-                    countdownText: root.weeklyCountdown === "resetting..." ? "resetting..." : (root.weeklyCountdown ? "in " + root.weeklyCountdown : "")
-                    value: root.weeklyPct
-                    barColor: root.weeklyColor
-                    etaText: root.usageHistory.length >= 0 ? root.etaToFull("w", root.weeklyPct) : ""
-                    deltaText: root.usageHistory.length >= 0 ? root.periodDelta("w", root.weeklyPct, 7 * 24 * 3600000, "last week") : ""
-                    tokenText: root.weeklyTokenLimit > 0 ? root.formatTokens(root.weeklyTokensUsed) + " / " + root.formatTokens(root.weeklyTokenLimit) + " tokens" : ""
-                    tooltipText: "Claude 7-day rolling window\nUsage: " + Math.round(root.weeklyPct) + "%" + (root.weeklyTokenLimit > 0 ? "\n" + root.formatTokens(root.weeklyTokensUsed) + " / " + root.formatTokens(root.weeklyTokenLimit) + " tokens" : "") + (root.weeklyResetTime ? "\nResets: " + root.weeklyResetTime : "")
-                }
-
-                Rectangle {
-                    visible: root.claudeExtraTokens > 0
-                    Layout.fillWidth: true
-                    height: 30
-                    radius: 6
-                    color: Qt.rgba(0.8, 0.47, 0.36, 0.12)
-                    border.width: 1
-                    border.color: Qt.rgba(0.8, 0.47, 0.36, 0.25)
-                    RowLayout {
-                        anchors {
-                            fill: parent
-                            leftMargin: 10
-                            rightMargin: 10
-                        }
-                        spacing: 6
-                        Rectangle {
-                            width: 6
-                            height: 6
-                            radius: 3
-                            color: root.claudeOrange
-                        }
-                        PlasmaComponents.Label {
-                            text: "Extra budget"
-                            font.pixelSize: 11
-                            font.bold: true
-                            color: root.claudeOrange
-                        }
-                        Item {
-                            Layout.fillWidth: true
-                        }
-                        PlasmaComponents.Label {
-                            text: root.formatTokens(root.claudeExtraTokens) + " tokens remaining"
-                            font.pixelSize: 11
-                            color: Kirigami.Theme.textColor
-                            opacity: 0.8
-                        }
-                    }
-                }
-
-                PopupRow {
-                    visible: root.claudeExtraUsageEnabled && root.claudeExtraUsageLimit > 0
-                    label: "Extra Purchases"
-                    value: root.claudeExtraUsagePct
-                    barColor: root.claudeOrange
-                    tokenText: root.claudeExtraUsageUsed.toFixed(2) + " / " + root.claudeExtraUsageLimit.toFixed(2) + " " + root.claudeExtraUsageCurrency + " used"
-                    tooltipText: "Claude pay-as-you-go credit spend\nLimit: " + root.claudeExtraUsageLimit + " " + root.claudeExtraUsageCurrency
-                }
-
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
-                    visible: Object.keys(root.claudeModels).length > 0
-
-                    Rectangle {
-                        Layout.fillWidth: true
-                        height: 1
-                        color: Qt.rgba(1, 1, 1, 0.08)
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 8
-                        PlasmaComponents.Label {
-                            text: "API Usage (30d)"
-                            font.bold: true
-                            font.pixelSize: 11
-                            opacity: 0.7
-                            color: Kirigami.Theme.textColor
-                        }
-                        Item {
-                            Layout.fillWidth: true
-                        }
-                        PlasmaComponents.Label {
-                            text: "$" + root.claudeTotalCostUSD.toFixed(2)
-                            font.bold: true
-                            font.pixelSize: 13
-                            color: root.claudeOrange
-                        }
-                    }
-                    PlasmaComponents.Label {
-                        text: root.formatTokens(root.claudeTotalInputTokens) + " in  ·  " + root.formatTokens(root.claudeTotalOutputTokens) + " out"
-                        font.pixelSize: 9
-                        opacity: 0.45
-                        color: Kirigami.Theme.textColor
-                    }
-
-                    Repeater {
-                        model: {
-                            var keys = Object.keys(root.claudeModels);
-                            keys.sort(function (a, b) {
-                                return root.claudeModels[b].cost_usd - root.claudeModels[a].cost_usd;
-                            });
-                            return keys;
-                        }
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            spacing: 3
-                            MouseArea {
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                propagateComposedEvents: true
-                                QQC2.ToolTip.visible: containsMouse
-                                QQC2.ToolTip.delay: 400
-                                QQC2.ToolTip.text: {
-                                    var m = root.claudeModels[modelData];
-                                    if (!m)
-                                        return modelData;
-                                    return modelData + "\nInput:  " + root.formatTokens(m.input_tokens) + " tokens\nOutput: " + root.formatTokens(m.output_tokens) + " tokens\nCost:   " + (m.priced ? "$" + m.cost_usd.toFixed(4) : "unpriced");
-                                }
-                            }
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 8
-                                PlasmaComponents.Label {
-                                    text: root.shortenModelName(modelData)
-                                    font.pixelSize: 10
-                                    opacity: 0.65
-                                    Layout.preferredWidth: 90
-                                    elide: Text.ElideRight
-                                    color: Kirigami.Theme.textColor
-                                }
-                                Item {
-                                    Layout.fillWidth: true
-                                }
-                                PlasmaComponents.Label {
-                                    text: root.formatTokens(root.claudeModels[modelData].input_tokens) + " in"
-                                    font.pixelSize: 9
-                                    opacity: 0.4
-                                    color: Kirigami.Theme.textColor
-                                }
-                                PlasmaComponents.Label {
-                                    text: root.formatTokens(root.claudeModels[modelData].output_tokens) + " out"
-                                    font.pixelSize: 9
-                                    opacity: 0.4
-                                    color: Kirigami.Theme.textColor
-                                }
-                                PlasmaComponents.Label {
-                                    text: root.claudeModels[modelData].priced ? "$" + root.claudeModels[modelData].cost_usd.toFixed(3) : "—"
-                                    font.pixelSize: 11
-                                    font.bold: true
-                                    color: Kirigami.Theme.textColor
-                                    opacity: root.claudeModels[modelData].priced ? 1.0 : 0.4
-                                    Layout.preferredWidth: 52
-                                    horizontalAlignment: Text.AlignRight
-                                }
-                            }
-                            Item {
-                                Layout.fillWidth: true
-                                height: 3
-                                Rectangle {
-                                    anchors.fill: parent
-                                    radius: 1.5
-                                    color: Qt.rgba(1, 1, 1, 0.05)
-                                }
-                                Rectangle {
-                                    anchors.left: parent.left
-                                    anchors.top: parent.top
-                                    anchors.bottom: parent.bottom
-                                    radius: 1.5
-                                    color: root.claudeOrange
-                                    opacity: 0.7
-                                    width: root.claudeTotalCostUSD > 0 ? parent.width * (root.claudeModels[modelData].cost_usd / root.claudeTotalCostUSD) : 0
-                                    Behavior on width {
-                                        NumberAnimation {
-                                            duration: 500
-                                            easing.type: Easing.OutCubic
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+            ClaudeTab {
+                rootItem: root
             }
 
-            // ── Antigravity / Gemini tab ──────────────────────────────────────
-            ColumnLayout {
-                visible: root.enabledTabs[root.activeTab] === "antigravity" && !root.showSettings
-                Layout.fillWidth: true
-                spacing: 12
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
-                    visible: root.antigravityEmail !== "" || root.antigravityPlanType !== ""
-                    Kirigami.Icon {
-                        source: "user-identity"
-                        width: 14
-                        height: 14
-                        color: root.googleBlue
-                        isMask: true
-                        opacity: 0.7
-                    }
-                    PlasmaComponents.Label {
-                        text: root.antigravityEmail || "Gemini Code Assist"
-                        font.pixelSize: 10
-                        opacity: 0.6
-                        color: Kirigami.Theme.textColor
-                        elide: Text.ElideRight
-                        Layout.fillWidth: true
-                    }
-                    Rectangle {
-                        visible: root.antigravityPlanType !== ""
-                        implicitHeight: 18
-                        implicitWidth: planLabel.implicitWidth + 16
-                        Layout.alignment: Qt.AlignVCenter
-                        radius: 4
-                        color: root.antigravityPlanType === "Free" ? Qt.rgba(1, 1, 1, 0.06) : Qt.rgba(0.26, 0.66, 0.33, 0.18)
-                        border.width: 1
-                        border.color: root.antigravityPlanType === "Free" ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(0.26, 0.66, 0.33, 0.35)
-                        PlasmaComponents.Label {
-                            id: planLabel
-                            anchors.centerIn: parent
-                            text: root.antigravityPlanType
-                            font.pixelSize: 10
-                            font.bold: true
-                            color: root.antigravityPlanType === "Free" ? Kirigami.Theme.textColor : root.googleGreen
-                        }
-                    }
-                }
-
-                PopupRow {
-                    visible: root.antigravityPromptCreditsMonthly > 0
-                    label: "Prompt Credits"
-                    resetText: root.antigravityResetTime ? "resets " + root.antigravityResetTime : ""
-                    countdownText: root.antigravityCountdown === "resetting..." ? "resetting..." : (root.antigravityCountdown ? "in " + root.antigravityCountdown : "")
-                    value: root.antigravityPromptCreditsMonthly > 0 ? (1 - root.antigravityPromptCreditsAvailable / root.antigravityPromptCreditsMonthly) * 100 : 0
-                    barColor: root.googleBlue
-                    tokenText: root.antigravityPromptCreditsAvailable + " / " + root.formatTokens(root.antigravityPromptCreditsMonthly) + " left"
-                    tooltipText: "Prompt Credits\nUsed: " + Math.round(value) + "%  ·  " + root.antigravityPromptCreditsAvailable + " / " + root.formatTokens(root.antigravityPromptCreditsMonthly) + " left" + (root.antigravityResetTime ? "\nResets: " + root.antigravityResetTime : "")
-                }
-
-                PopupRow {
-                    visible: root.antigravityPromptCreditsMonthly === 0 && Object.keys(root.antigravityModels).length > 0
-                    label: "Overall Quota"
-                    resetText: root.antigravityResetTime ? "resets " + root.antigravityResetTime : ""
-                    countdownText: root.antigravityCountdown === "resetting..." ? "resetting..." : (root.antigravityCountdown ? "in " + root.antigravityCountdown : "")
-                    value: root.antigravityPct
-                    barColor: root.googleBlue
-                    etaText: root.usageHistory.length >= 0 ? root.etaToFull("ag", root.antigravityPct) : ""
-                    deltaText: root.usageHistory.length >= 0 ? root.periodDelta("ag", root.antigravityPct, 30 * 24 * 3600000, "last month") : ""
-                    tooltipText: "Average quota usage across Gemini models\n" + Math.round(root.antigravityPct) + "% used" + (root.antigravityResetTime ? "\nResets: " + root.antigravityResetTime : "")
-                }
-
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 6
-                    visible: Object.keys(root.antigravityModels).length > 0
-
-                    Rectangle {
-                        Layout.fillWidth: true
-                        height: 1
-                        color: Qt.rgba(1, 1, 1, 0.08)
-                    }
-                    PlasmaComponents.Label {
-                        text: "Model Quotas"
-                        font.bold: true
-                        font.pixelSize: 11
-                        opacity: 0.7
-                        color: Kirigami.Theme.textColor
-                    }
-
-                    Repeater {
-                        model: Object.keys(root.antigravityModels).sort()
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: 8
-                            MouseArea {
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                propagateComposedEvents: true
-                                QQC2.ToolTip.visible: containsMouse
-                                QQC2.ToolTip.delay: 400
-                                QQC2.ToolTip.text: {
-                                    var m = root.antigravityModels[modelData];
-                                    var txt = (m.displayName || modelData) + "\n" + Math.round(m.usedPct) + "% used";
-                                    if (m.isExhausted)
-                                        txt += "\n⚠ Quota exhausted";
-                                    if (m.resetTime)
-                                        txt += "\nResets: " + Qt.formatDateTime(new Date(m.resetTime), "MMM d, hh:mm");
-                                    return txt;
-                                }
-                            }
-                            PlasmaComponents.Label {
-                                text: root.antigravityModels[modelData].displayName || modelData
-                                font.pixelSize: 10
-                                color: root.antigravityModels[modelData].isExhausted ? root.dangerColor : Kirigami.Theme.textColor
-                                opacity: root.antigravityModels[modelData].isExhausted ? 1.0 : 0.65
-                                Layout.preferredWidth: 120
-                                elide: Text.ElideRight
-                            }
-                            Rectangle {
-                                Layout.fillWidth: true
-                                height: 6
-                                radius: 3
-                                color: Qt.rgba(1, 1, 1, 0.06)
-                                border.width: 1
-                                border.color: Qt.rgba(1, 1, 1, 0.10)
-                                Rectangle {
-                                    anchors {
-                                        left: parent.left
-                                        top: parent.top
-                                        bottom: parent.bottom
-                                        margins: 1
-                                    }
-                                    width: Math.max(0, (parent.width - 2) * (root.antigravityModels[modelData].usedPct / 100))
-                                    radius: 2
-                                    color: root.antigravityModels[modelData].isExhausted ? root.dangerColor : root.antigravityModels[modelData].usedPct >= 70 ? root.warningColor : root.googleBlue
-                                    Behavior on width {
-                                        NumberAnimation {
-                                            duration: 500
-                                            easing.type: Easing.OutCubic
-                                        }
-                                    }
-                                }
-                            }
-                            PlasmaComponents.Label {
-                                text: root.antigravityModels[modelData].isExhausted ? "100%" : Math.round(root.antigravityModels[modelData].usedPct) + "%"
-                                font.pixelSize: 10
-                                font.bold: true
-                                color: root.usageColor(root.antigravityModels[modelData].usedPct)
-                                Layout.preferredWidth: 35
-                                horizontalAlignment: Text.AlignRight
-                            }
-                        }
-                    }
-                }
+            AntigravityTab {
+                rootItem: root
             }
 
-            // ── OpenAI tab ────────────────────────────────────────────────────
-            ColumnLayout {
-                visible: root.enabledTabs[root.activeTab] === "openai" && !root.showSettings
-                Layout.fillWidth: true
-                spacing: 14
-
-                // Codex / ChatGPT user identity & limits (top section, clean style)
-                ColumnLayout {
-                    visible: root.openaiCodexLoggedIn
-                    Layout.fillWidth: true
-                    spacing: 12
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 8
-
-                        Kirigami.Icon {
-                            source: "user-identity"
-                            width: 14
-                            height: 14
-                            color: root.openaiGreen
-                            isMask: true
-                            opacity: 0.7
-                        }
-                        PlasmaComponents.Label {
-                            text: root.openaiEmail || (root.openaiAccountId ? root.openaiAccountId : "Codex / ChatGPT User")
-                            font.pixelSize: 10
-                            opacity: 0.6
-                            color: Kirigami.Theme.textColor
-                            elide: Text.ElideRight
-                            Layout.fillWidth: true
-                        }
-                        Rectangle {
-                            visible: root.openaiPlanType !== ""
-                            implicitHeight: 18
-                            implicitWidth: codexPlanLabel.implicitWidth + 16
-                            Layout.alignment: Qt.AlignVCenter
-                            radius: 4
-                            color: root.openaiPlanType === "free" ? Qt.rgba(1, 1, 1, 0.06) : Qt.rgba(0.063, 0.639, 0.498, 0.18)
-                            border.width: 1
-                            border.color: root.openaiPlanType === "free" ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(0.063, 0.639, 0.498, 0.35)
-                            PlasmaComponents.Label {
-                                id: codexPlanLabel
-                                anchors.centerIn: parent
-                                text: root.openaiPlanType.toUpperCase()
-                                font.pixelSize: 10
-                                font.bold: true
-                                color: root.openaiPlanType === "free" ? Kirigami.Theme.textColor : root.openaiGreen
-                            }
-                        }
-                    }
-
-                    // Codex plan limits (messages remaining)
-                    ColumnLayout {
-                        visible: root.codexUsageAvailable
-                        Layout.fillWidth: true
-                        spacing: 12
-
-                        PopupRow {
-                            label: "5 Hours"
-                            countdownText: root.codexPrimaryCountdown === "resetting..." ? "resetting..." : (root.codexPrimaryCountdown ? "in " + root.codexPrimaryCountdown : "")
-                            value: root.codexPrimaryPct
-                            barColor: root.openaiGreen
-                            etaText: root.usageHistory.length >= 0 ? root.etaToFull("cp", root.codexPrimaryPct) : ""
-                            deltaText: root.usageHistory.length >= 0 ? root.periodDelta("cp", root.codexPrimaryPct, 5 * 3600000, "last 5h") : ""
-                            tokenText: Math.round(100 - root.codexPrimaryPct) + "% of messages left"
-                            tooltipText: "Codex 5-hour limit\nUsed: " + Math.round(root.codexPrimaryPct) + "%  ·  " + Math.round(100 - root.codexPrimaryPct) + "% left"
-                        }
-                        PopupRow {
-                            label: "Weekly"
-                            countdownText: root.codexSecondaryCountdown === "resetting..." ? "resetting..." : (root.codexSecondaryCountdown ? "in " + root.codexSecondaryCountdown : "")
-                            value: root.codexSecondaryPct
-                            barColor: root.openaiGreen
-                            etaText: root.usageHistory.length >= 0 ? root.etaToFull("cw", root.codexSecondaryPct) : ""
-                            deltaText: root.usageHistory.length >= 0 ? root.periodDelta("cw", root.codexSecondaryPct, 7 * 24 * 3600000, "last week") : ""
-                            tokenText: Math.round(100 - root.codexSecondaryPct) + "% of messages left"
-                            tooltipText: "Codex weekly limit\nUsed: " + Math.round(root.codexSecondaryPct) + "%  ·  " + Math.round(100 - root.codexSecondaryPct) + "% left"
-                        }
-
-                        PlasmaComponents.Label {
-                            visible: root.codexLimitReached
-                            text: "⚠ Limit reached — wait for reset"
-                            font.pixelSize: 10
-                            font.bold: true
-                            color: root.dangerColor
-                        }
-
-                        // Per-model additional rate limits
-                        Repeater {
-                            model: root.codexAdditionalLimits
-                            delegate: ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: 10
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 6
-                                    PlasmaComponents.Label {
-                                        text: modelData.name
-                                        font.pixelSize: 10
-                                        font.bold: true
-                                        opacity: 0.8
-                                        color: root.openaiGreen
-                                        elide: Text.ElideRight
-                                        Layout.fillWidth: true
-                                    }
-                                    Rectangle {
-                                        visible: modelData.limit_reached
-                                        implicitHeight: 14
-                                        implicitWidth: limitReachedLbl.implicitWidth + 8
-                                        radius: 3
-                                        color: Qt.rgba(1, 0.3, 0.3, 0.18)
-                                        border.width: 1
-                                        border.color: Qt.rgba(1, 0.3, 0.3, 0.4)
-                                        PlasmaComponents.Label {
-                                            id: limitReachedLbl
-                                            anchors.centerIn: parent
-                                            text: "LIMIT"
-                                            font.pixelSize: 8
-                                            font.bold: true
-                                            color: root.dangerColor
-                                        }
-                                    }
-                                }
-
-                                PopupRow {
-                                    label: "5 Hours"
-                                    countdownText: {
-                                        if (!modelData.primary_reset)
-                                            return "";
-                                        var cd = root.formatCountdown(modelData.primary_reset);
-                                        return cd === "resetting..." ? "resetting..." : (cd ? "in " + cd : "");
-                                    }
-                                    value: modelData.primary_pct
-                                    barColor: root.openaiGreen
-                                    tokenText: Math.round(100 - modelData.primary_pct) + "% of messages left"
-                                    tooltipText: modelData.name + " 5-hour limit\nUsed: " + Math.round(modelData.primary_pct) + "%  ·  " + Math.round(100 - modelData.primary_pct) + "% left"
-                                }
-                                PopupRow {
-                                    label: "Weekly"
-                                    countdownText: {
-                                        if (!modelData.secondary_reset)
-                                            return "";
-                                        var cd = root.formatCountdown(modelData.secondary_reset);
-                                        return cd === "resetting..." ? "resetting..." : (cd ? "in " + cd : "");
-                                    }
-                                    value: modelData.secondary_pct
-                                    barColor: root.openaiGreen
-                                    tokenText: Math.round(100 - modelData.secondary_pct) + "% of messages left"
-                                    tooltipText: modelData.name + " weekly limit\nUsed: " + Math.round(modelData.secondary_pct) + "%  ·  " + Math.round(100 - modelData.secondary_pct) + "% left"
-                                }
-                            }
-                        }
-                    }
-
-                    // Notice if no API key is added, matching Claude's tip box design
-                    PlasmaComponents.Label {
-                        visible: root._openaiApiKey === ""
-                        text: root.codexUsageAvailable ? "Plan limits above. Add an OpenAI API key in settings for API token/cost data." : "Codex plan limits are separate from OpenAI API billing. Add an OpenAI API key in settings for token and cost data."
-                        font.pixelSize: 9
-                        opacity: 0.45
-                        color: Kirigami.Theme.textColor
-                        wrapMode: Text.WordWrap
-                        Layout.fillWidth: true
-                        Layout.topMargin: 2
-                    }
-                }
-
-                // API usage surface (bottom section, clean style)
-                ColumnLayout {
-                    visible: root._openaiApiKey !== ""
-                    Layout.fillWidth: true
-                    spacing: 8
-
-                    Rectangle {
-                        visible: root.openaiCodexLoggedIn
-                        Layout.fillWidth: true
-                        height: 1
-                        color: Qt.rgba(1, 1, 1, 0.08)
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 8
-                        PlasmaComponents.Label {
-                            text: "API Usage (30d)"
-                            font.bold: true
-                            font.pixelSize: 11
-                            opacity: 0.7
-                            color: Kirigami.Theme.textColor
-                        }
-                        Item {
-                            Layout.fillWidth: true
-                        }
-                        Rectangle {
-                            height: 18
-                            width: apiKeyBadgeLabel.implicitWidth + 12
-                            radius: 4
-                            color: Qt.rgba(0.063, 0.639, 0.498, 0.18)
-                            border.width: 1
-                            border.color: Qt.rgba(0.063, 0.639, 0.498, 0.35)
-                            PlasmaComponents.Label {
-                                id: apiKeyBadgeLabel
-                                anchors.centerIn: parent
-                                text: "API KEY"
-                                font.pixelSize: 9
-                                font.bold: true
-                                color: root.openaiGreen
-                            }
-                        }
-                        PlasmaComponents.Label {
-                            text: "$" + root.openaiTotalCostUSD.toFixed(2)
-                            font.bold: true
-                            font.pixelSize: 13
-                            color: root.openaiGreen
-                        }
-                    }
-
-                    PlasmaComponents.Label {
-                        text: root.formatTokens(root.openaiTotalInputTokens) + " in  ·  " + root.formatTokens(root.openaiTotalOutputTokens) + " out"
-                        font.pixelSize: 9
-                        opacity: 0.45
-                        color: Kirigami.Theme.textColor
-                    }
-
-                    Rectangle {
-                        visible: Object.keys(root.openaiModels).length === 0 && root.errorMsg === ""
-                        Layout.fillWidth: true
-                        height: noApiUsageLabel.implicitHeight + 16
-                        radius: 6
-                        color: Qt.rgba(1, 1, 1, 0.04)
-                        border.width: 1
-                        border.color: Qt.rgba(1, 1, 1, 0.08)
-                        PlasmaComponents.Label {
-                            id: noApiUsageLabel
-                            anchors {
-                                left: parent.left
-                                right: parent.right
-                                verticalCenter: parent.verticalCenter
-                                leftMargin: 10
-                                rightMargin: 10
-                            }
-                            text: "No API usage returned for the last 30 days."
-                            font.pixelSize: 10
-                            opacity: 0.55
-                            color: Kirigami.Theme.textColor
-                            wrapMode: Text.WordWrap
-                        }
-                    }
-
-                    // Per-model API usage, nested inside the API usage container
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: 8
-                        visible: Object.keys(root.openaiModels).length > 0
-
-                        Rectangle {
-                            Layout.fillWidth: true
-                            height: 1
-                            color: Qt.rgba(1, 1, 1, 0.08)
-                        }
-
-                        Repeater {
-                            model: {
-                                var keys = Object.keys(root.openaiModels);
-                                keys.sort(function (a, b) {
-                                    return root.openaiModels[b].cost_usd - root.openaiModels[a].cost_usd;
-                                });
-                                return keys;
-                            }
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: 3
-                                MouseArea {
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    propagateComposedEvents: true
-                                    QQC2.ToolTip.visible: containsMouse
-                                    QQC2.ToolTip.delay: 400
-                                    QQC2.ToolTip.text: {
-                                        var m = root.openaiModels[modelData];
-                                        if (!m)
-                                            return modelData;
-                                        return modelData + "\nInput:  " + root.formatTokens(m.input_tokens) + " tokens\nOutput: " + root.formatTokens(m.output_tokens) + " tokens\nCost:   " + (m.priced ? "$" + m.cost_usd.toFixed(4) : "unpriced");
-                                    }
-                                }
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 8
-                                    PlasmaComponents.Label {
-                                        text: root.shortenModelName(modelData)
-                                        font.pixelSize: 10
-                                        opacity: 0.65
-                                        Layout.preferredWidth: 90
-                                        elide: Text.ElideRight
-                                        color: Kirigami.Theme.textColor
-                                    }
-                                    Item {
-                                        Layout.fillWidth: true
-                                    }
-                                    PlasmaComponents.Label {
-                                        text: root.formatTokens(root.openaiModels[modelData].input_tokens) + " in"
-                                        font.pixelSize: 9
-                                        opacity: 0.4
-                                        color: Kirigami.Theme.textColor
-                                    }
-                                    PlasmaComponents.Label {
-                                        text: root.formatTokens(root.openaiModels[modelData].output_tokens) + " out"
-                                        font.pixelSize: 9
-                                        opacity: 0.4
-                                        color: Kirigami.Theme.textColor
-                                    }
-                                    PlasmaComponents.Label {
-                                        text: root.openaiModels[modelData].priced ? "$" + root.openaiModels[modelData].cost_usd.toFixed(3) : "—"
-                                        font.pixelSize: 11
-                                        font.bold: true
-                                        color: Kirigami.Theme.textColor
-                                        opacity: root.openaiModels[modelData].priced ? 1.0 : 0.4
-                                        Layout.preferredWidth: 52
-                                        horizontalAlignment: Text.AlignRight
-                                    }
-                                }
-                                Item {
-                                    Layout.fillWidth: true
-                                    height: 3
-                                    Rectangle {
-                                        anchors.fill: parent
-                                        radius: 1.5
-                                        color: Qt.rgba(1, 1, 1, 0.05)
-                                    }
-                                    Rectangle {
-                                        anchors.left: parent.left
-                                        anchors.top: parent.top
-                                        anchors.bottom: parent.bottom
-                                        radius: 1.5
-                                        color: root.openaiGreen
-                                        opacity: 0.7
-                                        width: root.openaiTotalCostUSD > 0 ? parent.width * (root.openaiModels[modelData].cost_usd / root.openaiTotalCostUSD) : 0
-                                        Behavior on width {
-                                            NumberAnimation {
-                                                duration: 500
-                                                easing.type: Easing.OutCubic
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // No login and no key
-                ColumnLayout {
-                    visible: root._openaiApiKey === "" && !root.openaiCodexLoggedIn && root.enabledTabs[root.activeTab] === "openai"
-                    Layout.fillWidth: true
-                    spacing: 6
-                    PlasmaComponents.Label {
-                        text: "Not connected"
-                        font.pixelSize: 12
-                        font.bold: true
-                        color: Kirigami.Theme.textColor
-                        opacity: 0.7
-                    }
-                    PlasmaComponents.Label {
-                        text: "Add an OpenAI API key for API usage, or\nlog in with Codex CLI for account status."
-                        font.pixelSize: 10
-                        opacity: 0.5
-                        color: Kirigami.Theme.textColor
-                        wrapMode: Text.WordWrap
-                        Layout.fillWidth: true
-                    }
-                }
+            OpenAiTab {
+                rootItem: root
             }
 
-            // ── Mistral tab ─────────────────────────────────────────────────
-            ColumnLayout {
-                visible: root.enabledTabs[root.activeTab] === "mistral" && !root.showSettings
-                Layout.fillWidth: true
-                spacing: 14
-
-                // Status badge row
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
-
-                    Kirigami.Icon {
-                        source: "dialog-password"
-                        width: 14
-                        height: 14
-                        color: root.mistralOrange
-                        isMask: true
-                        opacity: 0.7
-                    }
-                    PlasmaComponents.Label {
-                        text: "Mistral AI"
-                        font.pixelSize: 10
-                        opacity: 0.6
-                        color: Kirigami.Theme.textColor
-                        elide: Text.ElideRight
-                        Layout.fillWidth: true
-                    }
-                    Rectangle {
-                        height: 18
-                        width: mistralBadgeLabel.implicitWidth + 12
-                        radius: 4
-                        color: root.mistralKeyValid ? Qt.rgba(1.0, 0.44, 0.0, 0.18) : Qt.rgba(1, 1, 1, 0.06)
-                        border.width: 1
-                        border.color: root.mistralKeyValid ? Qt.rgba(1.0, 0.44, 0.0, 0.35) : Qt.rgba(1, 1, 1, 0.12)
-                        PlasmaComponents.Label {
-                            id: mistralBadgeLabel
-                            anchors.centerIn: parent
-                            text: root.mistralKeyValid ? "ACTIVE" : (root._mistralApiKey ? "INVALID" : "NO KEY")
-                            font.pixelSize: 9
-                            font.bold: true
-                            color: root.mistralKeyValid ? root.mistralOrange : Kirigami.Theme.textColor
-                        }
-                    }
-                }
-
-                // No key message
-                ColumnLayout {
-                    visible: !root._mistralApiKey && !root.mistralKeyValid
-                    Layout.fillWidth: true
-                    spacing: 6
-                    PlasmaComponents.Label {
-                        text: "Not connected"
-                        font.pixelSize: 12
-                        font.bold: true
-                        color: Kirigami.Theme.textColor
-                        opacity: 0.7
-                    }
-                    PlasmaComponents.Label {
-                        text: "Set a Mistral API key in ⚙ settings or via\n$MISTRAL_API_KEY / ~/.config/mistral/api-key"
-                        font.pixelSize: 10
-                        opacity: 0.5
-                        color: Kirigami.Theme.textColor
-                        wrapMode: Text.WordWrap
-                        Layout.fillWidth: true
-                    }
-                }
-
-                // Key valid: show model list
-                ColumnLayout {
-                    visible: root.mistralKeyValid && root.mistralAvailableModels.length > 0
-                    Layout.fillWidth: true
-                    spacing: 8
-
-                    Rectangle {
-                        Layout.fillWidth: true
-                        height: 1
-                        color: Qt.rgba(1, 1, 1, 0.08)
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 8
-                        PlasmaComponents.Label {
-                            text: "Available Models"
-                            font.bold: true
-                            font.pixelSize: 11
-                            opacity: 0.7
-                            color: Kirigami.Theme.textColor
-                        }
-                        Item {
-                            Layout.fillWidth: true
-                        }
-                        PlasmaComponents.Label {
-                            text: root.mistralAvailableModels.length + " models"
-                            font.bold: true
-                            font.pixelSize: 13
-                            color: root.mistralOrange
-                        }
-                    }
-
-                    Repeater {
-                        model: root.mistralAvailableModels.slice(0, 10)
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: 8
-                            Rectangle {
-                                width: 6
-                                height: 6
-                                radius: 3
-                                color: root.mistralOrange
-                                opacity: 0.7
-                                Layout.alignment: Qt.AlignVCenter
-                            }
-                            PlasmaComponents.Label {
-                                text: modelData
-                                font.pixelSize: 10
-                                opacity: 0.65
-                                color: Kirigami.Theme.textColor
-                                elide: Text.ElideRight
-                                Layout.fillWidth: true
-                            }
-                        }
-                    }
-
-                    PlasmaComponents.Label {
-                        visible: root.mistralAvailableModels.length > 10
-                        text: "... and " + (root.mistralAvailableModels.length - 10) + " more"
-                        font.pixelSize: 9
-                        opacity: 0.4
-                        color: Kirigami.Theme.textColor
-                    }
-                }
-
-                // Note about billing
-                Rectangle {
-                    visible: root.mistralKeyValid
-                    Layout.fillWidth: true
-                    height: mistralNoteCol.implicitHeight + 16
-                    radius: 6
-                    color: Qt.rgba(1.0, 0.44, 0.0, 0.07)
-                    border.width: 1
-                    border.color: Qt.rgba(1.0, 0.44, 0.0, 0.20)
-                    ColumnLayout {
-                        id: mistralNoteCol
-                        anchors {
-                            left: parent.left
-                            right: parent.right
-                            top: parent.top
-                            margins: 10
-                        }
-                        spacing: 4
-                        RowLayout {
-                            spacing: 6
-                            Rectangle {
-                                width: 6
-                                height: 6
-                                radius: 3
-                                color: root.mistralOrange
-                                Layout.alignment: Qt.AlignVCenter
-                            }
-                            PlasmaComponents.Label {
-                                text: "No public usage API"
-                                font.pixelSize: 11
-                                font.bold: true
-                                color: root.mistralOrange
-                            }
-                        }
-                        PlasmaComponents.Label {
-                            text: "Mistral doesn't expose billing data via REST.\nCheck usage at console.mistral.ai"
-                            font.pixelSize: 10
-                            opacity: 0.55
-                            color: Kirigami.Theme.textColor
-                            wrapMode: Text.WordWrap
-                            Layout.fillWidth: true
-                        }
-                    }
-                }
+            MistralTab {
+                rootItem: root
             }
 
-            // ── OpenRouter tab ──────────────────────────────────────────────
-            ColumnLayout {
-                visible: root.enabledTabs[root.activeTab] === "openrouter" && !root.showSettings
-                Layout.fillWidth: true
-                spacing: 14
-
-                // Beta / Untested warning banner
-                Rectangle {
-                    Layout.fillWidth: true
-                    height: orBetaCol.implicitHeight + 16
-                    radius: 8
-                    color: Qt.rgba(0.93, 0.45, 0.1, 0.08)
-                    border.width: 1
-                    border.color: Qt.rgba(0.93, 0.45, 0.1, 0.20)
-
-                    RowLayout {
-                        id: orBetaCol
-                        anchors.fill: parent
-                        anchors.margins: 10
-                        spacing: 8
-
-                        Kirigami.Icon {
-                            source: "dialog-warning"
-                            width: 16
-                            height: 16
-                            color: "#f97316"
-                            isMask: true
-                            Layout.alignment: Qt.AlignVCenter
-                        }
-
-                        PlasmaComponents.Label {
-                            text: "OpenRouter support is in BETA and currently untested."
-                            font.pixelSize: 10
-                            font.bold: true
-                            color: "#f97316"
-                            wrapMode: Text.WordWrap
-                            Layout.fillWidth: true
-                            Layout.alignment: Qt.AlignVCenter
-                        }
-                    }
-                }
-
-                // Account row
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
-                    visible: root.openrouterKeyValid
-
-                    Kirigami.Icon {
-                        source: "user-identity"
-                        width: 14
-                        height: 14
-                        color: root.openrouterPurple
-                        isMask: true
-                        opacity: 0.7
-                    }
-                    PlasmaComponents.Label {
-                        text: root.openrouterLabel || "OpenRouter"
-                        font.pixelSize: 10
-                        opacity: 0.6
-                        color: Kirigami.Theme.textColor
-                        elide: Text.ElideRight
-                        Layout.fillWidth: true
-                    }
-                    Rectangle {
-                        height: 18
-                        width: orPlanLabel.implicitWidth + 12
-                        radius: 4
-                        color: root.openrouterIsFreeTier ? Qt.rgba(1, 1, 1, 0.06) : Qt.rgba(0.576, 0.2, 0.918, 0.18)
-                        border.width: 1
-                        border.color: root.openrouterIsFreeTier ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(0.576, 0.2, 0.918, 0.35)
-                        PlasmaComponents.Label {
-                            id: orPlanLabel
-                            anchors.centerIn: parent
-                            text: root.openrouterIsFreeTier ? "FREE" : "PAID"
-                            font.pixelSize: 9
-                            font.bold: true
-                            color: root.openrouterIsFreeTier ? Kirigami.Theme.textColor : root.openrouterPurple
-                        }
-                    }
-                }
-
-                // No key message
-                ColumnLayout {
-                    visible: !root.openrouterKeyValid && root._openrouterApiKey === ""
-                    Layout.fillWidth: true
-                    spacing: 6
-                    PlasmaComponents.Label {
-                        text: "Not connected"
-                        font.pixelSize: 12
-                        font.bold: true
-                        color: Kirigami.Theme.textColor
-                        opacity: 0.7
-                    }
-                    PlasmaComponents.Label {
-                        text: "Set an OpenRouter API key in ⚙ settings or via\n$OPENROUTER_API_KEY / ~/.config/openrouter/api-key"
-                        font.pixelSize: 10
-                        opacity: 0.5
-                        color: Kirigami.Theme.textColor
-                        wrapMode: Text.WordWrap
-                        Layout.fillWidth: true
-                    }
-                }
-
-                // Usage stats
-                ColumnLayout {
-                    visible: root.openrouterKeyValid
-                    Layout.fillWidth: true
-                    spacing: 8
-
-                    // Usage bar (only when limit is set)
-                    PopupRow {
-                        visible: root.openrouterLimitUSD !== null && root.openrouterLimitUSD > 0
-                        label: "Credit Usage"
-                        value: root.openrouterLimitUSD !== null && root.openrouterLimitUSD > 0 ? Math.min(100, (root.openrouterUsageUSD / root.openrouterLimitUSD) * 100) : 0
-                        barColor: root.openrouterPurple
-                        etaText: root.usageHistory.length >= 0 ? root.etaToFull("or", value) : ""
-                        deltaText: root.usageHistory.length >= 0 ? root.periodDelta("or", value, 30 * 24 * 3600000, "last month") : ""
-                        tokenText: "$" + root.openrouterUsageUSD.toFixed(4) + " / $" + (root.openrouterLimitUSD !== null ? root.openrouterLimitUSD.toFixed(2) : "∞") + " used"
-                        tooltipText: "OpenRouter credit spend\n$" + root.openrouterUsageUSD.toFixed(4) + " of $" + (root.openrouterLimitUSD !== null ? root.openrouterLimitUSD.toFixed(2) : "unlimited") + " limit"
-                    }
-
-                    // Usage summary card
-                    Rectangle {
-                        Layout.fillWidth: true
-                        height: orStatsCol.implicitHeight + 16
-                        radius: 8
-                        color: Qt.rgba(0.576, 0.2, 0.918, 0.08)
-                        border.width: 1
-                        border.color: Qt.rgba(0.576, 0.2, 0.918, 0.22)
-
-                        ColumnLayout {
-                            id: orStatsCol
-                            anchors {
-                                left: parent.left
-                                right: parent.right
-                                top: parent.top
-                                margins: 12
-                            }
-                            spacing: 8
-
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 8
-                                PlasmaComponents.Label {
-                                    text: "All-time Spend"
-                                    font.pixelSize: 11
-                                    opacity: 0.65
-                                    color: Kirigami.Theme.textColor
-                                    Layout.fillWidth: true
-                                }
-                                PlasmaComponents.Label {
-                                    text: "$" + root.openrouterUsageUSD.toFixed(4)
-                                    font.bold: true
-                                    font.pixelSize: 14
-                                    color: root.openrouterPurple
-                                }
-                            }
-
-                            // Credit limit row
-                            RowLayout {
-                                visible: root.openrouterLimitUSD !== null
-                                Layout.fillWidth: true
-                                spacing: 8
-                                PlasmaComponents.Label {
-                                    text: "Credit Limit"
-                                    font.pixelSize: 11
-                                    opacity: 0.65
-                                    color: Kirigami.Theme.textColor
-                                    Layout.fillWidth: true
-                                }
-                                PlasmaComponents.Label {
-                                    text: root.openrouterLimitUSD !== null ? "$" + root.openrouterLimitUSD.toFixed(2) : "∞"
-                                    font.bold: true
-                                    font.pixelSize: 12
-                                    color: Kirigami.Theme.textColor
-                                    opacity: 0.85
-                                }
-                            }
-
-                            // Remaining row
-                            RowLayout {
-                                visible: root.openrouterLimitRemainingUSD !== null
-                                Layout.fillWidth: true
-                                spacing: 8
-                                PlasmaComponents.Label {
-                                    text: "Remaining"
-                                    font.pixelSize: 11
-                                    opacity: 0.65
-                                    color: Kirigami.Theme.textColor
-                                    Layout.fillWidth: true
-                                }
-                                PlasmaComponents.Label {
-                                    text: root.openrouterLimitRemainingUSD !== null ? "$" + root.openrouterLimitRemainingUSD.toFixed(4) : "—"
-                                    font.bold: true
-                                    font.pixelSize: 12
-                                    color: {
-                                        if (root.openrouterLimitRemainingUSD === null)
-                                            return Kirigami.Theme.textColor;
-                                        var pct = root.openrouterLimitUSD > 0 ? ((root.openrouterLimitUSD - root.openrouterLimitRemainingUSD) / root.openrouterLimitUSD) * 100 : 0;
-                                        return root.usageColor(pct);
-                                    }
-                                }
-                            }
-
-                            // Rate limit info
-                            RowLayout {
-                                visible: root.openrouterRateLimit && root.openrouterRateLimit.requests !== undefined
-                                Layout.fillWidth: true
-                                spacing: 8
-                                PlasmaComponents.Label {
-                                    text: "Rate Limit"
-                                    font.pixelSize: 11
-                                    opacity: 0.65
-                                    color: Kirigami.Theme.textColor
-                                    Layout.fillWidth: true
-                                }
-                                PlasmaComponents.Label {
-                                    text: root.openrouterRateLimit.requests !== undefined ? root.openrouterRateLimit.requests + " req / " + (root.openrouterRateLimit.interval || "min") : ""
-                                    font.pixelSize: 10
-                                    opacity: 0.65
-                                    color: Kirigami.Theme.textColor
-                                }
-                            }
-                        }
-                    }
-
-                    // Free tier note
-                    Rectangle {
-                        visible: root.openrouterIsFreeTier
-                        Layout.fillWidth: true
-                        height: orFreeCol.implicitHeight + 12
-                        radius: 6
-                        color: Qt.rgba(1, 1, 1, 0.04)
-                        border.width: 1
-                        border.color: Qt.rgba(1, 1, 1, 0.10)
-                        ColumnLayout {
-                            id: orFreeCol
-                            anchors {
-                                left: parent.left
-                                right: parent.right
-                                top: parent.top
-                                margins: 10
-                            }
-                            spacing: 3
-                            PlasmaComponents.Label {
-                                text: "Free tier active — rate limits apply"
-                                font.pixelSize: 10
-                                opacity: 0.5
-                                color: Kirigami.Theme.textColor
-                                wrapMode: Text.WordWrap
-                                Layout.fillWidth: true
-                            }
-                        }
-                    }
-                }
+            OpenRouterTab {
+                rootItem: root
             }
 
-            // ── Usage chart (Claude 5H/7D · Codex 5H/7D) ───────────────────
-            Rectangle {
-                id: usageChartContainer
-                visible: !root.showSettings && root.showUsageChart && root.weeklyUsageHistory.length >= 1 && (root.enabledTabs[root.activeTab] === "claude" || (root.enabledTabs[root.activeTab] === "openai" && root.codexUsageAvailable) || root.enabledTabs[root.activeTab] === "antigravity" || root.enabledTabs[root.activeTab] === "openrouter")
-                Layout.fillWidth: true
-                Layout.preferredHeight: implicitHeight
-                implicitHeight: 184
-                radius: 10
-                color: root.resolvedCardBg
-                border.width: 1
-                border.color: Qt.rgba(1, 1, 1, 0.08)
-                clip: true
-
-                // subtle inner top highlight
-                Rectangle {
-                    anchors.top: parent.top
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    height: 1
-                    color: Qt.rgba(1, 1, 1, 0.10)
-                    radius: 10
-                }
-
-                // ── Chart navigation (top-left) ──
-                RowLayout {
-                    id: chartNavRow
-                    anchors.top: parent.top
-                    anchors.left: parent.left
-                    anchors.topMargin: 7
-                    anchors.leftMargin: 12
-                    spacing: 6
-
-                    // Left arrow button
-                    Rectangle {
-                        radius: 4
-                        implicitHeight: 16
-                        implicitWidth: 16
-                        color: leftNavMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(1, 1, 1, 0.06)
-                        opacity: enabled ? 1.0 : 0.3
-                        enabled: {
-                            var key = root._historyKey();
-                            var oldestT = 0;
-                            for (var i = 0; i < root.usageHistory.length; i++) {
-                                var p = root.usageHistory[i];
-                                if (p[key] !== undefined && p[key] !== null) {
-                                    oldestT = p.t;
-                                    break;
-                                }
-                            }
-                            if (oldestT === 0)
-                                return false;
-                            var now_ms = new Date().getTime();
-                            var winSize = root.getChartWindowSize();
-                            var maxT = now_ms - root.chartTimeOffset;
-                            var minT = maxT - winSize;
-                            return minT > oldestT;
-                        }
-                        PlasmaComponents.Label {
-                            anchors.centerIn: parent
-                            text: "<"
-                            font.pixelSize: 9
-                            font.bold: true
-                            color: Kirigami.Theme.textColor
-                        }
-                        MouseArea {
-                            id: leftNavMouse
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: parent.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                            onClicked: {
-                                root.chartTimeOffset += root.getChartWindowSize();
-                            }
-                        }
-                    }
-
-                    // Center label showing current range
-                    PlasmaComponents.Label {
-                        text: root.getChartRangeText()
-                        font.pixelSize: 9
-                        font.bold: true
-                        opacity: 0.6
-                        color: Kirigami.Theme.textColor
-                    }
-
-                    // Right arrow button
-                    Rectangle {
-                        radius: 4
-                        implicitHeight: 16
-                        implicitWidth: 16
-                        color: rightNavMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(1, 1, 1, 0.06)
-                        opacity: enabled ? 1.0 : 0.3
-                        enabled: root.chartTimeOffset > 0
-                        PlasmaComponents.Label {
-                            anchors.centerIn: parent
-                            text: ">"
-                            font.pixelSize: 9
-                            font.bold: true
-                            color: Kirigami.Theme.textColor
-                        }
-                        MouseArea {
-                            id: rightNavMouse
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: parent.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                            onClicked: {
-                                var winSize = root.getChartWindowSize();
-                                root.chartTimeOffset = Math.max(0, root.chartTimeOffset - winSize);
-                            }
-                        }
-                    }
-                }
-
-                // ── Window toggle — Claude: 5H/7D, Codex: 5H/7D (single-series tabs: hidden) ──
-                RowLayout {
-                    id: chartWindowToggle
-                    anchors.top: parent.top
-                    anchors.right: parent.right
-                    anchors.topMargin: 7
-                    anchors.rightMargin: 8
-                    spacing: 4
-                    visible: {
-                        var tab = root.enabledTabs[root.activeTab];
-                        if (tab === "claude") {
-                            for (var i = 0; i < root.usageHistory.length; i++)
-                                if (root.usageHistory[i].s !== undefined && root.usageHistory[i].s !== null)
-                                    return true;
-                            return false;
-                        }
-                        if (tab === "openai") {
-                            for (var j = 0; j < root.usageHistory.length; j++)
-                                if (root.usageHistory[j].cp !== undefined && root.usageHistory[j].cp !== null)
-                                    return true;
-                        }
-                        return false;
-                    }
-                    Repeater {
-                        model: {
-                            var tab = root.enabledTabs[root.activeTab];
-                            if (tab === "openai")
-                                return [
-                                    {
-                                        id: "codex_primary",
-                                        label: "5H"
-                                    },
-                                    {
-                                        id: "codex_weekly",
-                                        label: "7D"
-                                    }
-                                ];
-                            return [
-                                {
-                                    id: "session",
-                                    label: "5H"
-                                },
-                                {
-                                    id: "weekly",
-                                    label: "7D"
-                                }
-                            ];
-                        }
-                        Rectangle {
-                            radius: 4
-                            implicitHeight: 16
-                            implicitWidth: winLabel.implicitWidth + 12
-                            color: root.chartWindow === modelData.id ? root.activeAccent : Qt.rgba(1, 1, 1, 0.06)
-                            opacity: root.chartWindow === modelData.id ? 0.9 : 1.0
-                            Behavior on color {
-                                ColorAnimation {
-                                    duration: 150
-                                }
-                            }
-                            PlasmaComponents.Label {
-                                id: winLabel
-                                anchors.centerIn: parent
-                                text: modelData.label
-                                font.pixelSize: 9
-                                font.bold: root.chartWindow === modelData.id
-                                color: root.chartWindow === modelData.id ? "#ffffff" : Kirigami.Theme.textColor
-                                opacity: root.chartWindow === modelData.id ? 1.0 : 0.6
-                            }
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    root.chartWindow = modelData.id;
-                                    Plasmoid.configuration.chartWindow = modelData.id;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Y-axis labels
-                PlasmaComponents.Label {
-                    anchors.right: chartCanvas.left
-                    anchors.rightMargin: 4
-                    y: chartCanvas.y + 2
-                    text: "100%"
-                    font.pixelSize: 9
-                    opacity: 0.35
-                    color: Kirigami.Theme.textColor
-                }
-                PlasmaComponents.Label {
-                    anchors.right: chartCanvas.left
-                    anchors.rightMargin: 4
-                    y: chartCanvas.y + chartCanvas.height / 2 - 6
-                    text: "50%"
-                    font.pixelSize: 9
-                    opacity: 0.35
-                    color: Kirigami.Theme.textColor
-                }
-                PlasmaComponents.Label {
-                    anchors.right: chartCanvas.left
-                    anchors.rightMargin: 4
-                    y: chartCanvas.y + chartCanvas.height - 14
-                    text: "0%"
-                    font.pixelSize: 9
-                    opacity: 0.35
-                    color: Kirigami.Theme.textColor
-                }
-
-                Canvas {
-                    id: chartCanvas
-                    anchors.top: parent.top
-                    anchors.bottom: xAxisRow.top
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.leftMargin: 36
-                    anchors.rightMargin: 8
-                    anchors.topMargin: 28
-                    anchors.bottomMargin: 2
-
-                    property var history: root.weeklyUsageHistory
-                    property color accentColor: root.activeAccent
-                    // pulse phase 0..1, driven while usage is climbing fast; scales the latest dot's halo
-                    property real pulse: 0
-                    // hover-scrub index into history (-1 = none)
-                    property int scrubIndex: -1
-                    onHistoryChanged: requestPaint()
-                    onAccentColorChanged: requestPaint()
-                    onPulseChanged: requestPaint()
-                    onScrubIndexChanged: requestPaint()
-                    onVisibleChanged: if (visible)
-                        requestPaint()
-                    onWidthChanged: requestPaint()
-                    onHeightChanged: requestPaint()
-
-                    // Pulse when the selected window is climbing >2%/h
-                    readonly property bool climbingFast: {
-                        var key = root._historyKey();
-                        var slope = root.usageSlopePerHour(key, 2 * 3600000);
-                        return slope !== null && slope > 2;
-                    }
-                    SequentialAnimation on pulse {
-                        running: chartCanvas.climbingFast && chartCanvas.visible
-                        loops: Animation.Infinite
-                        NumberAnimation {
-                            from: 0
-                            to: 1
-                            duration: 900
-                            easing.type: Easing.InOutSine
-                        }
-                        NumberAnimation {
-                            from: 1
-                            to: 0
-                            duration: 900
-                            easing.type: Easing.InOutSine
-                        }
-                    }
-                    onClimbingFastChanged: if (!climbingFast)
-                        pulse = 0
-
-                    onPaint: {
-                        var ctx = getContext("2d");
-                        ctx.clearRect(0, 0, width, height);
-                        var pts = history;
-                        if (!pts || pts.length < 1)
-                            return;
-
-                        var w = width, h = height;
-                        var now_ms = new Date().getTime();
-                        var maxT = now_ms - root.chartTimeOffset;
-                        var minT = maxT - root.getChartWindowSize();
-                        var tRange = root.getChartWindowSize();
-
-                        function px(i) {
-                            return ((pts[i].t - minT) / tRange) * w;
-                        }
-                        // small top/bottom margin so the glow dot isn't clipped by the canvas edge
-                        function py(v) {
-                            return h - (v / 100) * h * 0.88 - h * 0.04;
-                        }
-
-                        // build rgba string from the QML color object (components are 0–1)
-                        var acR = Math.round(accentColor.r * 255);
-                        var acG = Math.round(accentColor.g * 255);
-                        var acB = Math.round(accentColor.b * 255);
-                        function acRgba(a) {
-                            return "rgba(" + acR + "," + acG + "," + acB + "," + a + ")";
-                        }
-
-                        // dashed grid lines at 25 / 50 / 75 / 100%
-                        ctx.save();
-                        ctx.setLineDash([3, 5]);
-                        ctx.strokeStyle = "rgba(255,255,255,0.08)";
-                        ctx.lineWidth = 1;
-                        [25, 50, 75, 100].forEach(function (pct) {
-                            var y = py(pct);
-                            ctx.beginPath();
-                            ctx.moveTo(0, y);
-                            ctx.lineTo(w, y);
-                            ctx.stroke();
-                        });
-                        ctx.restore();
-
-                        if (pts.length === 1) {
-                            var sx = w / 2, sy = py(pts[0].v);
-                            ctx.beginPath();
-                            ctx.arc(sx, sy, 7, 0, Math.PI * 2);
-                            ctx.fillStyle = acRgba(0.18);
-                            ctx.fill();
-                            ctx.beginPath();
-                            ctx.arc(sx, sy, 4, 0, Math.PI * 2);
-                            ctx.fillStyle = acRgba(1.0);
-                            ctx.fill();
-                            ctx.beginPath();
-                            ctx.arc(sx, sy, 1.8, 0, Math.PI * 2);
-                            ctx.fillStyle = "rgba(255,255,255,0.9)";
-                            ctx.fill();
-                            return;
-                        }
-
-                        // smooth cubic bezier path builder
-                        function buildPath() {
-                            ctx.moveTo(px(0), py(pts[0].v));
-                            for (var i = 0; i < pts.length - 1; i++) {
-                                var x0 = px(i), y0 = py(pts[i].v);
-                                var x1 = px(i + 1), y1 = py(pts[i + 1].v);
-                                var cpx = x0 + (x1 - x0) * 0.5;
-                                ctx.bezierCurveTo(cpx, y0, cpx, y1, x1, y1);
-                            }
-                        }
-
-                        // glow pass — wide soft stroke behind the crisp line (fast stroke-based glow instead of heavy CPU shadow blur)
-                        ctx.save();
-                        ctx.lineJoin = "round";
-                        ctx.lineCap = "round";
-                        ctx.beginPath();
-                        buildPath();
-                        ctx.strokeStyle = acRgba(0.08);
-                        ctx.lineWidth = 14;
-                        ctx.stroke();
-                        ctx.beginPath();
-                        buildPath();
-                        ctx.strokeStyle = acRgba(0.18);
-                        ctx.lineWidth = 8;
-                        ctx.stroke();
-                        ctx.beginPath();
-                        buildPath();
-                        ctx.strokeStyle = acRgba(0.40);
-                        ctx.lineWidth = 4;
-                        ctx.stroke();
-                        ctx.restore();
-
-                        // filled gradient area
-                        var grad = ctx.createLinearGradient(0, 0, 0, h);
-                        grad.addColorStop(0, acRgba(0.28));
-                        grad.addColorStop(0.6, acRgba(0.08));
-                        grad.addColorStop(1, acRgba(0.0));
-                        ctx.beginPath();
-                        buildPath();
-                        ctx.lineTo(px(pts.length - 1), h);
-                        ctx.lineTo(px(0), h);
-                        ctx.closePath();
-                        ctx.fillStyle = grad;
-                        ctx.fill();
-
-                        // crisp line on top
-                        ctx.beginPath();
-                        buildPath();
-                        ctx.strokeStyle = acRgba(1.0);
-                        ctx.lineWidth = 2;
-                        ctx.lineJoin = "round";
-                        ctx.lineCap = "round";
-                        ctx.stroke();
-
-                        // latest point: pulsing halo + dot + white pip
-                        var lx = px(pts.length - 1);
-                        var ly = py(pts[pts.length - 1].v);
-                        // halo grows + fades with the pulse phase when climbing fast
-                        var haloR = 7 + pulse * 8;
-                        var haloA = 0.18 + (1 - pulse) * 0.10;
-                        ctx.beginPath();
-                        ctx.arc(lx, ly, haloR, 0, Math.PI * 2);
-                        ctx.fillStyle = acRgba(pulse > 0 ? haloA * (1 - pulse) + 0.06 : 0.18);
-                        ctx.fill();
-                        ctx.beginPath();
-                        ctx.arc(lx, ly, 4, 0, Math.PI * 2);
-                        ctx.fillStyle = acRgba(1.0);
-                        ctx.fill();
-                        ctx.beginPath();
-                        ctx.arc(lx, ly, 1.8, 0, Math.PI * 2);
-                        ctx.fillStyle = "rgba(255,255,255,0.9)";
-                        ctx.fill();
-
-                        // hover scrub: vertical guide + highlighted point
-                        if (scrubIndex >= 0 && scrubIndex < pts.length) {
-                            var hx = px(scrubIndex);
-                            var hy = py(pts[scrubIndex].v);
-                            ctx.save();
-                            ctx.setLineDash([2, 3]);
-                            ctx.strokeStyle = acRgba(0.5);
-                            ctx.lineWidth = 1;
-                            ctx.beginPath();
-                            ctx.moveTo(hx, 0);
-                            ctx.lineTo(hx, h);
-                            ctx.stroke();
-                            ctx.restore();
-                            ctx.beginPath();
-                            ctx.arc(hx, hy, 5, 0, Math.PI * 2);
-                            ctx.fillStyle = acRgba(1.0);
-                            ctx.fill();
-                            ctx.beginPath();
-                            ctx.arc(hx, hy, 2, 0, Math.PI * 2);
-                            ctx.fillStyle = "#ffffff";
-                            ctx.fill();
-                        }
-                    }
-
-                    // ── Hover scrub ──────────────────────────────────────
-                    MouseArea {
-                        id: scrubArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        onPositionChanged: function (mouse) {
-                            var pts = chartCanvas.history;
-                            if (!pts || pts.length < 1) {
-                                chartCanvas.scrubIndex = -1;
-                                return;
-                            }
-                            // map mouse x → nearest sample index
-                            var ratio = Math.max(0, Math.min(1, mouse.x / chartCanvas.width));
-                            chartCanvas.scrubIndex = Math.round(ratio * (pts.length - 1));
-                        }
-                        onExited: chartCanvas.scrubIndex = -1
-                        QQC2.ToolTip.visible: chartCanvas.scrubIndex >= 0
-                        QQC2.ToolTip.delay: 0
-                        QQC2.ToolTip.text: {
-                            var pts = chartCanvas.history;
-                            if (chartCanvas.scrubIndex < 0 || chartCanvas.scrubIndex >= pts.length)
-                                return "";
-                            var p = pts[chartCanvas.scrubIndex];
-                            return Math.round(p.v) + "%  ·  " + Qt.formatDateTime(new Date(p.t), "MMM d, hh:mm");
-                        }
-                    }
-                }
-
-                // X-axis date labels
-                RowLayout {
-                    id: xAxisRow
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.bottom: parent.bottom
-                    anchors.leftMargin: 36
-                    anchors.rightMargin: 8
-                    anchors.bottomMargin: 5
-                    spacing: 0
-
-                    function formatLabel(timestamp) {
-                        if (root.chartWindow === "session" || root.chartWindow === "codex_primary") {
-                            return Qt.formatTime(new Date(timestamp), "hh:mm");
-                        }
-                        return Qt.formatDate(new Date(timestamp), "MMM d");
-                    }
-
-                    PlasmaComponents.Label {
-                        text: {
-                            var now_ms = new Date().getTime();
-                            var maxT = now_ms - root.chartTimeOffset;
-                            var minT = maxT - root.getChartWindowSize();
-                            return xAxisRow.formatLabel(minT);
-                        }
-                        font.pixelSize: 9
-                        opacity: 0.40
-                        color: Kirigami.Theme.textColor
-                    }
-                    Item {
-                        Layout.fillWidth: true
-                    }
-                    PlasmaComponents.Label {
-                        text: {
-                            var now_ms = new Date().getTime();
-                            var maxT = now_ms - root.chartTimeOffset;
-                            var winSize = root.getChartWindowSize();
-                            var minT = maxT - winSize;
-                            return xAxisRow.formatLabel(minT + winSize / 2);
-                        }
-                        font.pixelSize: 9
-                        opacity: 0.40
-                        color: Kirigami.Theme.textColor
-                    }
-                    Item {
-                        Layout.fillWidth: true
-                    }
-                    PlasmaComponents.Label {
-                        text: {
-                            var now_ms = new Date().getTime();
-                            var maxT = now_ms - root.chartTimeOffset;
-                            return xAxisRow.formatLabel(maxT);
-                        }
-                        font.pixelSize: 9
-                        opacity: 0.40
-                        color: Kirigami.Theme.textColor
-                    }
-                }
+            UsageChart {
+                rootItem: root
             }
 
             // ── Footer ─────────────────────────────────────────────────────────

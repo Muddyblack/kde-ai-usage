@@ -2,10 +2,10 @@
 # History persistence helper for the AI Usage widget.
 #
 # Usage:
-#   history_io.sh autosave   — silently mirror $WIDGET_HISTORY_JSON to the latest file (no timestamped copy)
-#   history_io.sh autoload   — read the latest file for startup restore; delete it if unreadable
-#   history_io.sh export     — write $WIDGET_HISTORY_JSON to a timestamped file + latest, print its path
-#   history_io.sh import     — read the most recent file, print its JSON (delete if corrupt)
+#   history-io autosave   — silently mirror $WIDGET_HISTORY_JSON to the latest file (no timestamped copy)
+#   history-io autoload   — read the latest file for startup restore; delete it if unreadable
+#   history-io export     — write $WIDGET_HISTORY_JSON to a timestamped file + latest, print its path
+#   history-io import     — read the most recent file, print its JSON (delete if corrupt)
 #
 # Output is a single JSON object: {"ok":true,"path":…} | {"ok":true,"data":[…]} |
 #   {"ok":true,"empty":true} | {"error":…}.

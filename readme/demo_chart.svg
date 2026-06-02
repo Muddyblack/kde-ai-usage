@@ -1,0 +1,234 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 486" width="400" height="486">
+<defs>
+  <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#181922"/>
+    <stop offset="100%" stop-color="#111218"/>
+  </linearGradient>
+  <linearGradient id="sessionGrad" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0%"   stop-color="#e87272"/>
+    <stop offset="100%" stop-color="#e05252"/>
+  </linearGradient>
+  <linearGradient id="weeklyGrad" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0%"   stop-color="#f7bc50"/>
+    <stop offset="100%" stop-color="#f5a623"/>
+  </linearGradient>
+  <linearGradient id="accentAreaGrad" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#cc785c" stop-opacity="0.3"/>
+    <stop offset="60%" stop-color="#cc785c" stop-opacity="0.08"/>
+    <stop offset="100%" stop-color="#cc785c" stop-opacity="0.0"/>
+  </linearGradient>
+</defs>
+
+<!-- Card Background -->
+<rect width="400" height="486" rx="12" fill="url(#bgGrad)"/>
+<rect width="400" height="486" rx="12" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1.2"/>
+
+<!-- Header Section -->
+<g transform="translate(16, 16)">
+  <!-- Official Widget Logo (Orange version) -->
+  <g transform="scale(0.85)">
+    <path d="M 3.5,10 A 8.5,8.5 0 0,0 20.5,10 M 6.5,10 A 5.5,5.5 0 0,0 17.5,10" fill="none" stroke="#cc785c" stroke-width="1.8" stroke-linecap="round" />
+    <path d="M 12,2 C 12,6.5 13.5,8 18,8 C 13.5,8 12,9.5 12,14 C 12,9.5 10.5,8 6,8 C 10.5,8 12,6.5 12,2 Z" fill="#cc785c" />
+    <path d="M 18.5,1.5 C 18.5,2.7 18.9,3.1 20.1,3.1 C 18.9,3.1 18.5,3.5 18.5,4.7 C 18.5,3.5 18.1,3.1 16.9,3.1 C 18.1,3.1 18.5,2.7 18.5,1.5 Z" fill="#cc785c" />
+  </g>
+  <text x="28" y="15" font-family="system-ui,-apple-system,sans-serif" font-size="14.5" font-weight="700" fill="#ffffff">Claude Usage</text>
+</g>
+
+<!-- Refresh Button -->
+<g transform="translate(366, 17) scale(0.9)">
+  <path d="M13.65 2.35A7 7 0 1 0 16 8h-2a5 5 0 1 1-1.7-3.43L10 7h6V1l-2.35 2.35z" fill="#9ca3af"/>
+</g>
+
+<!-- Tab Bar -->
+<g transform="translate(0, 0)">
+  <!-- Claude Tab (Active) -->
+  <rect x="16" y="52" width="117" height="28" rx="6" fill="#2d221e" stroke="#cc785c" stroke-width="1.2"/>
+  <circle cx="52" cy="66" r="3" fill="#cc785c"/>
+  <text x="62" y="70" font-family="system-ui,-apple-system,sans-serif" font-size="11.5" font-weight="700" fill="#ffffff">Claude</text>
+
+  <!-- Antigravity Tab (Inactive) -->
+  <rect x="141" y="52" width="117" height="28" rx="6" fill="#1b202a" stroke="rgba(59,130,246,0.15)" stroke-width="1"/>
+  <circle cx="165" cy="66" r="3" fill="#3b82f6"/>
+  <text x="175" y="70" font-family="system-ui,-apple-system,sans-serif" font-size="11.5" font-weight="600" fill="#3b82f6">Antigravity</text>
+
+  <!-- OpenAI Tab (Inactive) -->
+  <rect x="266" y="52" width="118" height="28" rx="6" fill="#1c2420" stroke="rgba(16,163,127,0.15)" stroke-width="1"/>
+  <circle cx="301" cy="66" r="3" fill="#10a37f"/>
+  <text x="311" y="70" font-family="system-ui,-apple-system,sans-serif" font-size="11.5" font-weight="600" fill="#10a37f">OpenAI</text>
+</g>
+
+<!-- User Row -->
+<g transform="translate(16, 96)">
+  <!-- User Profile Icon -->
+  <g fill="none" stroke="#cc785c" stroke-width="1.5">
+    <circle cx="10" cy="6" r="3"/>
+    <path d="M3,15 C3,11 6,10 10,10 C14,10 17,11 17,15" stroke-linecap="round"/>
+  </g>
+  <text x="28" y="13" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#9ca3af">Claude Code User</text>
+</g>
+
+<!-- PRO Badge -->
+<rect x="344" y="94" width="40" height="18" rx="4" fill="rgba(204,120,92,0.12)" stroke="rgba(204,120,92,0.3)" stroke-width="1"/>
+<text x="364" y="106" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="8.5" font-weight="700" fill="#cc785c">PRO</text>
+
+<!-- 5 Hours Row -->
+<g transform="translate(16, 126)">
+  <text x="0" y="11" font-family="system-ui,-apple-system,sans-serif" font-size="11.5" font-weight="700" fill="#ffffff">5 Hours</text>
+  <text x="56" y="10" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#9ca3af">· resets 01:50</text>
+  
+  <rect x="254" y="0" width="60" height="16" rx="3" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+  <text x="284" y="11" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="8" fill="rgba(255,255,255,0.7)">in 2h 24m</text>
+  
+  <text x="368" y="11" text-anchor="end" font-family="system-ui,-apple-system,sans-serif" font-size="12" font-weight="700" fill="#e05252">67%</text>
+
+  <!-- Segmented Bar (13 filled, 7 empty) -->
+  <g transform="translate(0, 20)">
+    <rect x="0" y="0" width="15.5" height="6" rx="1.5" fill="url(#sessionGrad)"/>
+    <rect x="18.5" y="0" width="15.5" height="6" rx="1.5" fill="url(#sessionGrad)"/>
+    <rect x="37" y="0" width="15.5" height="6" rx="1.5" fill="url(#sessionGrad)"/>
+    <rect x="55.5" y="0" width="15.5" height="6" rx="1.5" fill="url(#sessionGrad)"/>
+    <rect x="74" y="0" width="15.5" height="6" rx="1.5" fill="url(#sessionGrad)"/>
+    <rect x="92.5" y="0" width="15.5" height="6" rx="1.5" fill="url(#sessionGrad)"/>
+    <rect x="111" y="0" width="15.5" height="6" rx="1.5" fill="url(#sessionGrad)"/>
+    <rect x="129.5" y="0" width="15.5" height="6" rx="1.5" fill="url(#sessionGrad)"/>
+    <rect x="148" y="0" width="15.5" height="6" rx="1.5" fill="url(#sessionGrad)"/>
+    <rect x="166.5" y="0" width="15.5" height="6" rx="1.5" fill="url(#sessionGrad)"/>
+    <rect x="185" y="0" width="15.5" height="6" rx="1.5" fill="url(#sessionGrad)"/>
+    <rect x="203.5" y="0" width="15.5" height="6" rx="1.5" fill="url(#sessionGrad)"/>
+    <rect x="222" y="0" width="15.5" height="6" rx="1.5" fill="url(#sessionGrad)"/>
+    
+    <!-- Empty segments -->
+    <rect x="240.5" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="259" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="277.5" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="296" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="314.5" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="333" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="351.5" y="0" width="16.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+  </g>
+</g>
+
+<!-- 7 Days Row -->
+<g transform="translate(16, 186)">
+  <text x="0" y="11" font-family="system-ui,-apple-system,sans-serif" font-size="11.5" font-weight="700" fill="#ffffff">7 Days</text>
+  <text x="48" y="10" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#9ca3af">· resets Jun 6, 11:00</text>
+  
+  <rect x="254" y="0" width="60" height="16" rx="3" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+  <text x="284" y="11" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="8" fill="rgba(255,255,255,0.7)">in 4d 11h</text>
+  
+  <text x="368" y="11" text-anchor="end" font-family="system-ui,-apple-system,sans-serif" font-size="12" font-weight="700" fill="#f5a623">7%</text>
+
+  <!-- Segmented Bar (1 filled, 19 empty) -->
+  <g transform="translate(0, 20)">
+    <rect x="0" y="0" width="15.5" height="6" rx="1.5" fill="url(#weeklyGrad)"/>
+    <!-- Empty segments -->
+    <rect x="18.5" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="37" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="55.5" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="74" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="92.5" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="111" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="129.5" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="148" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="166.5" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="185" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="203.5" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="222" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="240.5" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="259" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="277.5" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="296" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="314.5" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="333" y="0" width="15.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+    <rect x="351.5" y="0" width="16.5" height="6" rx="1.5" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+  </g>
+</g>
+
+<!-- Usage Chart Section (NEW FEATURE) -->
+<g transform="translate(16, 246)">
+  <!-- Container background (resolvedCardBg style: translucency and border) -->
+  <rect width="368" height="184" rx="10" fill="rgba(255, 255, 255, 0.03)" stroke="rgba(255, 255, 255, 0.08)" stroke-width="1"/>
+  
+  <!-- Subtle top inner border highlight -->
+  <path d="M 1,10 Q 1,1 10,1 L 358,1 Q 367,1 367,10" fill="none" stroke="rgba(255, 255, 255, 0.1)" stroke-width="1"/>
+
+  <!-- Chart Navigation Row (Top-Left) -->
+  <g transform="translate(12, 8)">
+    <!-- Left Navigation Button -->
+    <rect width="16" height="16" rx="4" fill="rgba(255, 255, 255, 0.06)"/>
+    <text x="8" y="11" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="9.5" font-weight="700" fill="#ffffff" opacity="0.8">&lt;</text>
+
+    <!-- Range Text -->
+    <text x="24" y="11" font-family="system-ui,-apple-system,sans-serif" font-size="9" font-weight="700" fill="#ffffff" opacity="0.6">Jun 2, 06:13 - Jun 2, 11:13</text>
+
+    <!-- Right Navigation Button -->
+    <rect x="160" width="16" height="16" rx="4" fill="rgba(255, 255, 255, 0.06)"/>
+    <text x="168" y="11" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="9.5" font-weight="700" fill="#ffffff" opacity="0.8">&gt;</text>
+  </g>
+
+  <!-- Window Toggle (Top-Right) -->
+  <g transform="translate(300, 8)">
+    <!-- 5H Tab -->
+    <rect width="22" height="16" rx="4" fill="rgba(255, 255, 255, 0.06)"/>
+    <text x="11" y="11" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="9" font-weight="600" fill="#ffffff" opacity="0.6">5H</text>
+
+    <!-- 7D Tab (Active) -->
+    <rect x="26" width="22" height="16" rx="4" fill="#cc785c" opacity="0.9"/>
+    <text x="37" y="11" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="9" font-weight="700" fill="#ffffff">7D</text>
+  </g>
+
+  <!-- Y-Axis Labels -->
+  <text x="28" y="32" text-anchor="end" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#ffffff" opacity="0.35">100%</text>
+  <text x="28" y="93" text-anchor="end" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#ffffff" opacity="0.35">50%</text>
+  <text x="28" y="153" text-anchor="end" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#ffffff" opacity="0.35">0%</text>
+
+  <!-- Grid Lines (Dashed) -->
+  <g stroke="rgba(255, 255, 255, 0.08)" stroke-width="1" stroke-dasharray="3,5">
+    <line x1="36" y1="29" x2="360" y2="29"/>
+    <line x1="36" y1="60" x2="360" y2="60"/>
+    <line x1="36" y1="90" x2="360" y2="90"/>
+    <line x1="36" y1="121" x2="360" y2="121"/>
+    <line x1="36" y1="151" x2="360" y2="151"/>
+  </g>
+
+  <!-- Chart Area Gradient Fill -->
+  <!-- Path data matching smooth bezier curve (points: P0(36, 142) -> P1(90, 130) -> P2(150, 110) -> P3(210, 60) -> P4(280, 115) -> P5(360, 50)) -->
+  <path d="M 36,142 C 63,142 63,130 90,130 C 120,130 120,110 150,110 C 180,110 180,60 210,60 C 245,60 245,115 280,115 C 320,115 320,50 360,50 L 360,151 L 36,151 Z" fill="url(#accentAreaGrad)"/>
+
+  <!-- Chart Outline Glow (Wide & faint) -->
+  <path d="M 36,142 C 63,142 63,130 90,130 C 120,130 120,110 150,110 C 180,110 180,60 210,60 C 245,60 245,115 280,115 C 320,115 320,50 360,50" fill="none" stroke="#cc785c" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" opacity="0.15"/>
+  
+  <!-- Chart Outline Glow (Medium) -->
+  <path d="M 36,142 C 63,142 63,130 90,130 C 120,130 120,110 150,110 C 180,110 180,60 210,60 C 245,60 245,115 280,115 C 320,115 320,50 360,50" fill="none" stroke="#cc785c" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.4"/>
+
+  <!-- Chart Outline (Crisp top) -->
+  <path d="M 36,142 C 63,142 63,130 90,130 C 120,130 120,110 150,110 C 180,110 180,60 210,60 C 245,60 245,115 280,115 C 320,115 320,50 360,50" fill="none" stroke="#cc785c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity="1.0"/>
+
+  <!-- Latest Point Pulsing Dot (Right end) -->
+  <!-- Outer halo -->
+  <circle cx="360" cy="50" r="8.5" fill="#cc785c" opacity="0.22"/>
+  <!-- Middle accent color dot -->
+  <circle cx="360" cy="50" r="4" fill="#cc785c"/>
+  <!-- Inner white pip -->
+  <circle cx="360" cy="50" r="1.8" fill="#ffffff" opacity="0.9"/>
+
+  <!-- Hover Scrub Guide (Vertical Line at x=210) -->
+  <line x1="210" y1="28" x2="210" y2="151" stroke="#cc785c" stroke-width="1" stroke-dasharray="2,3" opacity="0.5"/>
+  <!-- Scrub highlighted point -->
+  <circle cx="210" cy="60" r="5" fill="#cc785c"/>
+  <circle cx="210" cy="60" r="2" fill="#ffffff"/>
+
+  <!-- Hover Tooltip Box above scrub point -->
+  <!-- Tooltip Rect at x=165, y=16 (width 90, height 20) -->
+  <rect x="165" y="16" width="90" height="20" rx="4" fill="#2d221e" stroke="#cc785c" stroke-width="1"/>
+  <text x="210" y="29" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="8.5" font-weight="700" fill="#ffffff">63% · 09:30</text>
+
+  <!-- X-Axis Labels (Timeline start/end) -->
+  <text x="36" y="168" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#ffffff" opacity="0.35">Jun 2, 06:13</text>
+  <text x="360" y="168" text-anchor="end" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#ffffff" opacity="0.35">Jun 2, 11:13</text>
+</g>
+
+<!-- Footer -->
+<text x="384" y="474" text-anchor="end" font-family="system-ui,-apple-system,sans-serif" font-size="9.5" fill="#6b7280">updated 11:13</text>
+
+</svg>

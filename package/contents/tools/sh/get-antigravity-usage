@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# get_antigravity_usage.sh - Runs the antigravity-usage CLI or falls back to querying the local server directly
+# get-antigravity-usage - Runs the antigravity-usage CLI or falls back to querying the local server directly
 
 # 1. Try to use CLI if available
 CLI=""

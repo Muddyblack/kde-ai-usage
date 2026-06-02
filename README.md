@@ -29,9 +29,12 @@
   <img src="./readme/demo_3.svg?v=8" alt="OpenAI view" width="340" valign="top"/>
 </p>
 <p align="center">
-  <img src="./readme/demo_2.svg?v=7" alt="Antigravity view" width="340" valign="top"/>
+  <img src="./readme/demo_chart.svg?v=1" alt="Usage Chart view" width="340" valign="top"/>
   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
   <img src="./readme/settings.svg?v=7" alt="Settings view" width="340" valign="top"/>
+</p>
+<p align="center">
+  <img src="./readme/demo_2.svg?v=7" alt="Antigravity view" width="340" valign="top"/>
 </p>
 
 A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple services. Monitor your **Claude** (5-hour session & 7-day weekly), **Antigravity/Google AI Studio**, **OpenAI API**, **Mistral AI**, and **OpenRouter** usage at a glance with animated segmented bars, live countdown timers, account status, and per-model breakdowns.
@@ -81,10 +84,13 @@ A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple serv
 - **Separate surfaces** — Codex/ChatGPT plan limits are not the same as OpenAI API organization billing usage
 - **Credential lookup** — Reads the widget setting first, then `$OPENAI_API_KEY`, `~/.config/openai-api-key`, `~/.openai/api-key`, and Codex auth metadata when available
 
-### Mistral AI *(untested)*
+### Mistral AI
 - **Key validation** — Confirms the API key is accepted by Mistral
-- **Model list** — Shows how many models are available under the account
-- **Requires** — A Mistral API key set in widget settings
+- **Model list** — Shows available models, with the active vibe CLI model highlighted
+- **vibe CLI stats** — Reads `~/.vibe/logs/session/*/meta.json` to show cumulative cost, session count, total tokens, and last session title
+- **Cost bar** — Spend bar scaled against a $50 soft cap, backed by 30-day chart history
+- **Credential lookup** — Reads the widget setting first, then `$MISTRAL_API_KEY`, `~/.vibe/.env`, `~/.config/mistral/api-key`, `~/.mistral/api-key`
+- **Requires** — A Mistral API key (or vibe CLI installed with a key in `~/.vibe/.env`)
 
 ### OpenRouter *(untested)*
 - **Spend tracking** — Shows USD spent against your credit limit (if one is set)
@@ -119,10 +125,11 @@ A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple serv
 | OpenAI API key | Required for API token and cost usage via the organization Usage API |
 | Codex CLI | Optional; logged-in Codex sessions are shown as account status only |
 
-### For Mistral Support *(untested)*
+### For Mistral Support
 | Dependency | Notes |
 |---|---|
-| Mistral API key | Set in widget settings — no local config file is read |
+| Mistral API key | Widget settings, `$MISTRAL_API_KEY`, `~/.vibe/.env`, or `~/.config/mistral/api-key` |
+| vibe CLI | Optional; session logs in `~/.vibe/logs/session/` provide cost and token stats without an API key |
 
 ### For OpenRouter Support *(untested)*
 | Dependency | Notes |
@@ -208,8 +215,8 @@ The widget reads credentials from the `antigravity-usage` CLI configuration (sto
 ### OpenAI
 The OpenAI tab has two independent sections. API usage is fetched from the official OpenAI organization usage endpoint with an API key and summarized over the last 30 days. Codex account status is read locally from `~/.codex/auth.json`; it confirms the Codex/ChatGPT login and plan metadata when present, but it does not provide API billing usage.
 
-### Mistral AI *(untested)*
-The widget validates the configured API key against the Mistral API and lists available models. No quota or usage data is currently shown — the tab confirms the key is valid and shows how many models the account can access.
+### Mistral AI
+The widget validates the configured API key against the Mistral API and lists available models, highlighting the one currently active in vibe CLI. Since Mistral exposes no public billing REST API, cost data is sourced locally from vibe CLI session logs (`~/.vibe/logs/session/*/meta.json`): cumulative spend, session count, total tokens, and the last session title are shown in a stats card. The spend bar is scaled against a $50 soft cap and feeds into a 30-day chart. The key is resolved from widget settings → `$MISTRAL_API_KEY` → `~/.vibe/.env` → `~/.config/mistral/api-key`.
 
 ### OpenRouter *(untested)*
 The widget fetches credit usage and limit from the OpenRouter API using the configured key. The popup shows USD spent, the credit limit (if any), and the account label. The usage bar reflects spend as a percentage of the limit; if no limit is set the bar stays empty.
