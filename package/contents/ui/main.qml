@@ -1756,7 +1756,6 @@ PlasmoidItem {
                 }
 
                 ColumnLayout {
-                    Layout.fillWidth: true
                     spacing: 0
                     PlasmaComponents.Label {
                         text: {
@@ -1786,6 +1785,10 @@ PlasmoidItem {
                         opacity: 0.5
                         color: Kirigami.Theme.textColor
                     }
+                }
+
+                Item {
+                    Layout.fillWidth: true
                 }
 
                 PlasmaComponents.ToolButton {
@@ -2239,48 +2242,6 @@ PlasmoidItem {
                         elide: Text.ElideRight
                         Layout.fillWidth: true
                     }
-                    Rectangle {
-                        implicitHeight: 18
-                        implicitWidth: planLabelClaude.implicitWidth + 16
-                        Layout.alignment: Qt.AlignVCenter
-                        radius: 4
-                        color: root.claudeSubscriptionType === "free" ? Qt.rgba(1, 1, 1, 0.06) : Qt.rgba(0.8, 0.47, 0.36, 0.18)
-                        border.width: 1
-                        border.color: root.claudeSubscriptionType === "free" ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(0.8, 0.47, 0.36, 0.35)
-                        PlasmaComponents.Label {
-                            id: planLabelClaude
-                            anchors.centerIn: parent
-                            text: root.claudeSubscriptionType.toUpperCase()
-                            font.pixelSize: 10
-                            font.bold: true
-                            color: root.claudeSubscriptionType === "free" ? Kirigami.Theme.textColor : root.claudeOrange
-                        }
-                    }
-                }
-
-                // ── Effort level + dream mode chips ──────────────────────────
-                RowLayout {
-                    visible: root.claudeEffortLevel !== "" || root.claudeAutoDream
-                    Layout.fillWidth: true
-                    spacing: 6
-
-                    Kirigami.Icon {
-                        source: "settings-configure"
-                        width: 12
-                        height: 12
-                        color: Kirigami.Theme.textColor
-                        isMask: true
-                        opacity: 0.45
-                    }
-                    PlasmaComponents.Label {
-                        text: "Session defaults"
-                        font.pixelSize: 9
-                        opacity: 0.45
-                        color: Kirigami.Theme.textColor
-                    }
-                    Item {
-                        Layout.fillWidth: true
-                    }
 
                     // Effort chip
                     Rectangle {
@@ -2343,6 +2304,24 @@ PlasmoidItem {
                             font.pixelSize: 9
                             font.bold: root.claudeAutoDream
                             color: parent.dreamColor
+                        }
+                    }
+
+                    Rectangle {
+                        implicitHeight: 18
+                        implicitWidth: planLabelClaude.implicitWidth + 16
+                        Layout.alignment: Qt.AlignVCenter
+                        radius: 4
+                        color: root.claudeSubscriptionType === "free" ? Qt.rgba(1, 1, 1, 0.06) : Qt.rgba(0.8, 0.47, 0.36, 0.18)
+                        border.width: 1
+                        border.color: root.claudeSubscriptionType === "free" ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(0.8, 0.47, 0.36, 0.35)
+                        PlasmaComponents.Label {
+                            id: planLabelClaude
+                            anchors.centerIn: parent
+                            text: root.claudeSubscriptionType.toUpperCase()
+                            font.pixelSize: 10
+                            font.bold: true
+                            color: root.claudeSubscriptionType === "free" ? Kirigami.Theme.textColor : root.claudeOrange
                         }
                     }
                 }
@@ -2803,11 +2782,180 @@ PlasmoidItem {
                 Layout.fillWidth: true
                 spacing: 14
 
-                // API usage surface — official OpenAI organization usage data
+                // Codex / ChatGPT user identity & limits (top section, clean style)
                 ColumnLayout {
+                    visible: root.openaiCodexLoggedIn
+                    Layout.fillWidth: true
+                    spacing: 12
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 8
+
+                        Kirigami.Icon {
+                            source: "user-identity"
+                            width: 14
+                            height: 14
+                            color: root.openaiGreen
+                            isMask: true
+                            opacity: 0.7
+                        }
+                        PlasmaComponents.Label {
+                            text: root.openaiEmail || (root.openaiAccountId ? root.openaiAccountId : "Codex / ChatGPT User")
+                            font.pixelSize: 10
+                            opacity: 0.6
+                            color: Kirigami.Theme.textColor
+                            elide: Text.ElideRight
+                            Layout.fillWidth: true
+                        }
+                        Rectangle {
+                            visible: root.openaiPlanType !== ""
+                            implicitHeight: 18
+                            implicitWidth: codexPlanLabel.implicitWidth + 16
+                            Layout.alignment: Qt.AlignVCenter
+                            radius: 4
+                            color: root.openaiPlanType === "free" ? Qt.rgba(1, 1, 1, 0.06) : Qt.rgba(0.063, 0.639, 0.498, 0.18)
+                            border.width: 1
+                            border.color: root.openaiPlanType === "free" ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(0.063, 0.639, 0.498, 0.35)
+                            PlasmaComponents.Label {
+                                id: codexPlanLabel
+                                anchors.centerIn: parent
+                                text: root.openaiPlanType.toUpperCase()
+                                font.pixelSize: 10
+                                font.bold: true
+                                color: root.openaiPlanType === "free" ? Kirigami.Theme.textColor : root.openaiGreen
+                            }
+                        }
+                    }
+
+                    // Codex plan limits (messages remaining)
+                    ColumnLayout {
+                        visible: root.codexUsageAvailable
+                        Layout.fillWidth: true
+                        spacing: 12
+
+                        PopupRow {
+                            label: "5 Hours"
+                            countdownText: root.codexPrimaryCountdown === "resetting..." ? "resetting..." : (root.codexPrimaryCountdown ? "in " + root.codexPrimaryCountdown : "")
+                            value: root.codexPrimaryPct
+                            barColor: root.openaiGreen
+                            etaText: root.usageHistory.length >= 0 ? root.etaToFull("cp", root.codexPrimaryPct) : ""
+                            deltaText: root.usageHistory.length >= 0 ? root.periodDelta("cp", root.codexPrimaryPct, 5 * 3600000, "last 5h") : ""
+                            tokenText: Math.round(100 - root.codexPrimaryPct) + "% of messages left"
+                            tooltipText: "Codex 5-hour limit\nUsed: " + Math.round(root.codexPrimaryPct) + "%  ·  " + Math.round(100 - root.codexPrimaryPct) + "% left"
+                        }
+                        PopupRow {
+                            label: "Weekly"
+                            countdownText: root.codexSecondaryCountdown === "resetting..." ? "resetting..." : (root.codexSecondaryCountdown ? "in " + root.codexSecondaryCountdown : "")
+                            value: root.codexSecondaryPct
+                            barColor: root.openaiGreen
+                            etaText: root.usageHistory.length >= 0 ? root.etaToFull("cw", root.codexSecondaryPct) : ""
+                            deltaText: root.usageHistory.length >= 0 ? root.periodDelta("cw", root.codexSecondaryPct, 7 * 24 * 3600000, "last week") : ""
+                            tokenText: Math.round(100 - root.codexSecondaryPct) + "% of messages left"
+                            tooltipText: "Codex weekly limit\nUsed: " + Math.round(root.codexSecondaryPct) + "%  ·  " + Math.round(100 - root.codexSecondaryPct) + "% left"
+                        }
+
+                        PlasmaComponents.Label {
+                            visible: root.codexLimitReached
+                            text: "⚠ Limit reached — wait for reset"
+                            font.pixelSize: 10
+                            font.bold: true
+                            color: root.dangerColor
+                        }
+
+                        // Per-model additional rate limits
+                        Repeater {
+                            model: root.codexAdditionalLimits
+                            delegate: ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 10
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 6
+                                    PlasmaComponents.Label {
+                                        text: modelData.name
+                                        font.pixelSize: 10
+                                        font.bold: true
+                                        opacity: 0.8
+                                        color: root.openaiGreen
+                                        elide: Text.ElideRight
+                                        Layout.fillWidth: true
+                                    }
+                                    Rectangle {
+                                        visible: modelData.limit_reached
+                                        implicitHeight: 14
+                                        implicitWidth: limitReachedLbl.implicitWidth + 8
+                                        radius: 3
+                                        color: Qt.rgba(1, 0.3, 0.3, 0.18)
+                                        border.width: 1
+                                        border.color: Qt.rgba(1, 0.3, 0.3, 0.4)
+                                        PlasmaComponents.Label {
+                                            id: limitReachedLbl
+                                            anchors.centerIn: parent
+                                            text: "LIMIT"
+                                            font.pixelSize: 8
+                                            font.bold: true
+                                            color: root.dangerColor
+                                        }
+                                    }
+                                }
+
+                                PopupRow {
+                                    label: "5 Hours"
+                                    countdownText: {
+                                        if (!modelData.primary_reset)
+                                            return "";
+                                        var cd = root.formatCountdown(modelData.primary_reset);
+                                        return cd === "resetting..." ? "resetting..." : (cd ? "in " + cd : "");
+                                    }
+                                    value: modelData.primary_pct
+                                    barColor: root.openaiGreen
+                                    tokenText: Math.round(100 - modelData.primary_pct) + "% of messages left"
+                                    tooltipText: modelData.name + " 5-hour limit\nUsed: " + Math.round(modelData.primary_pct) + "%  ·  " + Math.round(100 - modelData.primary_pct) + "% left"
+                                }
+                                PopupRow {
+                                    label: "Weekly"
+                                    countdownText: {
+                                        if (!modelData.secondary_reset)
+                                            return "";
+                                        var cd = root.formatCountdown(modelData.secondary_reset);
+                                        return cd === "resetting..." ? "resetting..." : (cd ? "in " + cd : "");
+                                    }
+                                    value: modelData.secondary_pct
+                                    barColor: root.openaiGreen
+                                    tokenText: Math.round(100 - modelData.secondary_pct) + "% of messages left"
+                                    tooltipText: modelData.name + " weekly limit\nUsed: " + Math.round(modelData.secondary_pct) + "%  ·  " + Math.round(100 - modelData.secondary_pct) + "% left"
+                                }
+                            }
+                        }
+                    }
+
+                    // Notice if no API key is added, matching Claude's tip box design
+                    PlasmaComponents.Label {
+                        visible: root._openaiApiKey === ""
+                        text: root.codexUsageAvailable ? "Plan limits above. Add an OpenAI API key in settings for API token/cost data." : "Codex plan limits are separate from OpenAI API billing. Add an OpenAI API key in settings for token and cost data."
+                        font.pixelSize: 9
+                        opacity: 0.45
+                        color: Kirigami.Theme.textColor
+                        wrapMode: Text.WordWrap
+                        Layout.fillWidth: true
+                        Layout.topMargin: 2
+                    }
+                }
+
+                // API usage surface (bottom section, clean style)
+                ColumnLayout {
+                    visible: root._openaiApiKey !== ""
                     Layout.fillWidth: true
                     spacing: 8
-                    visible: root._openaiApiKey !== ""
+
+                    Rectangle {
+                        visible: root.openaiCodexLoggedIn
+                        Layout.fillWidth: true
+                        height: 1
+                        color: Qt.rgba(1, 1, 1, 0.08)
+                    }
 
                     RowLayout {
                         Layout.fillWidth: true
@@ -2878,214 +3026,103 @@ PlasmoidItem {
                         }
                     }
 
-                    Rectangle {
-                        visible: Object.keys(root.openaiModels).length > 0
-                        Layout.fillWidth: true
-                        height: 1
-                        color: Qt.rgba(1, 1, 1, 0.08)
-                    }
-                }
-
-                // Codex / ChatGPT surface — account status, not API billing
-                Rectangle {
-                    visible: root.openaiCodexLoggedIn
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: implicitHeight
-                    implicitHeight: codexAccountCol.implicitHeight + 20
-                    radius: 6
-                    color: Qt.rgba(0.063, 0.639, 0.498, 0.07)
-                    border.width: 1
-                    border.color: Qt.rgba(0.063, 0.639, 0.498, 0.20)
-
+                    // Per-model API usage, nested inside the API usage container
                     ColumnLayout {
-                        id: codexAccountCol
-                        anchors {
-                            left: parent.left
-                            right: parent.right
-                            top: parent.top
-                            margins: 10
-                        }
-                        spacing: 4
+                        Layout.fillWidth: true
+                        spacing: 8
+                        visible: Object.keys(root.openaiModels).length > 0
 
-                        RowLayout {
-                            spacing: 6
-                            Rectangle {
-                                width: 6
-                                height: 6
-                                radius: 3
-                                color: root.openaiGreen
-                                Layout.alignment: Qt.AlignVCenter
-                            }
-                            PlasmaComponents.Label {
-                                text: "Codex / ChatGPT account"
-                                font.pixelSize: 11
-                                font.bold: true
-                                color: root.openaiGreen
-                            }
-                            Item {
-                                Layout.fillWidth: true
-                            }
-                            Rectangle {
-                                visible: root.openaiPlanType !== ""
-                                implicitHeight: 18
-                                implicitWidth: codexPlanLabel.implicitWidth + 16
-                                Layout.alignment: Qt.AlignVCenter
-                                radius: 4
-                                color: root.openaiPlanType === "free" ? Qt.rgba(1, 1, 1, 0.06) : Qt.rgba(0.063, 0.639, 0.498, 0.18)
-                                border.width: 1
-                                border.color: root.openaiPlanType === "free" ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(0.063, 0.639, 0.498, 0.35)
-                                PlasmaComponents.Label {
-                                    id: codexPlanLabel
-                                    anchors.centerIn: parent
-                                    text: root.openaiPlanType.toUpperCase()
-                                    font.pixelSize: 10
-                                    font.bold: true
-                                    color: root.openaiPlanType === "free" ? Kirigami.Theme.textColor : root.openaiGreen
-                                }
-                            }
-                        }
-                        PlasmaComponents.Label {
-                            text: root.openaiEmail || (root.openaiAccountId ? root.openaiAccountId : "Signed in with Codex CLI")
-                            font.pixelSize: 10
-                            opacity: 0.70
-                            color: Kirigami.Theme.textColor
-                            elide: Text.ElideRight
+                        Rectangle {
                             Layout.fillWidth: true
+                            height: 1
+                            color: Qt.rgba(1, 1, 1, 0.08)
                         }
 
-                        // ── Plan usage (messages remaining) ──────────────────
-                        ColumnLayout {
-                            visible: root.codexUsageAvailable
-                            Layout.fillWidth: true
-                            Layout.topMargin: 4
-                            spacing: 6
-
-                            Rectangle {
+                        Repeater {
+                            model: {
+                                var keys = Object.keys(root.openaiModels);
+                                keys.sort(function (a, b) {
+                                    return root.openaiModels[b].cost_usd - root.openaiModels[a].cost_usd;
+                                });
+                                return keys;
+                            }
+                            ColumnLayout {
                                 Layout.fillWidth: true
-                                height: 1
-                                color: Qt.rgba(1, 1, 1, 0.08)
-                            }
-
-                            PopupRow {
-                                label: "5 Hours"
-                                countdownText: root.codexPrimaryCountdown === "resetting..." ? "resetting..." : (root.codexPrimaryCountdown ? "in " + root.codexPrimaryCountdown : "")
-                                value: root.codexPrimaryPct
-                                barColor: root.openaiGreen
-                                etaText: root.usageHistory.length >= 0 ? root.etaToFull("cp", root.codexPrimaryPct) : ""
-                                deltaText: root.usageHistory.length >= 0 ? root.periodDelta("cp", root.codexPrimaryPct, 5 * 3600000, "last 5h") : ""
-                                tokenText: Math.round(100 - root.codexPrimaryPct) + "% of messages left"
-                                tooltipText: "Codex 5-hour limit\nUsed: " + Math.round(root.codexPrimaryPct) + "%  ·  " + Math.round(100 - root.codexPrimaryPct) + "% left"
-                            }
-                            PopupRow {
-                                label: "Weekly"
-                                countdownText: root.codexSecondaryCountdown === "resetting..." ? "resetting..." : (root.codexSecondaryCountdown ? "in " + root.codexSecondaryCountdown : "")
-                                value: root.codexSecondaryPct
-                                barColor: root.openaiGreen
-                                etaText: root.usageHistory.length >= 0 ? root.etaToFull("cw", root.codexSecondaryPct) : ""
-                                deltaText: root.usageHistory.length >= 0 ? root.periodDelta("cw", root.codexSecondaryPct, 7 * 24 * 3600000, "last week") : ""
-                                tokenText: Math.round(100 - root.codexSecondaryPct) + "% of messages left"
-                                tooltipText: "Codex weekly limit\nUsed: " + Math.round(root.codexSecondaryPct) + "%  ·  " + Math.round(100 - root.codexSecondaryPct) + "% left"
-                            }
-
-                            PlasmaComponents.Label {
-                                visible: root.codexLimitReached
-                                text: "⚠ Limit reached — wait for reset"
-                                font.pixelSize: 10
-                                font.bold: true
-                                color: root.dangerColor
-                            }
-
-                            // ── Per-model additional rate limits ──────────────
-                            Repeater {
-                                model: root.codexAdditionalLimits
-                                delegate: ColumnLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 6
-
-                                    Rectangle {
-                                        Layout.fillWidth: true
-                                        height: 1
-                                        color: Qt.rgba(1, 1, 1, 0.06)
+                                spacing: 3
+                                MouseArea {
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    propagateComposedEvents: true
+                                    QQC2.ToolTip.visible: containsMouse
+                                    QQC2.ToolTip.delay: 400
+                                    QQC2.ToolTip.text: {
+                                        var m = root.openaiModels[modelData];
+                                        if (!m)
+                                            return modelData;
+                                        return modelData + "\nInput:  " + root.formatTokens(m.input_tokens) + " tokens\nOutput: " + root.formatTokens(m.output_tokens) + " tokens\nCost:   " + (m.priced ? "$" + m.cost_usd.toFixed(4) : "unpriced");
                                     }
-
-                                    RowLayout {
+                                }
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 8
+                                    PlasmaComponents.Label {
+                                        text: root.shortenModelName(modelData)
+                                        font.pixelSize: 10
+                                        opacity: 0.65
+                                        Layout.preferredWidth: 90
+                                        elide: Text.ElideRight
+                                        color: Kirigami.Theme.textColor
+                                    }
+                                    Item {
                                         Layout.fillWidth: true
-                                        spacing: 6
-                                        Kirigami.Icon {
-                                            source: "cpu"
-                                            width: 12
-                                            height: 12
-                                            color: root.openaiGreen
-                                            isMask: true
-                                            opacity: 0.6
-                                        }
-                                        PlasmaComponents.Label {
-                                            text: modelData.name
-                                            font.pixelSize: 10
-                                            font.bold: true
-                                            opacity: 0.8
-                                            color: root.openaiGreen
-                                            elide: Text.ElideRight
-                                            Layout.fillWidth: true
-                                        }
-                                        Rectangle {
-                                            visible: modelData.limit_reached
-                                            implicitHeight: 14
-                                            implicitWidth: limitReachedLbl.implicitWidth + 8
-                                            radius: 3
-                                            color: Qt.rgba(1, 0.3, 0.3, 0.18)
-                                            border.width: 1
-                                            border.color: Qt.rgba(1, 0.3, 0.3, 0.4)
-                                            PlasmaComponents.Label {
-                                                id: limitReachedLbl
-                                                anchors.centerIn: parent
-                                                text: "LIMIT"
-                                                font.pixelSize: 8
-                                                font.bold: true
-                                                color: root.dangerColor
+                                    }
+                                    PlasmaComponents.Label {
+                                        text: root.formatTokens(root.openaiModels[modelData].input_tokens) + " in"
+                                        font.pixelSize: 9
+                                        opacity: 0.4
+                                        color: Kirigami.Theme.textColor
+                                    }
+                                    PlasmaComponents.Label {
+                                        text: root.formatTokens(root.openaiModels[modelData].output_tokens) + " out"
+                                        font.pixelSize: 9
+                                        opacity: 0.4
+                                        color: Kirigami.Theme.textColor
+                                    }
+                                    PlasmaComponents.Label {
+                                        text: root.openaiModels[modelData].priced ? "$" + root.openaiModels[modelData].cost_usd.toFixed(3) : "—"
+                                        font.pixelSize: 11
+                                        font.bold: true
+                                        color: Kirigami.Theme.textColor
+                                        opacity: root.openaiModels[modelData].priced ? 1.0 : 0.4
+                                        Layout.preferredWidth: 52
+                                        horizontalAlignment: Text.AlignRight
+                                    }
+                                }
+                                Item {
+                                    Layout.fillWidth: true
+                                    height: 3
+                                    Rectangle {
+                                        anchors.fill: parent
+                                        radius: 1.5
+                                        color: Qt.rgba(1, 1, 1, 0.05)
+                                    }
+                                    Rectangle {
+                                        anchors.left: parent.left
+                                        anchors.top: parent.top
+                                        anchors.bottom: parent.bottom
+                                        radius: 1.5
+                                        color: root.openaiGreen
+                                        opacity: 0.7
+                                        width: root.openaiTotalCostUSD > 0 ? parent.width * (root.openaiModels[modelData].cost_usd / root.openaiTotalCostUSD) : 0
+                                        Behavior on width {
+                                            NumberAnimation {
+                                                duration: 500
+                                                easing.type: Easing.OutCubic
                                             }
                                         }
                                     }
-
-                                    PopupRow {
-                                        label: "5 Hours"
-                                        countdownText: {
-                                            if (!modelData.primary_reset)
-                                                return "";
-                                            var cd = root.formatCountdown(modelData.primary_reset);
-                                            return cd === "resetting..." ? "resetting..." : (cd ? "in " + cd : "");
-                                        }
-                                        value: modelData.primary_pct
-                                        barColor: root.openaiGreen
-                                        tokenText: Math.round(100 - modelData.primary_pct) + "% of messages left"
-                                        tooltipText: modelData.name + " 5-hour limit\nUsed: " + Math.round(modelData.primary_pct) + "%  ·  " + Math.round(100 - modelData.primary_pct) + "% left"
-                                    }
-                                    PopupRow {
-                                        label: "Weekly"
-                                        countdownText: {
-                                            if (!modelData.secondary_reset)
-                                                return "";
-                                            var cd = root.formatCountdown(modelData.secondary_reset);
-                                            return cd === "resetting..." ? "resetting..." : (cd ? "in " + cd : "");
-                                        }
-                                        value: modelData.secondary_pct
-                                        barColor: root.openaiGreen
-                                        tokenText: Math.round(100 - modelData.secondary_pct) + "% of messages left"
-                                        tooltipText: modelData.name + " weekly limit\nUsed: " + Math.round(modelData.secondary_pct) + "%  ·  " + Math.round(100 - modelData.secondary_pct) + "% left"
-                                    }
                                 }
                             }
-                        }
-
-                        PlasmaComponents.Label {
-                            visible: root._openaiApiKey === ""
-                            text: root.codexUsageAvailable ? "Plan limits above. Add an OpenAI API key in settings for API token/cost data (separate billing)." : "Codex plan limits are separate from OpenAI API billing.\nAdd an OpenAI API key in settings for token and cost data."
-                            font.pixelSize: 10
-                            opacity: 0.55
-                            color: Kirigami.Theme.textColor
-                            wrapMode: Text.WordWrap
-                            Layout.fillWidth: true
-                            Layout.topMargin: 4
                         }
                     }
                 }
@@ -3109,100 +3146,6 @@ PlasmoidItem {
                         color: Kirigami.Theme.textColor
                         wrapMode: Text.WordWrap
                         Layout.fillWidth: true
-                    }
-                }
-
-                // Per-model API usage, only returned by the API usage endpoint
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
-                    visible: Object.keys(root.openaiModels).length > 0
-
-                    Repeater {
-                        model: {
-                            var keys = Object.keys(root.openaiModels);
-                            keys.sort(function (a, b) {
-                                return root.openaiModels[b].cost_usd - root.openaiModels[a].cost_usd;
-                            });
-                            return keys;
-                        }
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            spacing: 3
-                            MouseArea {
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                propagateComposedEvents: true
-                                QQC2.ToolTip.visible: containsMouse
-                                QQC2.ToolTip.delay: 400
-                                QQC2.ToolTip.text: {
-                                    var m = root.openaiModels[modelData];
-                                    if (!m)
-                                        return modelData;
-                                    return modelData + "\nInput:  " + root.formatTokens(m.input_tokens) + " tokens\nOutput: " + root.formatTokens(m.output_tokens) + " tokens\nCost:   " + (m.priced ? "$" + m.cost_usd.toFixed(4) : "unpriced");
-                                }
-                            }
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 8
-                                PlasmaComponents.Label {
-                                    text: root.shortenModelName(modelData)
-                                    font.pixelSize: 10
-                                    opacity: 0.65
-                                    Layout.preferredWidth: 90
-                                    elide: Text.ElideRight
-                                    color: Kirigami.Theme.textColor
-                                }
-                                Item {
-                                    Layout.fillWidth: true
-                                }
-                                PlasmaComponents.Label {
-                                    text: root.formatTokens(root.openaiModels[modelData].input_tokens) + " in"
-                                    font.pixelSize: 9
-                                    opacity: 0.4
-                                    color: Kirigami.Theme.textColor
-                                }
-                                PlasmaComponents.Label {
-                                    text: root.formatTokens(root.openaiModels[modelData].output_tokens) + " out"
-                                    font.pixelSize: 9
-                                    opacity: 0.4
-                                    color: Kirigami.Theme.textColor
-                                }
-                                PlasmaComponents.Label {
-                                    text: root.openaiModels[modelData].priced ? "$" + root.openaiModels[modelData].cost_usd.toFixed(3) : "—"
-                                    font.pixelSize: 11
-                                    font.bold: true
-                                    color: Kirigami.Theme.textColor
-                                    opacity: root.openaiModels[modelData].priced ? 1.0 : 0.4
-                                    Layout.preferredWidth: 52
-                                    horizontalAlignment: Text.AlignRight
-                                }
-                            }
-                            Item {
-                                Layout.fillWidth: true
-                                height: 3
-                                Rectangle {
-                                    anchors.fill: parent
-                                    radius: 1.5
-                                    color: Qt.rgba(1, 1, 1, 0.05)
-                                }
-                                Rectangle {
-                                    anchors.left: parent.left
-                                    anchors.top: parent.top
-                                    anchors.bottom: parent.bottom
-                                    radius: 1.5
-                                    color: root.openaiGreen
-                                    opacity: 0.7
-                                    width: root.openaiTotalCostUSD > 0 ? parent.width * (root.openaiModels[modelData].cost_usd / root.openaiTotalCostUSD) : 0
-                                    Behavior on width {
-                                        NumberAnimation {
-                                            duration: 500
-                                            easing.type: Easing.OutCubic
-                                        }
-                                    }
-                                }
-                            }
-                        }
                     }
                 }
             }
@@ -3611,7 +3554,7 @@ PlasmoidItem {
             // ── Usage chart (Claude 5H/7D · Codex 5H/7D) ───────────────────
             Rectangle {
                 id: usageChartContainer
-                visible: root.showUsageChart && root.weeklyUsageHistory.length >= 1 && (root.enabledTabs[root.activeTab] === "claude" || (root.enabledTabs[root.activeTab] === "openai" && root.codexUsageAvailable) || root.enabledTabs[root.activeTab] === "antigravity" || root.enabledTabs[root.activeTab] === "openrouter")
+                visible: !root.showSettings && root.showUsageChart && root.weeklyUsageHistory.length >= 1 && (root.enabledTabs[root.activeTab] === "claude" || (root.enabledTabs[root.activeTab] === "openai" && root.codexUsageAvailable) || root.enabledTabs[root.activeTab] === "antigravity" || root.enabledTabs[root.activeTab] === "openrouter")
                 Layout.fillWidth: true
                 Layout.preferredHeight: implicitHeight
                 implicitHeight: 184
@@ -3864,16 +3807,24 @@ PlasmoidItem {
                             }
                         }
 
-                        // glow pass — wide soft stroke behind the crisp line
+                        // glow pass — wide soft stroke behind the crisp line (fast stroke-based glow instead of heavy CPU shadow blur)
                         ctx.save();
-                        ctx.shadowColor = acRgba(0.55);
-                        ctx.shadowBlur = 14;
-                        ctx.beginPath();
-                        buildPath();
-                        ctx.strokeStyle = acRgba(0.70);
-                        ctx.lineWidth = 4;
                         ctx.lineJoin = "round";
                         ctx.lineCap = "round";
+                        ctx.beginPath();
+                        buildPath();
+                        ctx.strokeStyle = acRgba(0.08);
+                        ctx.lineWidth = 14;
+                        ctx.stroke();
+                        ctx.beginPath();
+                        buildPath();
+                        ctx.strokeStyle = acRgba(0.18);
+                        ctx.lineWidth = 8;
+                        ctx.stroke();
+                        ctx.beginPath();
+                        buildPath();
+                        ctx.strokeStyle = acRgba(0.40);
+                        ctx.lineWidth = 4;
                         ctx.stroke();
                         ctx.restore();
 
@@ -3981,12 +3932,23 @@ PlasmoidItem {
                     anchors.bottomMargin: 5
                     spacing: 0
 
+                    function formatLabel(timestamp) {
+                        var pts = root.weeklyUsageHistory;
+                        if (!pts || pts.length < 2)
+                            return Qt.formatDate(new Date(timestamp), "MMM d");
+                        var totalSpanMs = pts[pts.length - 1].t - pts[0].t;
+                        if (totalSpanMs < 24 * 3600000) {
+                            return Qt.formatTime(new Date(timestamp), "hh:mm");
+                        }
+                        return Qt.formatDate(new Date(timestamp), "MMM d");
+                    }
+
                     PlasmaComponents.Label {
                         text: {
                             var pts = root.weeklyUsageHistory;
                             if (!pts || pts.length < 1)
                                 return "";
-                            return Qt.formatDate(new Date(pts[0].t), "MMM d");
+                            return xAxisRow.formatLabel(pts[0].t);
                         }
                         font.pixelSize: 9
                         opacity: 0.40
@@ -4001,7 +3963,7 @@ PlasmoidItem {
                             if (!pts || pts.length < 2)
                                 return "";
                             var mid = pts[Math.floor(pts.length / 2)];
-                            return Qt.formatDate(new Date(mid.t), "MMM d");
+                            return xAxisRow.formatLabel(mid.t);
                         }
                         font.pixelSize: 9
                         opacity: 0.40
@@ -4015,7 +3977,7 @@ PlasmoidItem {
                             var pts = root.weeklyUsageHistory;
                             if (!pts || pts.length < 1)
                                 return "";
-                            return Qt.formatTime(new Date(), "hh:mm");
+                            return Qt.formatTime(new Date(pts[pts.length - 1].t), "hh:mm");
                         }
                         font.pixelSize: 9
                         opacity: 0.40
