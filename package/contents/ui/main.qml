@@ -10,6 +10,8 @@ import QtQuick.Dialogs
 PlasmoidItem {
     id: root
 
+    Plasmoid.backgroundHints: root.backgroundHints
+
     toolTipMainText: "AI API Usage"
     toolTipSubText: {
         var lines = [];
@@ -98,6 +100,10 @@ PlasmoidItem {
     }
 
     property int activeTab: 0
+    property real chartTimeOffset: 0
+    onChartWindowChanged: {
+        root.chartTimeOffset = 0;
+    }
     onActiveTabChanged: {
         // Switch chart window to the right series when tabs change so the chart
         // always shows meaningful data without requiring a manual toggle.
@@ -119,6 +125,7 @@ PlasmoidItem {
             root.chartWindow = "openrouter";
             Plasmoid.configuration.chartWindow = "openrouter";
         }
+        root.chartTimeOffset = 0;
     }
 
     // ── Claude data ───────────────────────────────────────────────────────────
@@ -253,19 +260,61 @@ PlasmoidItem {
         return "w";
     }
 
+    function getChartWindowSize() {
+        var win = root.chartWindow;
+        if (win === "session" || win === "codex_primary") {
+            return 5 * 3600000; // 5 hours in ms
+        }
+        if (win === "weekly" || win === "codex_weekly") {
+            return 7 * 24 * 3600000; // 7 days in ms
+        }
+        if (win === "antigravity" || win === "openrouter") {
+            return 30 * 24 * 3600000; // 30 days in ms
+        }
+        return 7 * 24 * 3600000;
+    }
+
+    function getChartRangeText() {
+        var now_ms = new Date().getTime();
+        var offset = root.chartTimeOffset;
+        var winSize = root.getChartWindowSize();
+        var maxT = now_ms - offset;
+        var minT = maxT - winSize;
+
+        var minDate = new Date(minT);
+        var maxDate = new Date(maxT);
+
+        var is5h = (root.chartWindow === "session" || root.chartWindow === "codex_primary");
+        if (is5h) {
+            if (minDate.toDateString() === maxDate.toDateString()) {
+                return Qt.formatDateTime(minDate, "hh:mm") + " - " + Qt.formatDateTime(maxDate, "hh:mm") + " (" + Qt.formatDateTime(maxDate, "MMM d") + ")";
+            } else {
+                return Qt.formatDateTime(minDate, "MMM d, hh:mm") + " - " + Qt.formatDateTime(maxDate, "MMM d, hh:mm");
+            }
+        } else {
+            return Qt.formatDateTime(minDate, "MMM d") + " - " + Qt.formatDateTime(maxDate, "MMM d");
+        }
+    }
+
     // {t, v} view of the currently-selected chart window
     readonly property var weeklyUsageHistory: {
         var key = root._historyKey();
         var out = [];
+        var now_ms = new Date().getTime();
+        var winSize = root.getChartWindowSize();
+        var maxT = now_ms - root.chartTimeOffset;
+        var minT = maxT - winSize;
         for (var i = 0; i < root.usageHistory.length; i++) {
             var p = root.usageHistory[i];
             var v = p[key];
             if (v === undefined || v === null)
                 continue;
-            out.push({
-                t: p.t,
-                v: v
-            });
+            if (p.t >= minT && p.t <= maxT) {
+                out.push({
+                    t: p.t,
+                    v: v
+                });
+            }
         }
         return out;
     }
@@ -557,6 +606,7 @@ PlasmoidItem {
     readonly property color activeAccent: root.accentFor(root.enabledTabs[root.activeTab] || "claude")
 
     // ── Appearance Customization ────────────────────────────────────────────────
+    property int backgroundHints: Plasmoid.configuration.backgroundHints !== undefined ? Plasmoid.configuration.backgroundHints : 1
     property color cardBgColor: Plasmoid.configuration.cardBgColor || "#100a1a"
     property real cardBgOpacity: Plasmoid.configuration.cardBgOpacity !== undefined ? Plasmoid.configuration.cardBgOpacity : 0.90
     property color popupBgColor: Plasmoid.configuration.popupBgColor || "#000000"
@@ -1595,7 +1645,6 @@ PlasmoidItem {
             PanelSlot {
                 pct: root.sessionPct
                 iconColor: root.sessionColor
-                spark: root.sparkSeries("s", 24)
                 stale: root.stale && root.enabledTabs[root.activeTab] === "claude"
                 visible: root.enabledTabs[root.activeTab] === "claude"
                 tooltipText: "Claude 5-hour: " + Math.round(root.sessionPct) + "%" + (root.sessionTokenLimit > 0 ? "\n" + root.formatTokens(root.sessionTokensUsed) + " / " + root.formatTokens(root.sessionTokenLimit) : "")
@@ -1610,7 +1659,6 @@ PlasmoidItem {
             PanelSlot {
                 pct: root.weeklyPct
                 iconColor: root.weeklyColor
-                spark: root.sparkSeries("w", 24)
                 stale: root.stale && root.enabledTabs[root.activeTab] === "claude"
                 visible: root.enabledTabs[root.activeTab] === "claude"
                 tooltipText: "Claude 7-day: " + Math.round(root.weeklyPct) + "%" + (root.weeklyTokenLimit > 0 ? "\n" + root.formatTokens(root.weeklyTokensUsed) + " / " + root.formatTokens(root.weeklyTokenLimit) : "")
@@ -1627,13 +1675,28 @@ PlasmoidItem {
             PanelSlot {
                 // When Codex plan usage is available (and no API cost to show), surface the
                 // 5-hour window % so the panel reflects "messages left" at a glance.
-                pct: root.codexUsageAvailable && root.openaiTotalCostUSD <= 0 ? root.codexPrimaryPct : (root.openaiTotalCostUSD > 0 ? Math.min(100, (root.openaiTotalCostUSD / 10) * 100) : 0)
+                pct: root.codexUsageAvailable ? root.codexPrimaryPct : (root.openaiTotalCostUSD > 0 ? Math.min(100, (root.openaiTotalCostUSD / 10) * 100) : 0)
                 iconColor: root.openaiGreen
                 stale: root.stale && root.enabledTabs[root.activeTab] === "openai"
                 visible: root.enabledTabs[root.activeTab] === "openai"
-                showCost: !(root.codexUsageAvailable && root.openaiTotalCostUSD <= 0)
+                showCost: !root.codexUsageAvailable
                 costText: root.openaiTotalCostUSD > 0 ? "$" + root.openaiTotalCostUSD.toFixed(2) : (root._openaiApiKey ? "API" : (root.openaiCodexLoggedIn ? "Codex" : "—"))
                 tooltipText: "OpenAI" + (root.codexUsageAvailable ? "\nCodex 5h: " + Math.round(100 - root.codexPrimaryPct) + "% left  ·  weekly: " + Math.round(100 - root.codexSecondaryPct) + "% left" : "") + (root._openaiApiKey ? "\nAPI usage configured\nCost (30d): $" + root.openaiTotalCostUSD.toFixed(2) + "\nIn: " + root.formatTokens(root.openaiTotalInputTokens) + "  Out: " + root.formatTokens(root.openaiTotalOutputTokens) : "\nAPI usage needs an OpenAI API key") + (root.openaiCodexLoggedIn ? "\nCodex signed in" + (root.openaiEmail ? ": " + root.openaiEmail : "") : "")
+            }
+            Rectangle {
+                visible: root.enabledTabs[root.activeTab] === "openai" && root.codexUsageAvailable
+                width: 1
+                height: 14
+                color: Qt.rgba(1, 1, 1, 0.16)
+                Layout.alignment: Qt.AlignVCenter
+            }
+            PanelSlot {
+                pct: root.codexSecondaryPct
+                iconColor: root.openaiGreen
+                stale: root.stale && root.enabledTabs[root.activeTab] === "openai"
+                visible: root.enabledTabs[root.activeTab] === "openai" && root.codexUsageAvailable
+                showCost: false
+                tooltipText: "OpenAI Codex weekly: " + Math.round(100 - root.codexSecondaryPct) + "% left"
             }
 
             PanelSlot {
@@ -2329,7 +2392,42 @@ PlasmoidItem {
                         PlasmaComponents.Label {
                             text: "%"
                             font.pixelSize: 10
-                            opacity: 0.6
+                        }
+                    }
+
+                    // Row 3: Widget Background Style
+                    PlasmaComponents.Label {
+                        text: "Bg Style"
+                        font.pixelSize: 11
+                        color: Kirigami.Theme.textColor
+                        Layout.preferredWidth: 80
+                    }
+                    QQC2.ComboBox {
+                        Layout.columnSpan: 2
+                        Layout.fillWidth: true
+                        implicitHeight: 22
+                        font.pixelSize: 10
+                        model: ["Plasma Native", "Translucent (Flat)", "Glassmorphic (Shadow + Blur)"]
+                        currentIndex: {
+                            var val = root.backgroundHints;
+                            if (val === 0)
+                                return 0;
+                            if (val === 1)
+                                return 1;
+                            if (val === 2)
+                                return 2;
+                            return 1;
+                        }
+                        onActivated: {
+                            var hints = 1;
+                            if (index === 0)
+                                hints = 0;
+                            else if (index === 1)
+                                hints = 1;
+                            else if (index === 2)
+                                hints = 2;
+                            Plasmoid.configuration.backgroundHints = hints;
+                            root.backgroundHints = hints;
                         }
                     }
                 }
@@ -3462,6 +3560,42 @@ PlasmoidItem {
                 Layout.fillWidth: true
                 spacing: 14
 
+                // Beta / Untested warning banner
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: orBetaCol.implicitHeight + 16
+                    radius: 8
+                    color: Qt.rgba(0.93, 0.45, 0.1, 0.08)
+                    border.width: 1
+                    border.color: Qt.rgba(0.93, 0.45, 0.1, 0.20)
+
+                    RowLayout {
+                        id: orBetaCol
+                        anchors.fill: parent
+                        anchors.margins: 10
+                        spacing: 8
+
+                        Kirigami.Icon {
+                            source: "dialog-warning"
+                            width: 16
+                            height: 16
+                            color: "#f97316"
+                            isMask: true
+                            Layout.alignment: Qt.AlignVCenter
+                        }
+
+                        PlasmaComponents.Label {
+                            text: "OpenRouter support is in BETA and currently untested."
+                            font.pixelSize: 10
+                            font.bold: true
+                            color: "#f97316"
+                            wrapMode: Text.WordWrap
+                            Layout.fillWidth: true
+                            Layout.alignment: Qt.AlignVCenter
+                        }
+                    }
+                }
+
                 // Account row
                 RowLayout {
                     Layout.fillWidth: true
@@ -3701,6 +3835,95 @@ PlasmoidItem {
                     radius: 10
                 }
 
+                // ── Chart navigation (top-left) ──
+                RowLayout {
+                    id: chartNavRow
+                    anchors.top: parent.top
+                    anchors.left: parent.left
+                    anchors.topMargin: 7
+                    anchors.leftMargin: 12
+                    spacing: 6
+
+                    // Left arrow button
+                    Rectangle {
+                        radius: 4
+                        implicitHeight: 16
+                        implicitWidth: 16
+                        color: leftNavMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(1, 1, 1, 0.06)
+                        opacity: enabled ? 1.0 : 0.3
+                        enabled: {
+                            var key = root._historyKey();
+                            var oldestT = 0;
+                            for (var i = 0; i < root.usageHistory.length; i++) {
+                                var p = root.usageHistory[i];
+                                if (p[key] !== undefined && p[key] !== null) {
+                                    oldestT = p.t;
+                                    break;
+                                }
+                            }
+                            if (oldestT === 0)
+                                return false;
+                            var now_ms = new Date().getTime();
+                            var winSize = root.getChartWindowSize();
+                            var maxT = now_ms - root.chartTimeOffset;
+                            var minT = maxT - winSize;
+                            return minT > oldestT;
+                        }
+                        PlasmaComponents.Label {
+                            anchors.centerIn: parent
+                            text: "<"
+                            font.pixelSize: 9
+                            font.bold: true
+                            color: Kirigami.Theme.textColor
+                        }
+                        MouseArea {
+                            id: leftNavMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: parent.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                            onClicked: {
+                                root.chartTimeOffset += root.getChartWindowSize();
+                            }
+                        }
+                    }
+
+                    // Center label showing current range
+                    PlasmaComponents.Label {
+                        text: root.getChartRangeText()
+                        font.pixelSize: 9
+                        font.bold: true
+                        opacity: 0.6
+                        color: Kirigami.Theme.textColor
+                    }
+
+                    // Right arrow button
+                    Rectangle {
+                        radius: 4
+                        implicitHeight: 16
+                        implicitWidth: 16
+                        color: rightNavMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(1, 1, 1, 0.06)
+                        opacity: enabled ? 1.0 : 0.3
+                        enabled: root.chartTimeOffset > 0
+                        PlasmaComponents.Label {
+                            anchors.centerIn: parent
+                            text: ">"
+                            font.pixelSize: 9
+                            font.bold: true
+                            color: Kirigami.Theme.textColor
+                        }
+                        MouseArea {
+                            id: rightNavMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: parent.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                            onClicked: {
+                                var winSize = root.getChartWindowSize();
+                                root.chartTimeOffset = Math.max(0, root.chartTimeOffset - winSize);
+                            }
+                        }
+                    }
+                }
+
                 // ── Window toggle — Claude: 5H/7D, Codex: 5H/7D (single-series tabs: hidden) ──
                 RowLayout {
                     id: chartWindowToggle
@@ -3869,12 +4092,10 @@ PlasmoidItem {
                             return;
 
                         var w = width, h = height;
-                        // Always pin the right edge to "now" so new/sparse data isn't squashed.
-                        // Minimum window = 1 hour; otherwise span from earliest point to now.
                         var now_ms = new Date().getTime();
-                        var maxT = now_ms;
-                        var minT = pts[0].t;
-                        var tRange = Math.max(maxT - minT, 3600000);
+                        var maxT = now_ms - root.chartTimeOffset;
+                        var minT = maxT - root.getChartWindowSize();
+                        var tRange = root.getChartWindowSize();
 
                         function px(i) {
                             return ((pts[i].t - minT) / tRange) * w;
@@ -4068,10 +4289,10 @@ PlasmoidItem {
 
                     PlasmaComponents.Label {
                         text: {
-                            var pts = root.weeklyUsageHistory;
-                            if (!pts || pts.length < 1)
-                                return "";
-                            return xAxisRow.formatLabel(pts[0].t);
+                            var now_ms = new Date().getTime();
+                            var maxT = now_ms - root.chartTimeOffset;
+                            var minT = maxT - root.getChartWindowSize();
+                            return xAxisRow.formatLabel(minT);
                         }
                         font.pixelSize: 9
                         opacity: 0.40
@@ -4082,11 +4303,11 @@ PlasmoidItem {
                     }
                     PlasmaComponents.Label {
                         text: {
-                            var pts = root.weeklyUsageHistory;
-                            if (!pts || pts.length < 2)
-                                return "";
-                            var mid = pts[Math.floor(pts.length / 2)];
-                            return xAxisRow.formatLabel(mid.t);
+                            var now_ms = new Date().getTime();
+                            var maxT = now_ms - root.chartTimeOffset;
+                            var winSize = root.getChartWindowSize();
+                            var minT = maxT - winSize;
+                            return xAxisRow.formatLabel(minT + winSize / 2);
                         }
                         font.pixelSize: 9
                         opacity: 0.40
@@ -4097,10 +4318,9 @@ PlasmoidItem {
                     }
                     PlasmaComponents.Label {
                         text: {
-                            var pts = root.weeklyUsageHistory;
-                            if (!pts || pts.length < 1)
-                                return "";
-                            return xAxisRow.formatLabel(pts[pts.length - 1].t);
+                            var now_ms = new Date().getTime();
+                            var maxT = now_ms - root.chartTimeOffset;
+                            return xAxisRow.formatLabel(maxT);
                         }
                         font.pixelSize: 9
                         opacity: 0.40

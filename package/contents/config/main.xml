@@ -74,5 +74,8 @@
     <entry name="popupBgOpacity" type="Double">
       <default>0.00</default>
     </entry>
+    <entry name="backgroundHints" type="Int">
+      <default>1</default>
+    </entry>
   </group>
 </kcfg>

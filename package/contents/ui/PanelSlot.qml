@@ -71,59 +71,6 @@ RowLayout {
         }
     }
 
-    // ── Spark-line (mini trend) ─────────────────────────────────────────
-    Canvas {
-        id: sparkCanvas
-        visible: !slot.showCost && slot.spark && slot.spark.length >= 2
-        width: visible ? 28 : 0
-        height: 14
-        Layout.alignment: Qt.AlignVCenter
-        property var pts: slot.spark
-        property color lineColor: slot.iconColor
-        onPtsChanged: requestPaint()
-        onLineColorChanged: requestPaint()
-        onPaint: {
-            var ctx = getContext("2d");
-            ctx.clearRect(0, 0, width, height);
-            var p = pts;
-            if (!p || p.length < 2)
-                return;
-            var minT = p[0].t, maxT = p[p.length - 1].t;
-            var tr = maxT - minT || 1;
-            // autoscale y to the visible value range so small movements still read
-            var minV = p[0].v, maxV = p[0].v;
-            for (var k = 0; k < p.length; k++) {
-                if (p[k].v < minV)
-                    minV = p[k].v;
-                if (p[k].v > maxV)
-                    maxV = p[k].v;
-            }
-            var vr = (maxV - minV) || 1;
-            var pad = 2;
-            function X(i) {
-                return ((p[i].t - minT) / tr) * (width - pad * 2) + pad;
-            }
-            function Y(v) {
-                return (height - pad) - ((v - minV) / vr) * (height - pad * 2);
-            }
-            var r = Math.round(lineColor.r * 255), g = Math.round(lineColor.g * 255), b = Math.round(lineColor.b * 255);
-            ctx.beginPath();
-            ctx.moveTo(X(0), Y(p[0].v));
-            for (var i = 1; i < p.length; i++)
-                ctx.lineTo(X(i), Y(p[i].v));
-            ctx.strokeStyle = "rgba(" + r + "," + g + "," + b + ",0.85)";
-            ctx.lineWidth = 1.5;
-            ctx.lineJoin = "round";
-            ctx.lineCap = "round";
-            ctx.stroke();
-            // endpoint dot
-            ctx.beginPath();
-            ctx.arc(X(p.length - 1), Y(p[p.length - 1].v), 1.6, 0, Math.PI * 2);
-            ctx.fillStyle = "rgba(" + r + "," + g + "," + b + ",1)";
-            ctx.fill();
-        }
-    }
-
     PlasmaComponents.Label {
         text: slot.showCost ? slot.costText : Math.round(slot.displayPct) + "%"
         font.pixelSize: 12
