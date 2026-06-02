@@ -47,7 +47,7 @@
     </entry>
     <!-- Accent color mode: true = follow Plasma accent (highlightColor), false = per-service colors -->
     <entry name="useThemeAccent" type="Bool">
-      <default>true</default>
+      <default>false</default>
     </entry>
     <!-- Pinned tab id (e.g. "claude"); empty = auto (show active/first enabled) -->
     <entry name="pinnedTab" type="String">
@@ -60,6 +60,19 @@
     <!-- Poll interval in seconds (applies to all services) -->
     <entry name="pollIntervalSec" type="Int">
       <default>300</default>
+    </entry>
+    <!-- Appearance customizations -->
+    <entry name="cardBgColor" type="String">
+      <default>#100a1a</default>
+    </entry>
+    <entry name="cardBgOpacity" type="Double">
+      <default>0.90</default>
+    </entry>
+    <entry name="popupBgColor" type="String">
+      <default>#000000</default>
+    </entry>
+    <entry name="popupBgOpacity" type="Double">
+      <default>0.00</default>
     </entry>
   </group>
 </kcfg>

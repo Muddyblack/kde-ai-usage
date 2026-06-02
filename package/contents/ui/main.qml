@@ -5,6 +5,7 @@ import org.kde.plasma.plasmoid
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.plasma5support as Plasma5Support
+import QtQuick.Dialogs
 
 PlasmoidItem {
     id: root
@@ -554,6 +555,39 @@ PlasmoidItem {
     }
     // Accent for the currently active tab
     readonly property color activeAccent: root.accentFor(root.enabledTabs[root.activeTab] || "claude")
+
+    // ── Appearance Customization ────────────────────────────────────────────────
+    property color cardBgColor: Plasmoid.configuration.cardBgColor || "#100a1a"
+    property real cardBgOpacity: Plasmoid.configuration.cardBgOpacity !== undefined ? Plasmoid.configuration.cardBgOpacity : 0.90
+    property color popupBgColor: Plasmoid.configuration.popupBgColor || "#000000"
+    property real popupBgOpacity: Plasmoid.configuration.popupBgOpacity !== undefined ? Plasmoid.configuration.popupBgOpacity : 0.00
+
+    readonly property color resolvedCardBg: {
+        var c = Qt.color(root.cardBgColor);
+        return Qt.rgba(c.r, c.g, c.b, root.cardBgOpacity);
+    }
+    readonly property color resolvedPopupBg: {
+        var c = Qt.color(root.popupBgColor);
+        return Qt.rgba(c.r, c.g, c.b, root.popupBgOpacity);
+    }
+
+    property string colorTarget: "popup"
+    ColorDialog {
+        id: colorDialog
+        title: colorTarget === "popup" ? "Choose Popup Background Color" : "Choose Card Background Color"
+        onAccepted: {
+            var hex = selectedColor.toString().substring(0, 7);
+            if (hex.charAt(0) !== '#')
+                hex = '#' + hex; // standard hex validation
+            if (colorTarget === "popup") {
+                Plasmoid.configuration.popupBgColor = hex;
+                root.popupBgColor = hex;
+            } else {
+                Plasmoid.configuration.cardBgColor = hex;
+                root.cardBgColor = hex;
+            }
+        }
+    }
 
     // ── Pin (auto-rotate stays the default) ─────────────────────────────────────
     property string pinnedTab: Plasmoid.configuration.pinnedTab || ""
@@ -1694,6 +1728,15 @@ PlasmoidItem {
             }
         }
 
+        // Custom background tint overlay (defaults to 0 opacity, i.e. invisible/glassy)
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: -(Kirigami.Units.largeSpacing + 4)
+            radius: 12
+            color: root.resolvedPopupBg
+            visible: root.popupBgOpacity > 0
+        }
+
         ColumnLayout {
             id: mainColumn
             anchors.left: parent.left
@@ -2108,6 +2151,186 @@ PlasmoidItem {
                     }
                     Item {
                         Layout.fillWidth: true
+                    }
+                }
+
+                // ── Appearance ──────────────────────────────────────────────
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: 1
+                    color: Qt.rgba(1, 1, 1, 0.08)
+                }
+                PlasmaComponents.Label {
+                    text: "Appearance"
+                    font.bold: true
+                    font.pixelSize: 10
+                    opacity: 0.5
+                    color: Kirigami.Theme.textColor
+                }
+
+                // Grid of appearance settings
+                GridLayout {
+                    Layout.fillWidth: true
+                    columns: 3
+                    columnSpacing: 8
+                    rowSpacing: 6
+
+                    // Row 1: Popup Background Color & Opacity
+                    PlasmaComponents.Label {
+                        text: "Popup BG"
+                        font.pixelSize: 11
+                        color: Kirigami.Theme.textColor
+                        Layout.preferredWidth: 80
+                    }
+                    RowLayout {
+                        spacing: 4
+                        Layout.fillWidth: true
+                        Rectangle {
+                            width: 12
+                            height: 12
+                            radius: 2
+                            color: root.resolvedPopupBg
+                            border.width: 1
+                            border.color: Qt.rgba(1, 1, 1, 0.2)
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                hoverEnabled: true
+                                onClicked: {
+                                    root.colorTarget = "popup";
+                                    colorDialog.selectedColor = root.popupBgColor;
+                                    colorDialog.open();
+                                }
+                                QQC2.ToolTip.delay: 400
+                                QQC2.ToolTip.visible: containsMouse
+                                QQC2.ToolTip.text: "Click to open color picker"
+                            }
+                        }
+                        QQC2.TextField {
+                            text: Plasmoid.configuration.popupBgColor || "#000000"
+                            placeholderText: "#000000"
+                            implicitHeight: 22
+                            Layout.fillWidth: true
+                            font.pixelSize: 9
+                            onTextEdited: {
+                                if (/^#[0-9A-Fa-f]{6}$/.test(text)) {
+                                    Plasmoid.configuration.popupBgColor = text;
+                                    root.popupBgColor = text;
+                                }
+                            }
+                        }
+                    }
+                    RowLayout {
+                        spacing: 4
+                        PlasmaComponents.Label {
+                            text: "Opacity:"
+                            font.pixelSize: 10
+                            opacity: 0.6
+                        }
+                        QQC2.TextField {
+                            text: Math.round(root.popupBgOpacity * 100)
+                            placeholderText: "0"
+                            implicitHeight: 22
+                            Layout.preferredWidth: 32
+                            font.pixelSize: 9
+                            validator: IntValidator {
+                                bottom: 0
+                                top: 100
+                            }
+                            onTextEdited: {
+                                var val = parseInt(text);
+                                if (!isNaN(val) && val >= 0 && val <= 100) {
+                                    var opacityVal = val / 100.0;
+                                    Plasmoid.configuration.popupBgOpacity = opacityVal;
+                                    root.popupBgOpacity = opacityVal;
+                                }
+                            }
+                        }
+                        PlasmaComponents.Label {
+                            text: "%"
+                            font.pixelSize: 10
+                            opacity: 0.6
+                        }
+                    }
+
+                    // Row 2: Card Background Color & Opacity
+                    PlasmaComponents.Label {
+                        text: "Card BG"
+                        font.pixelSize: 11
+                        color: Kirigami.Theme.textColor
+                        Layout.preferredWidth: 80
+                    }
+                    RowLayout {
+                        spacing: 4
+                        Layout.fillWidth: true
+                        Rectangle {
+                            width: 12
+                            height: 12
+                            radius: 2
+                            color: root.resolvedCardBg
+                            border.width: 1
+                            border.color: Qt.rgba(1, 1, 1, 0.2)
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                hoverEnabled: true
+                                onClicked: {
+                                    root.colorTarget = "card";
+                                    colorDialog.selectedColor = root.cardBgColor;
+                                    colorDialog.open();
+                                }
+                                QQC2.ToolTip.delay: 400
+                                QQC2.ToolTip.visible: containsMouse
+                                QQC2.ToolTip.text: "Click to open color picker"
+                            }
+                        }
+                        QQC2.TextField {
+                            text: Plasmoid.configuration.cardBgColor || "#100a1a"
+                            placeholderText: "#100a1a"
+                            implicitHeight: 22
+                            Layout.fillWidth: true
+                            font.pixelSize: 9
+                            onTextEdited: {
+                                if (/^#[0-9A-Fa-f]{6}$/.test(text)) {
+                                    Plasmoid.configuration.cardBgColor = text;
+                                    root.cardBgColor = text;
+                                }
+                            }
+                        }
+                    }
+                    RowLayout {
+                        spacing: 4
+                        PlasmaComponents.Label {
+                            text: "Opacity:"
+                            font.pixelSize: 10
+                            opacity: 0.6
+                        }
+                        QQC2.TextField {
+                            text: Math.round(root.cardBgOpacity * 100)
+                            placeholderText: "90"
+                            implicitHeight: 22
+                            Layout.preferredWidth: 32
+                            font.pixelSize: 9
+                            validator: IntValidator {
+                                bottom: 0
+                                top: 100
+                            }
+                            onTextEdited: {
+                                var val = parseInt(text);
+                                if (!isNaN(val) && val >= 0 && val <= 100) {
+                                    var opacityVal = val / 100.0;
+                                    Plasmoid.configuration.cardBgOpacity = opacityVal;
+                                    root.cardBgOpacity = opacityVal;
+                                }
+                            }
+                        }
+                        PlasmaComponents.Label {
+                            text: "%"
+                            font.pixelSize: 10
+                            opacity: 0.6
+                        }
                     }
                 }
 
@@ -2572,91 +2795,15 @@ PlasmoidItem {
                     }
                 }
 
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 6
+                PopupRow {
                     visible: root.antigravityPromptCreditsMonthly > 0
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 6
-                        PlasmaComponents.Label {
-                            text: "Prompt Credits"
-                            font.bold: true
-                            font.pixelSize: 12
-                            color: Kirigami.Theme.textColor
-                        }
-                        Item {
-                            Layout.fillWidth: true
-                        }
-                        PlasmaComponents.Label {
-                            text: root.antigravityPromptCreditsAvailable + " / " + root.formatTokens(root.antigravityPromptCreditsMonthly) + " left"
-                            font.pixelSize: 11
-                            font.bold: true
-                            color: {
-                                var pct = root.antigravityPromptCreditsMonthly > 0 ? (1 - root.antigravityPromptCreditsAvailable / root.antigravityPromptCreditsMonthly) * 100 : 0;
-                                return root.usageColor(pct);
-                            }
-                        }
-                    }
-
-                    Item {
-                        Layout.fillWidth: true
-                        height: 8
-                        Row {
-                            anchors.fill: parent
-                            spacing: 3
-                            Repeater {
-                                model: 20
-                                Rectangle {
-                                    id: segRect
-                                    property real usedPct: root.antigravityPromptCreditsMonthly > 0 ? (1 - root.antigravityPromptCreditsAvailable / root.antigravityPromptCreditsMonthly) * 100 : 0
-                                    property real segThresh: (index + 1) * 5
-                                    property real prevThresh: index * 5
-                                    property real fillRatio: {
-                                        if (usedPct >= segThresh)
-                                            return 1.0;
-                                        if (usedPct <= prevThresh)
-                                            return 0.0;
-                                        return (usedPct - prevThresh) / 5;
-                                    }
-                                    width: (parent.width - 19 * 3) / 20
-                                    height: parent.height
-                                    radius: 2
-                                    color: Qt.rgba(1, 1, 1, 0.06)
-                                    border.width: 1
-                                    border.color: Qt.rgba(1, 1, 1, 0.10)
-                                    Rectangle {
-                                        anchors {
-                                            left: parent.left
-                                            top: parent.top
-                                            bottom: parent.bottom
-                                            margins: 1
-                                        }
-                                        width: Math.max(0, (parent.width - 2) * fillRatio)
-                                        radius: 1.5
-                                        gradient: Gradient {
-                                            orientation: Gradient.Horizontal
-                                            GradientStop {
-                                                position: 0.0
-                                                color: Qt.lighter(root.usageColor(segRect.usedPct), 1.2)
-                                            }
-                                            GradientStop {
-                                                position: 1.0
-                                                color: root.usageColor(segRect.usedPct)
-                                            }
-                                        }
-                                        Behavior on width {
-                                            NumberAnimation {
-                                                duration: 500
-                                                easing.type: Easing.OutCubic
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    label: "Prompt Credits"
+                    resetText: root.antigravityResetTime ? "resets " + root.antigravityResetTime : ""
+                    countdownText: root.antigravityCountdown === "resetting..." ? "resetting..." : (root.antigravityCountdown ? "in " + root.antigravityCountdown : "")
+                    value: root.antigravityPromptCreditsMonthly > 0 ? (1 - root.antigravityPromptCreditsAvailable / root.antigravityPromptCreditsMonthly) * 100 : 0
+                    barColor: root.googleBlue
+                    tokenText: root.antigravityPromptCreditsAvailable + " / " + root.formatTokens(root.antigravityPromptCreditsMonthly) + " left"
+                    tooltipText: "Prompt Credits\nUsed: " + Math.round(value) + "%  ·  " + root.antigravityPromptCreditsAvailable + " / " + root.formatTokens(root.antigravityPromptCreditsMonthly) + " left" + (root.antigravityResetTime ? "\nResets: " + root.antigravityResetTime : "")
                 }
 
                 PopupRow {
@@ -2752,26 +2899,6 @@ PlasmoidItem {
                                 horizontalAlignment: Text.AlignRight
                             }
                         }
-                    }
-                }
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 6
-                    visible: root.antigravityResetTime !== "" && root.antigravityPromptCreditsMonthly > 0
-                    Kirigami.Icon {
-                        source: "appointment-soon"
-                        width: 12
-                        height: 12
-                        isMask: true
-                        color: Kirigami.Theme.textColor
-                        opacity: 0.4
-                    }
-                    PlasmaComponents.Label {
-                        text: "Resets " + root.antigravityResetTime + (root.antigravityCountdown && root.antigravityCountdown !== "resetting..." ? "  (" + root.antigravityCountdown + ")" : "")
-                        font.pixelSize: 10
-                        opacity: 0.45
-                        color: Kirigami.Theme.textColor
                     }
                 }
             }
@@ -3559,7 +3686,7 @@ PlasmoidItem {
                 Layout.preferredHeight: implicitHeight
                 implicitHeight: 184
                 radius: 10
-                color: Qt.rgba(0.06, 0.04, 0.10, 0.90)
+                color: root.resolvedCardBg
                 border.width: 1
                 border.color: Qt.rgba(1, 1, 1, 0.08)
                 clip: true
@@ -3933,11 +4060,7 @@ PlasmoidItem {
                     spacing: 0
 
                     function formatLabel(timestamp) {
-                        var pts = root.weeklyUsageHistory;
-                        if (!pts || pts.length < 2)
-                            return Qt.formatDate(new Date(timestamp), "MMM d");
-                        var totalSpanMs = pts[pts.length - 1].t - pts[0].t;
-                        if (totalSpanMs < 24 * 3600000) {
+                        if (root.chartWindow === "session" || root.chartWindow === "codex_primary") {
                             return Qt.formatTime(new Date(timestamp), "hh:mm");
                         }
                         return Qt.formatDate(new Date(timestamp), "MMM d");
@@ -3977,7 +4100,7 @@ PlasmoidItem {
                             var pts = root.weeklyUsageHistory;
                             if (!pts || pts.length < 1)
                                 return "";
-                            return Qt.formatTime(new Date(pts[pts.length - 1].t), "hh:mm");
+                            return xAxisRow.formatLabel(pts[pts.length - 1].t);
                         }
                         font.pixelSize: 9
                         opacity: 0.40
