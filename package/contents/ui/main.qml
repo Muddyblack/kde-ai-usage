@@ -6,7 +6,6 @@ import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.plasma5support as Plasma5Support
 import QtQuick.Dialogs
-import QtCore
 
 PlasmoidItem {
     id: root
@@ -576,54 +575,41 @@ PlasmoidItem {
     }
 
     // ── Tab snapshot export ─────────────────────────────────────────────────
-    // Temp PNG path + dimensions stored between capture and dialog accept
-    property string _exportTmpPng: ""
     property string _exportFormat: ""
     property int _exportW: 0
     property int _exportH: 0
-    property bool _exportHideHeader: false   // toggled to hide the header row during grab
+    property bool _exportHideHeader: false
 
-    // Step 1: capture to /tmp (header hidden for a clean image), then open the Save dialog
+    // Grab while the popup is still open and visible, save straight to Downloads.
     function doExportSnapshot(grabItem, format) {
         var tab = root.enabledTabs[root.activeTab] || "tab";
         var ts = Qt.formatDateTime(new Date(), "yyyyMMdd-HHmmss");
-        root._exportTmpPng = "/tmp/ai-usage-export-" + ts + ".png";
+        var baseName = "ai-usage-" + tab + "-" + ts;
+        var tmpPng = "/tmp/" + baseName + ".png";
+
         root._exportFormat = format;
         root._exportW = Math.round(grabItem.width);
         root._exportH = Math.round(grabItem.implicitHeight > 0 ? grabItem.implicitHeight : grabItem.height);
 
-        // Hide chrome so the exported image only shows data
         root._exportHideHeader = true;
         Qt.callLater(function () {
             grabItem.grabToImage(function (result) {
                 root._exportHideHeader = false;
-                if (!result.saveToFile(root._exportTmpPng)) {
+                if (!result.saveToFile(tmpPng)) {
+                    exportSaveSource.disconnectSource("notify-send 'AI Usage Widget' 'Export failed: could not capture image'");
+                    exportSaveSource.connectSource("notify-send 'AI Usage Widget' 'Export failed: could not capture image'");
                     return;
                 }
-                var suggestedName = "ai-usage-" + tab + "-" + ts + "." + format;
-                exportSaveDialog.selectedFile = "file://" + StandardPaths.writableLocation(StandardPaths.DownloadLocation) + "/" + suggestedName;
-                exportSaveDialog.open();
+                // Use $HOME in the shell so it always resolves correctly regardless of QML context
+                var destPath = "$HOME/Downloads/" + baseName + "." + format;
+                var cmd = "mkdir -p \"$HOME/Downloads\" && " + root.scriptDir + "export-snapshot " + format + " \"" + tmpPng + "\" \"" + destPath + "\"";
+                if (format === "svg")
+                    cmd += " " + root._exportW + " " + root._exportH;
+                cmd += " && notify-send 'AI Usage Widget' 'Saved to ~/Downloads/" + baseName + "." + format + "'";
+                exportSaveSource.disconnectSource(cmd);
+                exportSaveSource.connectSource(cmd);
             });
         });
-    }
-
-    // Step 2: user picked a path — run the shell helper to copy/convert
-    function _finishExport(destPath) {
-        var cmd = root.scriptDir + "export-snapshot " + root._exportFormat + " \"" + root._exportTmpPng + "\" " + "\"" + destPath + "\"";
-        if (root._exportFormat === "svg")
-            cmd += " " + root._exportW + " " + root._exportH;
-        exportSaveSource.disconnectSource(cmd);
-        exportSaveSource.connectSource(cmd);
-    }
-
-    FileDialog {
-        id: exportSaveDialog
-        fileMode: FileDialog.SaveFile
-        currentFolder: StandardPaths.writableLocation(StandardPaths.DownloadLocation)
-        onAccepted: {
-            var path = selectedFile.toString().replace(/^file:\/\//, "");
-            root._finishExport(path);
-        }
     }
 
     Plasma5Support.DataSource {

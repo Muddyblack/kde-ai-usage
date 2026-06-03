@@ -32,7 +32,27 @@ mkdir -p "$(dirname "$dest")"
 
 case "$cmd" in
   png)
-    cp "$src" "$dest"
+    if command -v magick >/dev/null 2>&1; then
+      magick "$src" -background "#0d0d1a" -flatten "$dest"
+    elif command -v convert >/dev/null 2>&1; then
+      convert -background "#0d0d1a" -flatten "$src" "$dest"
+    elif command -v python3 >/dev/null 2>&1; then
+      python3 - "$src" "$dest" <<'PYEOF'
+import sys
+src, dest = sys.argv[1], sys.argv[2]
+try:
+    from PIL import Image
+    img = Image.open(src).convert("RGBA")
+    bg = Image.new("RGBA", img.size, (13, 13, 26, 255))
+    bg.paste(img, mask=img.split()[3])
+    bg.convert("RGB").save(dest, "PNG")
+except ImportError:
+    import shutil
+    shutil.copy(src, dest)
+PYEOF
+    else
+      cp "$src" "$dest"
+    fi
     printf '{"ok":true,"path":"%s"}\n' "$dest"
     ;;
   svg)
