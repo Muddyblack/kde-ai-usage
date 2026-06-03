@@ -39,13 +39,24 @@ ColumnLayout {
     Layout.fillWidth: true
     spacing: 5
 
-    MouseArea {
-        anchors.fill: parent
-        hoverEnabled: true
-        propagateComposedEvents: true
-        QQC2.ToolTip.visible: containsMouse && row.tooltipText !== ""
-        QQC2.ToolTip.text: row.tooltipText
-        QQC2.ToolTip.delay: 500
+    // Overlay mouse area for the tooltip. Must be in an Item with Layout
+    // properties (not anchors) so the ColumnLayout can manage its geometry.
+    Item {
+        Layout.fillWidth: true
+        Layout.preferredHeight: 0   // zero-height so it doesn't push siblings
+        // Extend visually over the whole row via z-ordered MouseArea
+        MouseArea {
+            // Reach up to cover the full ColumnLayout by using the parent chain
+            x: 0
+            y: -row.height   // position from top of the ColumnLayout
+            width: row.width
+            height: row.height
+            hoverEnabled: true
+            propagateComposedEvents: true
+            QQC2.ToolTip.visible: containsMouse && row.tooltipText !== ""
+            QQC2.ToolTip.text: row.tooltipText
+            QQC2.ToolTip.delay: 500
+        }
     }
 
     RowLayout {

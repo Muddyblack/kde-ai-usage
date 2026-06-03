@@ -6,6 +6,7 @@ import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.plasma5support as Plasma5Support
 import QtQuick.Dialogs
+import QtCore
 
 PlasmoidItem {
     id: root
@@ -574,6 +575,65 @@ PlasmoidItem {
         return out;
     }
 
+    // ── Tab snapshot export ─────────────────────────────────────────────────
+    // Temp PNG path + dimensions stored between capture and dialog accept
+    property string _exportTmpPng: ""
+    property string _exportFormat: ""
+    property int _exportW: 0
+    property int _exportH: 0
+    property bool _exportHideHeader: false   // toggled to hide the header row during grab
+
+    // Step 1: capture to /tmp (header hidden for a clean image), then open the Save dialog
+    function doExportSnapshot(grabItem, format) {
+        var tab = root.enabledTabs[root.activeTab] || "tab";
+        var ts = Qt.formatDateTime(new Date(), "yyyyMMdd-HHmmss");
+        root._exportTmpPng = "/tmp/ai-usage-export-" + ts + ".png";
+        root._exportFormat = format;
+        root._exportW = Math.round(grabItem.width);
+        root._exportH = Math.round(grabItem.implicitHeight > 0 ? grabItem.implicitHeight : grabItem.height);
+
+        // Hide chrome so the exported image only shows data
+        root._exportHideHeader = true;
+        Qt.callLater(function () {
+            grabItem.grabToImage(function (result) {
+                root._exportHideHeader = false;
+                if (!result.saveToFile(root._exportTmpPng)) {
+                    return;
+                }
+                var suggestedName = "ai-usage-" + tab + "-" + ts + "." + format;
+                exportSaveDialog.selectedFile = "file://" + StandardPaths.writableLocation(StandardPaths.DownloadLocation) + "/" + suggestedName;
+                exportSaveDialog.open();
+            });
+        });
+    }
+
+    // Step 2: user picked a path — run the shell helper to copy/convert
+    function _finishExport(destPath) {
+        var cmd = root.scriptDir + "export-snapshot " + root._exportFormat + " \"" + root._exportTmpPng + "\" " + "\"" + destPath + "\"";
+        if (root._exportFormat === "svg")
+            cmd += " " + root._exportW + " " + root._exportH;
+        exportSaveSource.disconnectSource(cmd);
+        exportSaveSource.connectSource(cmd);
+    }
+
+    FileDialog {
+        id: exportSaveDialog
+        fileMode: FileDialog.SaveFile
+        currentFolder: StandardPaths.writableLocation(StandardPaths.DownloadLocation)
+        onAccepted: {
+            var path = selectedFile.toString().replace(/^file:\/\//, "");
+            root._finishExport(path);
+        }
+    }
+
+    Plasma5Support.DataSource {
+        id: exportSaveSource
+        engine: "executable"
+        connectedSources: []
+        onNewData: function (src, data) {
+            disconnectSource(src);
+        }
+    }
     // ── History export / import ─────────────────────────────────────────────────
     property string historyIOMsg: ""
 
@@ -1971,8 +2031,10 @@ PlasmoidItem {
 
             // ── Header ──────────────────────────────────────────────────────
             RowLayout {
+                id: headerRow
                 Layout.fillWidth: true
                 spacing: 8
+                visible: !root._exportHideHeader
 
                 Item {
                     width: 22
@@ -2054,6 +2116,40 @@ PlasmoidItem {
 
                 Item {
                     Layout.fillWidth: true
+                }
+
+                // ── Export button ─────────────────────────────────────────
+                PlasmaComponents.ToolButton {
+                    id: exportBtn
+                    icon.name: "document-save"
+                    display: PlasmaComponents.AbstractButton.IconOnly
+                    visible: !root.showSettings
+                    opacity: hovered ? 1.0 : 0.6
+                    Behavior on opacity {
+                        NumberAnimation {
+                            duration: 150
+                        }
+                    }
+                    QQC2.ToolTip.visible: hovered && !exportMenu.visible
+                    QQC2.ToolTip.delay: 400
+                    QQC2.ToolTip.text: "Export current tab as PNG or SVG"
+                    onClicked: exportMenu.popup()
+
+                    QQC2.Menu {
+                        id: exportMenu
+
+                        QQC2.MenuItem {
+                            text: "Export as PNG"
+                            icon.name: "image-x-generic"
+                            onTriggered: root.doExportSnapshot(mainColumn, "png")
+                        }
+
+                        QQC2.MenuItem {
+                            text: "Export as SVG"
+                            icon.name: "image-svg+xml"
+                            onTriggered: root.doExportSnapshot(mainColumn, "svg")
+                        }
+                    }
                 }
 
                 PlasmaComponents.ToolButton {

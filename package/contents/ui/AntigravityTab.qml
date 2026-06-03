@@ -95,9 +95,12 @@ ColumnLayout {
 
         Repeater {
             model: Object.keys(rootItem.antigravityModels).sort()
-            RowLayout {
+            // Wrap in a plain Item so the MouseArea can use anchors.fill without
+            // conflicting with layout management (the Item is the layout delegate).
+            Item {
                 Layout.fillWidth: true
-                spacing: 8
+                implicitHeight: modelRow.implicitHeight
+
                 MouseArea {
                     anchors.fill: parent
                     hoverEnabled: true
@@ -114,46 +117,55 @@ ColumnLayout {
                         return txt;
                     }
                 }
-                PlasmaComponents.Label {
-                    text: rootItem.antigravityModels[modelData].displayName || modelData
-                    font.pixelSize: 10
-                    color: rootItem.antigravityModels[modelData].isExhausted ? rootItem.dangerColor : Kirigami.Theme.textColor
-                    opacity: rootItem.antigravityModels[modelData].isExhausted ? 1.0 : 0.65
-                    Layout.preferredWidth: 120
-                    elide: Text.ElideRight
-                }
-                Rectangle {
-                    Layout.fillWidth: true
-                    height: 6
-                    radius: 3
-                    color: Qt.rgba(1, 1, 1, 0.06)
-                    border.width: 1
-                    border.color: Qt.rgba(1, 1, 1, 0.10)
+
+                RowLayout {
+                    id: modelRow
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 8
+
+                    PlasmaComponents.Label {
+                        text: rootItem.antigravityModels[modelData].displayName || modelData
+                        font.pixelSize: 10
+                        color: rootItem.antigravityModels[modelData].isExhausted ? rootItem.dangerColor : Kirigami.Theme.textColor
+                        opacity: rootItem.antigravityModels[modelData].isExhausted ? 1.0 : 0.65
+                        Layout.preferredWidth: 120
+                        elide: Text.ElideRight
+                    }
                     Rectangle {
-                        anchors {
-                            left: parent.left
-                            top: parent.top
-                            bottom: parent.bottom
-                            margins: 1
-                        }
-                        width: Math.max(0, (parent.width - 2) * (rootItem.antigravityModels[modelData].usedPct / 100))
-                        radius: 2
-                        color: rootItem.antigravityModels[modelData].isExhausted ? rootItem.dangerColor : rootItem.antigravityModels[modelData].usedPct >= 70 ? rootItem.warningColor : rootItem.googleBlue
-                        Behavior on width {
-                            NumberAnimation {
-                                duration: 500
-                                easing.type: Easing.OutCubic
+                        Layout.fillWidth: true
+                        height: 6
+                        radius: 3
+                        color: Qt.rgba(1, 1, 1, 0.06)
+                        border.width: 1
+                        border.color: Qt.rgba(1, 1, 1, 0.10)
+                        Rectangle {
+                            anchors {
+                                left: parent.left
+                                top: parent.top
+                                bottom: parent.bottom
+                                margins: 1
+                            }
+                            width: Math.max(0, (parent.width - 2) * (rootItem.antigravityModels[modelData].usedPct / 100))
+                            radius: 2
+                            color: rootItem.antigravityModels[modelData].isExhausted ? rootItem.dangerColor : rootItem.antigravityModels[modelData].usedPct >= 70 ? rootItem.warningColor : rootItem.googleBlue
+                            Behavior on width {
+                                NumberAnimation {
+                                    duration: 500
+                                    easing.type: Easing.OutCubic
+                                }
                             }
                         }
                     }
-                }
-                PlasmaComponents.Label {
-                    text: rootItem.antigravityModels[modelData].isExhausted ? "100%" : Math.round(rootItem.antigravityModels[modelData].usedPct) + "%"
-                    font.pixelSize: 10
-                    font.bold: true
-                    color: rootItem.usageColor(rootItem.antigravityModels[modelData].usedPct)
-                    Layout.preferredWidth: 35
-                    horizontalAlignment: Text.AlignRight
+                    PlasmaComponents.Label {
+                        text: rootItem.antigravityModels[modelData].isExhausted ? "100%" : Math.round(rootItem.antigravityModels[modelData].usedPct) + "%"
+                        font.pixelSize: 10
+                        font.bold: true
+                        color: rootItem.usageColor(rootItem.antigravityModels[modelData].usedPct)
+                        Layout.preferredWidth: 35
+                        horizontalAlignment: Text.AlignRight
+                    }
                 }
             }
         }
