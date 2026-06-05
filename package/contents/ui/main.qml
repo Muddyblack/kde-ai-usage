@@ -166,6 +166,8 @@ PlasmoidItem {
 
     // ── Antigravity / Gemini data ─────────────────────────────────────────────
     property real antigravityPct: 0
+    property real antigravityGooglePct: 0
+    property real antigravityExternalPct: 0
     property string antigravityResetTime: ""
     property var antigravityResetDate: null
     property string antigravityCountdown: ""
@@ -1191,6 +1193,10 @@ PlasmoidItem {
                 var newModels = {};
                 var totalUsed = 0;
                 var modelCount = 0;
+                var googleUsed = 0;
+                var googleCount = 0;
+                var externalUsed = 0;
+                var externalCount = 0;
                 var earliestReset = null;
                 for (var i = 0; i < modelsList.length; i++) {
                     var m = modelsList[i];
@@ -1206,6 +1212,14 @@ PlasmoidItem {
                     if (remaining !== -1) {
                         totalUsed += usedPct;
                         modelCount++;
+                        var name = (m.label || m.modelId).toLowerCase();
+                        if (name.indexOf("gemini") !== -1 || name.indexOf("google") !== -1) {
+                            googleUsed += usedPct;
+                            googleCount++;
+                        } else {
+                            externalUsed += usedPct;
+                            externalCount++;
+                        }
                     }
                     if (m.resetTime) {
                         var rd = new Date(m.resetTime);
@@ -1215,6 +1229,8 @@ PlasmoidItem {
                 }
                 root.antigravityModels = newModels;
                 root.antigravityPct = modelCount > 0 ? totalUsed / modelCount : 0;
+                root.antigravityGooglePct = googleCount > 0 ? googleUsed / googleCount : 0;
+                root.antigravityExternalPct = externalCount > 0 ? externalUsed / externalCount : 0;
                 root.recordAntigravityUsage(root.antigravityPct);
                 if (earliestReset) {
                     root.antigravityResetDate = earliestReset;
@@ -1847,11 +1863,25 @@ PlasmoidItem {
             }
 
             PanelSlot {
-                pct: root.antigravityPct
+                pct: root.antigravityGooglePct
                 iconColor: root.googleBlue
                 stale: root.stale && root.panelTab === "antigravity"
                 visible: root.panelTab === "antigravity"
-                tooltipText: "Gemini quota: " + Math.round(root.antigravityPct) + "%" + (root.antigravityPlanType ? "\nPlan: " + root.antigravityPlanType : "") + (root.antigravityEmail ? "\n" + root.antigravityEmail : "")
+                tooltipText: "Gemini (Google) quota: " + Math.round(root.antigravityGooglePct) + "%" + (root.antigravityPlanType ? "\nPlan: " + root.antigravityPlanType : "") + (root.antigravityEmail ? "\n" + root.antigravityEmail : "")
+            }
+            Rectangle {
+                visible: root.panelTab === "antigravity"
+                width: 1
+                height: 14
+                color: Qt.rgba(1, 1, 1, 0.16)
+                Layout.alignment: Qt.AlignVCenter
+            }
+            PanelSlot {
+                pct: root.antigravityExternalPct
+                iconColor: root.googleGreen
+                stale: root.stale && root.panelTab === "antigravity"
+                visible: root.panelTab === "antigravity"
+                tooltipText: "External models quota: " + Math.round(root.antigravityExternalPct) + "%" + (root.antigravityPlanType ? "\nPlan: " + root.antigravityPlanType : "") + (root.antigravityEmail ? "\n" + root.antigravityEmail : "")
             }
 
             PanelSlot {
