@@ -52,6 +52,15 @@ PlasmoidItem {
                 lines.push("Plan: " + root.openaiPlanType);
             if (root.openaiCodexLoggedIn && !root._openaiApiKey)
                 lines.push("API usage needs an OpenAI API key");
+        } else if (tab === "kiro") {
+            if (root.kiroPlanType)
+                lines.push("Plan: " + root.kiroPlanType.toUpperCase());
+            if (root.kiroUsageLimit > 0)
+                lines.push("Credits: " + root.kiroCurrentUsage.toFixed(2) + " / " + root.kiroUsageLimit.toFixed(0));
+            if (root.kiroResetTime)
+                lines.push("Resets: " + root.kiroResetTime + (root.kiroCountdown ? " (" + root.kiroCountdown + ")" : ""));
+            if (root.kiroCurrentOverages > 0 || root.kiroOverageCharges > 0)
+                lines.push("Overage: " + root.kiroCurrencySymbol + root.kiroOverageCharges.toFixed(2));
         } else if (tab === "mistral") {
             if (root.mistralKeyValid)
                 lines.push("API key: configured");
@@ -83,6 +92,7 @@ PlasmoidItem {
     property bool claudeEnabled: Plasmoid.configuration.claudeEnabled
     property bool antigravityEnabled: Plasmoid.configuration.antigravityEnabled
     property bool openaiEnabled: Plasmoid.configuration.openaiEnabled
+    property bool kiroEnabled: Plasmoid.configuration.kiroEnabled
     property bool mistralEnabled: Plasmoid.configuration.mistralEnabled
     property bool openrouterEnabled: Plasmoid.configuration.openrouterEnabled
 
@@ -95,6 +105,8 @@ PlasmoidItem {
             t.push("antigravity");
         if (root.openaiEnabled)
             t.push("openai");
+        if (root.kiroEnabled)
+            t.push("kiro");
         if (root.mistralEnabled)
             t.push("mistral");
         if (root.openrouterEnabled)
@@ -195,6 +207,25 @@ PlasmoidItem {
     property real openaiTotalInputTokens: 0
     property real openaiTotalOutputTokens: 0
 
+    // ── Kiro data ─────────────────────────────────────────────────────────────
+    property bool kiroUsageAvailable: false
+    property string kiroPlanType: ""
+    property string kiroDisplayName: "Credit"
+    property string kiroDisplayNamePlural: "Credits"
+    property real kiroCurrentUsage: 0
+    property real kiroUsageLimit: 0
+    property real kiroPct: 0
+    property real kiroRemaining: 0
+    property real kiroCurrentOverages: 0
+    property real kiroOverageCap: 0
+    property real kiroOverageCharges: 0
+    property real kiroOverageRate: 0
+    property string kiroCurrencyCode: "USD"
+    property string kiroCurrencySymbol: "$"
+    property string kiroResetTime: ""
+    property var kiroResetDate: null
+    property string kiroCountdown: ""
+
     // ── Codex / ChatGPT-plan usage (from chatgpt.com/backend-api/codex/usage) ──
     // Two rolling windows like Claude: primary = 5-hour, secondary = weekly.
     property bool codexUsageAvailable: false
@@ -288,6 +319,8 @@ PlasmoidItem {
             return gran === "5h" ? "session" : gran === "24h" ? "day" : "weekly";
         if (tab === "openai")
             return gran === "5h" ? "codex_primary" : gran === "24h" ? "codex_day" : "codex_weekly";
+        if (tab === "kiro")
+            return "kiro";
         if (tab === "antigravity")
             return "antigravity";
         if (tab === "openrouter")
@@ -306,6 +339,8 @@ PlasmoidItem {
             return "cp";
         if (root.chartWindow === "codex_weekly")
             return "cw";
+        if (root.chartWindow === "kiro")
+            return "kr";
         if (root.chartWindow === "antigravity")
             return "ag";
         if (root.chartWindow === "openrouter")
@@ -326,7 +361,7 @@ PlasmoidItem {
         if (win === "weekly" || win === "codex_weekly") {
             return 7 * 24 * 3600000; // 7 days in ms
         }
-        if (win === "antigravity" || win === "openrouter" || win === "mistral") {
+        if (win === "kiro" || win === "antigravity" || win === "openrouter" || win === "mistral") {
             return 30 * 24 * 3600000; // 30 days in ms
         }
         return 7 * 24 * 3600000;
@@ -481,6 +516,27 @@ PlasmoidItem {
             history.push({
                 t: now,
                 or: pct
+            });
+        }
+        if (history.length > root.historyLimit)
+            history = history.slice(history.length - root.historyLimit);
+        root.usageHistory = history;
+        var json = JSON.stringify(history);
+        Plasmoid.configuration.usageHistory = json;
+        root.autosaveHistory(json);
+    }
+
+    function recordKiroUsage(pct) {
+        var history = root.usageHistory.slice();
+        var now = new Date().getTime();
+        if (history.length > 0 && now - history[history.length - 1].t < 120000) {
+            var last = history[history.length - 1];
+            last.kr = pct;
+            history[history.length - 1] = last;
+        } else {
+            history.push({
+                t: now,
+                kr: pct
             });
         }
         if (history.length > root.historyLimit)
@@ -716,6 +772,7 @@ PlasmoidItem {
     readonly property color googleBlue: "#4285f4"
     readonly property color googleGreen: "#34a853"
     readonly property color openaiGreen: "#10a37f"
+    readonly property color kiroPurple: "#8b5cf6"
     readonly property color mistralOrange: "#ff7000"
     readonly property color openrouterPurple: "#9333ea"
     readonly property color sessionColor: "#e05252"
@@ -730,6 +787,8 @@ PlasmoidItem {
             return root.googleBlue;
         if (tabId === "openai")
             return root.openaiGreen;
+        if (tabId === "kiro")
+            return root.kiroPurple;
         if (tabId === "mistral")
             return root.mistralOrange;
         if (tabId === "openrouter")
@@ -744,6 +803,8 @@ PlasmoidItem {
             return "Antigravity";
         if (tabId === "openai")
             return "OpenAI";
+        if (tabId === "kiro")
+            return "Kiro";
         if (tabId === "mistral")
             return "Mistral";
         if (tabId === "openrouter")
@@ -1089,6 +1150,7 @@ PlasmoidItem {
         root.antigravityCountdown = root.formatCountdown(root.antigravityResetDate);
         root.codexPrimaryCountdown = root.formatCountdown(root.codexPrimaryResetDate);
         root.codexSecondaryCountdown = root.formatCountdown(root.codexSecondaryResetDate);
+        root.kiroCountdown = root.formatCountdown(root.kiroResetDate);
     }
 
     function usageColor(pct) {
@@ -1306,6 +1368,61 @@ PlasmoidItem {
     }
 
     Plasma5Support.DataSource {
+        id: kiroUsageSource
+        engine: "executable"
+        connectedSources: []
+        onNewData: function (src, data) {
+            disconnectSource(src);
+            if (root.enabledTabs[root.activeTab] !== "kiro")
+                return;
+            var output = (data["stdout"] || "").trim();
+            if (!output || output === "{}") {
+                root.kiroUsageAvailable = false;
+                root.errorMsg = "Kiro: no local usage data found";
+                root.stale = root.lastUpdate !== "";
+                return;
+            }
+            try {
+                var res = JSON.parse(output);
+                if (res.error) {
+                    root.kiroUsageAvailable = false;
+                    root.errorMsg = "Kiro: " + res.error;
+                    root.stale = root.lastUpdate !== "";
+                    return;
+                }
+                root.kiroPlanType = res.planType || "";
+                root.kiroDisplayName = res.displayName || "Credit";
+                root.kiroDisplayNamePlural = res.displayNamePlural || "Credits";
+                root.kiroCurrentUsage = res.currentUsage || 0;
+                root.kiroUsageLimit = res.usageLimit || 0;
+                root.kiroPct = Math.max(0, Math.min(100, res.percentageUsed || 0));
+                root.kiroRemaining = res.remaining || 0;
+                root.kiroCurrentOverages = res.currentOverages || 0;
+                root.kiroOverageCap = res.overageCap || 0;
+                root.kiroOverageCharges = res.overageCharges || 0;
+                root.kiroOverageRate = res.overageRate || 0;
+                root.kiroCurrencyCode = res.currencyCode || "USD";
+                root.kiroCurrencySymbol = res.currencySymbol || "$";
+                root.kiroResetDate = res.resetDate ? new Date(res.resetDate) : null;
+                root.kiroResetTime = root.kiroResetDate ? Qt.formatDateTime(root.kiroResetDate, "MMM d, hh:mm") : "";
+                root.kiroUsageAvailable = root.kiroUsageLimit > 0 || root.kiroCurrentUsage > 0;
+                root.updateCountdowns();
+                root.errorMsg = root.kiroUsageAvailable ? "" : "Kiro: usage snapshot is empty";
+                root.stale = false;
+                root.lastUpdate = Qt.formatTime(new Date(), "hh:mm");
+                root._offline = false;
+                offlineRetryTimer.stop();
+                if (root.kiroUsageAvailable)
+                    root.recordKiroUsage(root.kiroPct);
+            } catch (e) {
+                root.kiroUsageAvailable = false;
+                root.errorMsg = "Kiro: parse error";
+                root.stale = root.lastUpdate !== "";
+            }
+        }
+    }
+
+    Plasma5Support.DataSource {
         id: mistralCredSource
         engine: "executable"
         connectedSources: []
@@ -1424,6 +1541,10 @@ PlasmoidItem {
             var cmd = envPrefix + root.scriptDir + "get-openai-usage";
             openaiCredSource.disconnectSource(cmd);
             openaiCredSource.connectSource(cmd);
+        } else if (tab === "kiro") {
+            var cmd = root.scriptDir + "get-kiro-usage";
+            kiroUsageSource.disconnectSource(cmd);
+            kiroUsageSource.connectSource(cmd);
         } else if (tab === "mistral") {
             var cfgKey = Plasmoid.configuration.mistralApiKey || "";
             var envPrefix = cfgKey ? "WIDGET_MISTRAL_API_KEY=\"$(printf %s '" + Qt.btoa(cfgKey) + "' | base64 -d)\" " : "";
@@ -1912,6 +2033,16 @@ PlasmoidItem {
             }
 
             PanelSlot {
+                pct: root.kiroPct
+                iconColor: root.kiroPurple
+                stale: root.stale && root.panelTab === "kiro"
+                visible: root.panelTab === "kiro"
+                showCost: !root.kiroUsageAvailable
+                costText: root.kiroUsageAvailable ? "" : "—"
+                tooltipText: "Kiro" + (root.kiroPlanType ? "\nPlan: " + root.kiroPlanType.toUpperCase() : "") + (root.kiroUsageLimit > 0 ? "\nCredits: " + root.kiroCurrentUsage.toFixed(2) + " / " + root.kiroUsageLimit.toFixed(0) : "") + (root.kiroResetTime ? "\nResets: " + root.kiroResetTime : "")
+            }
+
+            PanelSlot {
                 pct: 0
                 iconColor: root.mistralOrange
                 stale: root.stale && root.panelTab === "mistral"
@@ -2111,6 +2242,8 @@ PlasmoidItem {
                                 return "Antigravity Usage";
                             if (tab === "openai")
                                 return "OpenAI Usage";
+                            if (tab === "kiro")
+                                return "Kiro Usage";
                             if (tab === "mistral")
                                 return "Mistral Usage";
                             if (tab === "openrouter")
@@ -2304,6 +2437,10 @@ PlasmoidItem {
             }
 
             OpenAiTab {
+                rootItem: root
+            }
+
+            KiroTab {
                 rootItem: root
             }
 

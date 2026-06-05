@@ -9,7 +9,7 @@ Rectangle {
     id: usageChartContainer
     property Item rootItem
 
-    visible: !rootItem.showSettings && rootItem.showUsageChart && rootItem.weeklyUsageHistory.length >= 1 && (rootItem.enabledTabs[rootItem.activeTab] === "claude" || (rootItem.enabledTabs[rootItem.activeTab] === "openai" && rootItem.codexUsageAvailable) || rootItem.enabledTabs[rootItem.activeTab] === "antigravity" || rootItem.enabledTabs[rootItem.activeTab] === "openrouter" || rootItem.enabledTabs[rootItem.activeTab] === "mistral")
+    visible: !rootItem.showSettings && rootItem.showUsageChart && rootItem.weeklyUsageHistory.length >= 1 && (rootItem.enabledTabs[rootItem.activeTab] === "claude" || (rootItem.enabledTabs[rootItem.activeTab] === "openai" && rootItem.codexUsageAvailable) || rootItem.enabledTabs[rootItem.activeTab] === "kiro" || rootItem.enabledTabs[rootItem.activeTab] === "antigravity" || rootItem.enabledTabs[rootItem.activeTab] === "openrouter" || rootItem.enabledTabs[rootItem.activeTab] === "mistral")
     Layout.fillWidth: true
     Layout.preferredHeight: implicitHeight
     implicitHeight: 184

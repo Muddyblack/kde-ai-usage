@@ -3,10 +3,10 @@
   "KPlugin": {
     "Id": "org.muddyblack.aiUsageWidget",
     "Name": "AI Usage Monitor",
-    "Description": "Multi-service AI quota tracker with cost breakdown (Claude, Antigravity, OpenAI, OpenRouter & Mistral)",
+    "Description": "Multi-service AI quota tracker with cost breakdown (Claude, Antigravity, OpenAI, Kiro, OpenRouter & Mistral)",
     "Icon": "org.muddyblack.aiUsageWidget",
     "Category": "Utilities",
-    "Version": "1.2.2",
+    "Version": "1.3.0",
     "Website": "https://github.com/Muddyblack/kde-ai-usage",
     "Authors": [
       {

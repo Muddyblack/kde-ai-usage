@@ -47,6 +47,11 @@ ColumnLayout {
                     color: "#10a37f"
                 },
                 {
+                    id: "kiro",
+                    label: "Kiro",
+                    color: "#8b5cf6"
+                },
+                {
                     id: "mistral",
                     label: "Mistral",
                     color: "#ff7000"
@@ -87,6 +92,8 @@ ColumnLayout {
                             return Plasmoid.configuration.antigravityEnabled;
                         if (modelData.id === "openai")
                             return Plasmoid.configuration.openaiEnabled;
+                        if (modelData.id === "kiro")
+                            return Plasmoid.configuration.kiroEnabled;
                         if (modelData.id === "mistral")
                             return Plasmoid.configuration.mistralEnabled;
                         if (modelData.id === "openrouter")
@@ -100,6 +107,8 @@ ColumnLayout {
                             Plasmoid.configuration.antigravityEnabled = checked;
                         if (modelData.id === "openai")
                             Plasmoid.configuration.openaiEnabled = checked;
+                        if (modelData.id === "kiro")
+                            Plasmoid.configuration.kiroEnabled = checked;
                         if (modelData.id === "mistral")
                             Plasmoid.configuration.mistralEnabled = checked;
                         if (modelData.id === "openrouter")

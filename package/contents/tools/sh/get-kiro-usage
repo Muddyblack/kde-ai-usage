@@ -1,0 +1,128 @@
+#!/usr/bin/env bash
+
+DB_PATH="${HOME}/.config/Kiro/User/globalStorage/state.vscdb"
+
+if [ ! -f "$DB_PATH" ]; then
+    echo '{"error":"Kiro state database not found"}'
+    exit 0
+fi
+
+perl -MJSON::PP -e '
+use strict;
+use warnings;
+
+my $path = shift @ARGV;
+open my $fh, "<:raw", $path or do {
+    print "{\"error\":\"Could not read Kiro state database\"}\n";
+    exit 0;
+};
+local $/;
+my $blob = <$fh>;
+close $fh;
+
+my $marker = "\"kiro.resourceNotifications.usageState\":";
+my $start = index($blob, $marker);
+if ($start < 0) {
+    print "{\"error\":\"Kiro usage state not found\"}\n";
+    exit 0;
+}
+
+$start += length($marker);
+my $json_start = index($blob, "{", $start);
+if ($json_start < 0) {
+    print "{\"error\":\"Kiro usage payload missing\"}\n";
+    exit 0;
+}
+
+my $depth = 0;
+my $in_string = 0;
+my $escaped = 0;
+my $json_end = -1;
+
+for (my $i = $json_start; $i < length($blob); $i++) {
+    my $ch = substr($blob, $i, 1);
+    if ($in_string) {
+        if ($escaped) {
+            $escaped = 0;
+        } elsif ($ch eq "\\\\") {
+            $escaped = 1;
+        } elsif ($ch eq "\"") {
+            $in_string = 0;
+        }
+        next;
+    }
+
+    if ($ch eq "\"") {
+        $in_string = 1;
+        next;
+    }
+    if ($ch eq "{") {
+        $depth++;
+        next;
+    }
+    if ($ch eq "}") {
+        $depth--;
+        if ($depth == 0) {
+            $json_end = $i;
+            last;
+        }
+    }
+}
+
+if ($json_end < 0) {
+    print "{\"error\":\"Kiro usage payload is incomplete\"}\n";
+    exit 0;
+}
+
+my $usage_json = substr($blob, $json_start, $json_end - $json_start + 1);
+my $usage_state = eval { decode_json($usage_json) };
+if (!$usage_state || ref($usage_state) ne "HASH") {
+    print "{\"error\":\"Kiro usage payload could not be parsed\"}\n";
+    exit 0;
+}
+
+my $breakdown = {};
+if (ref($usage_state->{usageBreakdowns}) eq "ARRAY" && @{$usage_state->{usageBreakdowns}} > 0) {
+    $breakdown = $usage_state->{usageBreakdowns}[0] || {};
+}
+
+my $limit = 0 + ($breakdown->{usageLimit} // 0);
+my $plan = "custom";
+$plan = "free" if $limit == 50;
+$plan = "pro" if $limit == 1000;
+$plan = "pro+" if $limit == 2000;
+$plan = "power" if $limit == 10000;
+
+my $current = 0 + ($breakdown->{currentUsage} // 0);
+my $percentage = 0 + ($breakdown->{percentageUsed} // 0);
+if ($percentage == 0 && $limit > 0 && $current > 0) {
+    $percentage = ($current / $limit) * 100.0;
+}
+my $remaining = $limit > 0 ? ($limit - $current) : 0;
+if ($remaining < 0) {
+    $remaining = 0;
+}
+
+my $out = {
+    planType => $plan,
+    usageType => ($breakdown->{type} // ""),
+    usageUnit => ($breakdown->{unit} // ""),
+    displayName => ($breakdown->{displayName} // "Credit"),
+    displayNamePlural => ($breakdown->{displayNamePlural} // "Credits"),
+    currentUsage => $current,
+    usageLimit => $limit,
+    percentageUsed => $percentage,
+    remaining => $remaining,
+    currentOverages => 0 + ($breakdown->{currentOverages} // 0),
+    overageCap => 0 + ($breakdown->{overageCap} // 0),
+    overageCharges => 0 + ($breakdown->{overageCharges} // 0),
+    overageRate => 0 + ($breakdown->{overageRate} // 0),
+    resetDate => ($breakdown->{resetDate} // ""),
+    currencyCode => (($breakdown->{currency} || {})->{code} // "USD"),
+    currencySymbol => (($breakdown->{currency} || {})->{symbol} // q{$}),
+    timestamp => 0 + ($usage_state->{timestamp} // 0),
+    source => $path
+};
+
+print encode_json($out), "\n";
+' "$DB_PATH"

@@ -43,13 +43,13 @@
   <img src="./readme/settings.svg?v=7" alt="Settings panel" width="340" valign="top"/>
 </p>
 
-A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple services. Monitor your **Claude** (5-hour session & 7-day weekly), **Antigravity/Google AI Studio**, **OpenAI API**, **Mistral AI**, and **OpenRouter** usage at a glance with animated segmented bars, live countdown timers, account status, and per-model breakdowns.
+A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple services. Monitor your **Claude** (5-hour session & 7-day weekly), **Antigravity/Google AI Studio**, **OpenAI API**, **Kiro**, **Mistral AI**, and **OpenRouter** usage at a glance with animated segmented bars, live countdown timers, account status, and per-model breakdowns.
 
 ---
 
 ## Features
 
-- **Multi-service support** — Switch between Claude, Antigravity, OpenAI, Mistral, and OpenRouter tabs in the popup
+- **Multi-service support** — Switch between Claude, Antigravity, OpenAI, Kiro, Mistral, and OpenRouter tabs in the popup
 - **Panel view** — Compact percentage readouts in the taskbar, color-coded by usage level, with an inline spark-line trend
 - **Popup view** — Segmented bars showing exact fill level with reset times and countdowns
 - **Usage chart** — Smooth, glowing area chart of historical usage with a 5H / 24H / 7D window toggle and hover-scrub (point + timestamp on hover). The 24H window plots the session percentage across the whole day, so each 5-hour limit climbing toward 100% and resetting shows up as a sawtooth burn pattern.
@@ -89,6 +89,13 @@ A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple serv
 - **Codex account status** — Detects Codex/ChatGPT login from `~/.codex/auth.json`
 - **Separate surfaces** — Codex/ChatGPT plan limits are not the same as OpenAI API organization billing usage
 - **Credential lookup** — Reads the widget setting first, then `$OPENAI_API_KEY`, `~/.config/openai-api-key`, `~/.openai/api-key`, and Codex auth metadata when available
+
+### Kiro
+- **Monthly credit usage** — Shows current credit usage, remaining credits, and the billing reset date
+- **Local-only source** — Reads Kiro's local app state from `~/.config/Kiro/User/globalStorage/state.vscdb`
+- **Plan detection** — Labels common tiers like Free / Pro / Pro+ / Power from the stored usage limit
+- **No API key required** — Works from Kiro's cached usage snapshot after you sign in once
+- **Chart support** — Feeds the monthly credit percentage into the widget's history chart
 
 ### Mistral AI
 - **Key validation** — Confirms the API key is accepted by Mistral
@@ -130,6 +137,11 @@ A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple serv
 |---|---|
 | OpenAI API key | Required for API token and cost usage via the organization Usage API |
 | Codex CLI | Optional; logged-in Codex sessions are shown as account status only |
+
+### For Kiro Support
+| Dependency | Notes |
+|---|---|
+| Kiro IDE | Sign in once so Kiro writes usage state to `~/.config/Kiro/User/globalStorage/state.vscdb` |
 
 ### For Mistral Support
 | Dependency | Notes |
@@ -220,6 +232,9 @@ The widget reads credentials from the `antigravity-usage` CLI configuration (sto
 
 ### OpenAI
 The OpenAI tab has two independent sections. API usage is fetched from the official OpenAI organization usage endpoint with an API key and summarized over the last 30 days. Codex account status is read locally from `~/.codex/auth.json`; it confirms the Codex/ChatGPT login and plan metadata when present, but it does not provide API billing usage.
+
+### Kiro
+The Kiro tab reads Kiro's locally cached usage state from `~/.config/Kiro/User/globalStorage/state.vscdb`. No API key is needed. The widget extracts the stored credit breakdown, usage percentage, reset date, overage information, and inferred plan tier from that local snapshot, then feeds the percentage into the 30-day chart history.
 
 ### Mistral AI
 The widget validates the configured API key against the Mistral API and lists available models, highlighting the one currently active in vibe CLI. Since Mistral exposes no public billing REST API, cost data is sourced locally from vibe CLI session logs (`~/.vibe/logs/session/*/meta.json`): cumulative spend, session count, total tokens, and the last session title are shown in a stats card. The spend bar is scaled against a $50 soft cap and feeds into a 30-day chart. The key is resolved from widget settings → `$MISTRAL_API_KEY` → `~/.vibe/.env` → `~/.config/mistral/api-key`.
