@@ -56,6 +56,15 @@ ColumnLayout {
                     color: rootItem.openaiPlanType === "free" ? Kirigami.Theme.textColor : rootItem.openaiGreen
                 }
             }
+            StatusChip {
+                Layout.alignment: Qt.AlignVCenter
+                indicator: rootItem.openaiStatus.indicator
+                description: rootItem.openaiStatus.description
+                affectedComponents: rootItem.openaiStatus.components
+                incidents: rootItem.openaiStatus.incidents
+                latestUpdate: rootItem.openaiStatus.latestUpdate
+                statusUrl: "https://status.openai.com"
+            }
         }
 
         // Codex plan limits (messages remaining)

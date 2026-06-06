@@ -140,6 +140,44 @@ PlasmoidItem {
         root.chartTimeOffset = 0;
     }
 
+    // ── Service status (status pages) ────────────────────────────────────────
+    // Each object: { indicator, description, components, incidents, latestUpdate }
+    property var claudeStatus: ({
+            indicator: "",
+            description: "",
+            components: [],
+            incidents: [],
+            latestUpdate: ""
+        })
+    property var mistralStatus: ({
+            indicator: "",
+            description: "",
+            components: [],
+            incidents: [],
+            latestUpdate: ""
+        })
+    property var openaiStatus: ({
+            indicator: "",
+            description: "",
+            components: [],
+            incidents: [],
+            latestUpdate: ""
+        })
+    property var openrouterStatus: ({
+            indicator: "",
+            description: "",
+            components: [],
+            incidents: [],
+            latestUpdate: ""
+        })
+
+    // Legacy aliases kept so ClaudeTab still compiles during the transition
+    readonly property string claudeApiStatusIndicator: claudeStatus.indicator
+    readonly property string claudeApiStatusDescription: claudeStatus.description
+    readonly property var claudeApiStatusComponents: claudeStatus.components
+    readonly property var claudeApiStatusIncidents: claudeStatus.incidents
+    readonly property string claudeApiStatusLatestUpdate: claudeStatus.latestUpdate
+
     // ── Claude data ───────────────────────────────────────────────────────────
     property real sessionPct: 0
     property real sessionTokensUsed: 0
@@ -1851,6 +1889,88 @@ PlasmoidItem {
         xhr.send();
     }
 
+    // ── Service status (Statuspage JSON API) ─────────────────────────────────
+    // Parses a Statuspage /api/v2/summary.json response and calls setter(obj).
+    function _fetchStatusPage(url, setter) {
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", url);
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState !== XMLHttpRequest.DONE)
+                return;
+            if (xhr.status !== 200)
+                return;
+            try {
+                var d = JSON.parse(xhr.responseText);
+                var indicator = (d.status || {}).indicator || "none";
+                var description = (d.status || {}).description || "";
+
+                // Non-operational components (skip group parent rows)
+                var comps = d.components || [];
+                var affectedComps = [];
+                for (var c = 0; c < comps.length; c++) {
+                    var comp = comps[c];
+                    if (comp.status && comp.status !== "operational" && !comp.group)
+                        affectedComps.push((comp.name || "") + " (" + comp.status.replace(/_/g, " ") + ")");
+                }
+
+                // Active incidents + most recent update body
+                var inc = d.incidents || [];
+                var activeNames = [];
+                var latestBody = "";
+                for (var i = 0; i < inc.length; i++) {
+                    var incident = inc[i];
+                    if (incident.status === "resolved")
+                        continue;
+                    activeNames.push(incident.name || "");
+                    if (!latestBody) {
+                        var updates = incident.incident_updates || [];
+                        if (updates.length > 0) {
+                            var body = (updates[0].body || "").trim();
+                            latestBody = body.length > 200 ? body.substring(0, 197) + "…" : body;
+                        }
+                    }
+                }
+
+                setter({
+                    indicator: indicator,
+                    description: description,
+                    components: affectedComps,
+                    incidents: activeNames,
+                    latestUpdate: latestBody
+                });
+            } catch (_) {}
+        };
+        xhr.send();
+    }
+
+    function fetchClaudeStatus() {
+        root._fetchStatusPage("https://status.claude.com/api/v2/summary.json", function (s) {
+            root.claudeStatus = s;
+        });
+    }
+    function fetchMistralStatus() {
+        root._fetchStatusPage("https://status.mistral.ai/api/v2/summary.json", function (s) {
+            root.mistralStatus = s;
+        });
+    }
+    function fetchOpenAIStatus() {
+        root._fetchStatusPage("https://status.openai.com/api/v2/summary.json", function (s) {
+            root.openaiStatus = s;
+        });
+    }
+    function fetchOpenRouterStatus() {
+        root._fetchStatusPage("https://status.openrouter.ai/api/v2/summary.json", function (s) {
+            root.openrouterStatus = s;
+        });
+    }
+
+    function fetchAllStatuses() {
+        root.fetchClaudeStatus();
+        root.fetchMistralStatus();
+        root.fetchOpenAIStatus();
+        root.fetchOpenRouterStatus();
+    }
+
     function refresh() {
         if (root.enabledTabs.length === 0)
             return;
@@ -1893,6 +2013,13 @@ PlasmoidItem {
         running: false
         repeat: true
         onTriggered: root.refresh()
+    }
+    Timer {
+        interval: 300000  // 5 minutes
+        running: true
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: root.fetchAllStatuses()
     }
 
     Component.onCompleted: {

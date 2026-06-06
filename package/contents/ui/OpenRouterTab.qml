@@ -86,6 +86,15 @@ ColumnLayout {
                 color: rootItem.openrouterIsFreeTier ? Kirigami.Theme.textColor : rootItem.openrouterPurple
             }
         }
+        StatusChip {
+            Layout.alignment: Qt.AlignVCenter
+            indicator: rootItem.openrouterStatus.indicator
+            description: rootItem.openrouterStatus.description
+            affectedComponents: rootItem.openrouterStatus.components
+            incidents: rootItem.openrouterStatus.incidents
+            latestUpdate: rootItem.openrouterStatus.latestUpdate
+            statusUrl: "https://status.openrouter.ai"
+        }
     }
 
     // No key message

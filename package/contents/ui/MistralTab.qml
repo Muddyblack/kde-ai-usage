@@ -76,6 +76,15 @@ ColumnLayout {
                 color: rootItem.mistralKeyValid ? rootItem.mistralOrange : Kirigami.Theme.textColor
             }
         }
+        StatusChip {
+            Layout.alignment: Qt.AlignVCenter
+            indicator: rootItem.mistralStatus.indicator
+            description: rootItem.mistralStatus.description
+            affectedComponents: rootItem.mistralStatus.components
+            incidents: rootItem.mistralStatus.incidents
+            latestUpdate: rootItem.mistralStatus.latestUpdate
+            statusUrl: "https://status.mistral.ai"
+        }
     }
 
     // ── No data at all ────────────────────────────────────────────────────────

@@ -125,6 +125,16 @@ ColumnLayout {
                 color: rootItem.claudeSubscriptionType === "free" ? Kirigami.Theme.textColor : rootItem.claudeOrange
             }
         }
+
+        StatusChip {
+            Layout.alignment: Qt.AlignVCenter
+            indicator: rootItem.claudeStatus.indicator
+            description: rootItem.claudeStatus.description
+            affectedComponents: rootItem.claudeStatus.components
+            incidents: rootItem.claudeStatus.incidents
+            latestUpdate: rootItem.claudeStatus.latestUpdate
+            statusUrl: "https://status.claude.com"
+        }
     }
 
     PopupRow {
@@ -135,8 +145,8 @@ ColumnLayout {
         barColor: rootItem.sessionColor
         etaText: rootItem.usageHistory.length >= 0 ? rootItem.etaToFull("s", rootItem.sessionPct) : ""
         deltaText: rootItem.usageHistory.length >= 0 ? rootItem.periodDelta("s", rootItem.sessionPct, 24 * 3600000, "yesterday") : ""
-        tokenText: rootItem.sessionTokenLimit > 0 ? rootItem.formatTokens(rootItem.sessionTokensUsed) + " / " + rootItem.formatTokens(rootItem.sessionTokenLimit) + " tokens" : ""
-        tooltipText: "Claude 5-hour rolling window\nUsage: " + Math.round(rootItem.sessionPct) + "%" + (rootItem.sessionTokenLimit > 0 ? "\n" + rootItem.formatTokens(rootItem.sessionTokensUsed) + " / " + rootItem.formatTokens(rootItem.sessionTokenLimit) + " tokens" : "") + (rootItem.sessionResetTime ? "\nResets: " + rootItem.sessionResetTime : "")
+        tokenText: rootItem.sessionTokensUsed > 0 ? rootItem.formatTokens(rootItem.sessionTokensUsed) + (rootItem.sessionTokenLimit > 0 ? " / " + rootItem.formatTokens(rootItem.sessionTokenLimit) : "") + " tokens" : ""
+        tooltipText: "Claude 5-hour rolling window\nUsage: " + Math.round(rootItem.sessionPct) + "%" + (rootItem.sessionTokensUsed > 0 ? "\n" + rootItem.formatTokens(rootItem.sessionTokensUsed) + (rootItem.sessionTokenLimit > 0 ? " / " + rootItem.formatTokens(rootItem.sessionTokenLimit) : "") + " tokens" : "") + (rootItem.sessionResetTime ? "\nResets: " + rootItem.sessionResetTime : "")
     }
 
     PopupRow {
@@ -147,8 +157,138 @@ ColumnLayout {
         barColor: rootItem.weeklyColor
         etaText: rootItem.usageHistory.length >= 0 ? rootItem.etaToFull("w", rootItem.weeklyPct) : ""
         deltaText: rootItem.usageHistory.length >= 0 ? rootItem.periodDelta("w", rootItem.weeklyPct, 7 * 24 * 3600000, "last week") : ""
-        tokenText: rootItem.weeklyTokenLimit > 0 ? rootItem.formatTokens(rootItem.weeklyTokensUsed) + " / " + rootItem.formatTokens(rootItem.weeklyTokenLimit) + " tokens" : ""
-        tooltipText: "Claude 7-day rolling window\nUsage: " + Math.round(rootItem.weeklyPct) + "%" + (rootItem.weeklyTokenLimit > 0 ? "\n" + rootItem.formatTokens(rootItem.weeklyTokensUsed) + " / " + rootItem.formatTokens(rootItem.weeklyTokenLimit) + " tokens" : "") + (rootItem.weeklyResetTime ? "\nResets: " + rootItem.weeklyResetTime : "")
+        tokenText: rootItem.weeklyTokensUsed > 0 ? rootItem.formatTokens(rootItem.weeklyTokensUsed) + (rootItem.weeklyTokenLimit > 0 ? " / " + rootItem.formatTokens(rootItem.weeklyTokenLimit) : "") + " tokens" : ""
+        tooltipText: "Claude 7-day rolling window\nUsage: " + Math.round(rootItem.weeklyPct) + "%" + (rootItem.weeklyTokensUsed > 0 ? "\n" + rootItem.formatTokens(rootItem.weeklyTokensUsed) + (rootItem.weeklyTokenLimit > 0 ? " / " + rootItem.formatTokens(rootItem.weeklyTokenLimit) : "") + " tokens" : "") + (rootItem.weeklyResetTime ? "\nResets: " + rootItem.weeklyResetTime : "")
+    }
+
+    // ── API cost estimate (subscription users without admin API key) ───────────
+    // Shown when we have token data but no real billing data from an admin key.
+    // Assumes a 3:1 input:output token ratio (typical for coding workflows).
+    // Pricing: sonnet-4 ($3/$15 per M), opus-4 ($15/$75 per M).
+    Rectangle {
+        id: apiCostEstimate
+        visible: rootItem.weeklyTokensUsed > 0 && rootItem._claudeAdminToken === ""
+        Layout.fillWidth: true
+        height: costEstCol.implicitHeight + 16
+        radius: 6
+        color: Qt.rgba(0.8, 0.47, 0.36, 0.06)
+        border.width: 1
+        border.color: Qt.rgba(0.8, 0.47, 0.36, 0.15)
+
+        readonly property real _tok: rootItem.weeklyTokensUsed / 1000000
+        // blended rate: 0.75 input + 0.25 output
+        readonly property real _sonnet: _tok * (0.75 * 3.0 + 0.25 * 15.0)
+        readonly property real _opus: _tok * (0.75 * 15.0 + 0.25 * 75.0)
+
+        QQC2.ToolTip.visible: costEstMA.containsMouse
+        QQC2.ToolTip.delay: 300
+        QQC2.ToolTip.text: "Estimated API cost for your 7-day token usage\n" + "if billed at pay-as-you-go rates.\n\n" + "Assumes 3:1 input:output token ratio.\n" + "Actual cost depends on model mix used.\n\n" + "Add a Claude Admin API key in settings\nfor exact per-model billing data."
+
+        MouseArea {
+            id: costEstMA
+            anchors.fill: parent
+            hoverEnabled: true
+        }
+
+        ColumnLayout {
+            id: costEstCol
+            anchors {
+                left: parent.left
+                right: parent.right
+                top: parent.top
+                margins: 10
+            }
+            spacing: 6
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 4
+                PlasmaComponents.Label {
+                    text: "API equiv. (7d)"
+                    font.pixelSize: 10
+                    font.bold: true
+                    opacity: 0.55
+                    color: Kirigami.Theme.textColor
+                }
+                PlasmaComponents.Label {
+                    text: "~" + rootItem.formatTokens(rootItem.weeklyTokensUsed) + " tokens"
+                    font.pixelSize: 9
+                    opacity: 0.35
+                    color: Kirigami.Theme.textColor
+                }
+                Item {
+                    Layout.fillWidth: true
+                }
+                PlasmaComponents.Label {
+                    text: "est. ≈"
+                    font.pixelSize: 9
+                    opacity: 0.4
+                    color: Kirigami.Theme.textColor
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+
+                // sonnet-4
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: 28
+                    radius: 4
+                    color: Qt.rgba(0.8, 0.47, 0.36, 0.10)
+                    border.width: 1
+                    border.color: Qt.rgba(0.8, 0.47, 0.36, 0.22)
+                    ColumnLayout {
+                        anchors.centerIn: parent
+                        spacing: 0
+                        PlasmaComponents.Label {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: "sonnet-4"
+                            font.pixelSize: 8
+                            opacity: 0.5
+                            color: Kirigami.Theme.textColor
+                        }
+                        PlasmaComponents.Label {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: "$" + apiCostEstimate._sonnet.toFixed(apiCostEstimate._sonnet < 0.01 ? 4 : 2)
+                            font.pixelSize: 12
+                            font.bold: true
+                            color: rootItem.claudeOrange
+                        }
+                    }
+                }
+
+                // opus-4
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: 28
+                    radius: 4
+                    color: Qt.rgba(0.8, 0.47, 0.36, 0.06)
+                    border.width: 1
+                    border.color: Qt.rgba(0.8, 0.47, 0.36, 0.15)
+                    ColumnLayout {
+                        anchors.centerIn: parent
+                        spacing: 0
+                        PlasmaComponents.Label {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: "opus-4"
+                            font.pixelSize: 8
+                            opacity: 0.5
+                            color: Kirigami.Theme.textColor
+                        }
+                        PlasmaComponents.Label {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: "$" + apiCostEstimate._opus.toFixed(apiCostEstimate._opus < 0.01 ? 4 : 2)
+                            font.pixelSize: 12
+                            font.bold: true
+                            color: Kirigami.Theme.textColor
+                            opacity: 0.75
+                        }
+                    }
+                }
+            }
+        }
     }
 
     Rectangle {

@@ -50,6 +50,11 @@ ColumnLayout {
                 color: rootItem.antigravityPlanType === "Free" ? Kirigami.Theme.textColor : rootItem.googleGreen
             }
         }
+        StatusChip {
+            Layout.alignment: Qt.AlignVCenter
+            linkOnly: true
+            statusUrl: "https://aistudio.google.com/status"
+        }
     }
 
     PopupRow {
