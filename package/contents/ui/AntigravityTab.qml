@@ -80,10 +80,14 @@ ColumnLayout {
         tooltipText: "Average quota usage across Gemini models\n" + Math.round(rootItem.antigravityPct) + "% used" + (rootItem.antigravityResetTime ? "\nResets: " + rootItem.antigravityResetTime : "")
     }
 
+    // ── Model Quotas, grouped by pooled-quota family ───────────────────────────
+    // Mirrors the Antigravity IDE's "Gemini Models" / "Claude & GPT Models"
+    // grouping (each group shares a 5-hour reset window), while keeping the
+    // richer per-model bars underneath each group header.
     ColumnLayout {
         Layout.fillWidth: true
-        spacing: 6
-        visible: Object.keys(rootItem.antigravityModels).length > 0
+        spacing: 10
+        visible: rootItem.antigravityGroups.length > 0
 
         Rectangle {
             Layout.fillWidth: true
@@ -99,77 +103,147 @@ ColumnLayout {
         }
 
         Repeater {
-            model: Object.keys(rootItem.antigravityModels).sort()
-            // Wrap in a plain Item so the MouseArea can use anchors.fill without
-            // conflicting with layout management (the Item is the layout delegate).
-            Item {
+            model: rootItem.antigravityGroups
+            ColumnLayout {
+                id: groupCol
                 Layout.fillWidth: true
-                implicitHeight: modelRow.implicitHeight
+                spacing: 5
+                required property var modelData
+                readonly property var group: modelData
 
-                MouseArea {
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    propagateComposedEvents: true
-                    QQC2.ToolTip.visible: containsMouse
-                    QQC2.ToolTip.delay: 400
-                    QQC2.ToolTip.text: {
-                        var m = rootItem.antigravityModels[modelData];
-                        var txt = (m.displayName || modelData) + "\n" + Math.round(m.usedPct) + "% used";
-                        if (m.isExhausted)
-                            txt += "\n⚠ Quota exhausted";
-                        if (m.resetTime)
-                            txt += "\nResets: " + Qt.formatDateTime(new Date(m.resetTime), "MMM d, hh:mm");
-                        return txt;
+                // Group header: name, shared reset countdown, pooled usage %.
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 6
+                    Rectangle {
+                        width: 7
+                        height: 7
+                        radius: 3.5
+                        Layout.alignment: Qt.AlignVCenter
+                        color: groupCol.group.key === "gemini" ? rootItem.googleBlue : rootItem.googleGreen
+                    }
+                    PlasmaComponents.Label {
+                        text: groupCol.group.label
+                        font.pixelSize: 10
+                        font.bold: true
+                        opacity: 0.85
+                        color: Kirigami.Theme.textColor
+                    }
+                    PlasmaComponents.Label {
+                        visible: groupCol.group.resetDate !== null
+                        text: {
+                            var cd = rootItem.formatCountdown(groupCol.group.resetDate);
+                            return cd && cd !== "resetting..." ? "· resets in " + cd : (cd === "resetting..." ? "· resetting…" : "");
+                        }
+                        font.pixelSize: 9
+                        opacity: 0.45
+                        color: Kirigami.Theme.textColor
+                        elide: Text.ElideRight
+                        Layout.fillWidth: true
+                    }
+                    Item {
+                        Layout.fillWidth: true
+                        visible: groupCol.group.resetDate === null
+                    }
+                    PlasmaComponents.Label {
+                        text: Math.round(groupCol.group.usedPct) + "%"
+                        font.pixelSize: 10
+                        font.bold: true
+                        color: rootItem.usageColor(groupCol.group.usedPct)
                     }
                 }
 
-                RowLayout {
-                    id: modelRow
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: 8
-
-                    PlasmaComponents.Label {
-                        text: rootItem.antigravityModels[modelData].displayName || modelData
-                        font.pixelSize: 10
-                        color: rootItem.antigravityModels[modelData].isExhausted ? rootItem.dangerColor : Kirigami.Theme.textColor
-                        opacity: rootItem.antigravityModels[modelData].isExhausted ? 1.0 : 0.65
-                        Layout.preferredWidth: 120
-                        elide: Text.ElideRight
-                    }
-                    Rectangle {
+                // Per-model bars within the group.
+                Repeater {
+                    model: groupCol.group.models
+                    // Wrap in a plain Item so the MouseArea can use anchors.fill
+                    // without conflicting with the layout delegate.
+                    Item {
                         Layout.fillWidth: true
-                        height: 6
-                        radius: 3
-                        color: Qt.rgba(1, 1, 1, 0.06)
-                        border.width: 1
-                        border.color: Qt.rgba(1, 1, 1, 0.10)
-                        Rectangle {
-                            anchors {
-                                left: parent.left
-                                top: parent.top
-                                bottom: parent.bottom
-                                margins: 1
-                            }
-                            width: Math.max(0, (parent.width - 2) * (rootItem.antigravityModels[modelData].usedPct / 100))
-                            radius: 2
-                            color: rootItem.antigravityModels[modelData].isExhausted ? rootItem.dangerColor : rootItem.antigravityModels[modelData].usedPct >= 70 ? rootItem.warningColor : rootItem.googleBlue
-                            Behavior on width {
-                                NumberAnimation {
-                                    duration: 500
-                                    easing.type: Easing.OutCubic
-                                }
+                        Layout.leftMargin: 13
+                        implicitHeight: modelRow.implicitHeight
+
+                        MouseArea {
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            propagateComposedEvents: true
+                            QQC2.ToolTip.visible: containsMouse
+                            QQC2.ToolTip.delay: 400
+                            QQC2.ToolTip.text: {
+                                var m = rootItem.antigravityModels[modelData];
+                                if (!m)
+                                    return modelData;
+                                var txt = (m.displayName || modelData) + "\n" + Math.round(m.usedPct) + "% used";
+                                if (m.isExhausted)
+                                    txt += "\n⚠ Quota exhausted";
+                                if (m.resetTime)
+                                    txt += "\nResets: " + Qt.formatDateTime(new Date(m.resetTime), "MMM d, hh:mm");
+                                return txt;
                             }
                         }
-                    }
-                    PlasmaComponents.Label {
-                        text: rootItem.antigravityModels[modelData].isExhausted ? "100%" : Math.round(rootItem.antigravityModels[modelData].usedPct) + "%"
-                        font.pixelSize: 10
-                        font.bold: true
-                        color: rootItem.usageColor(rootItem.antigravityModels[modelData].usedPct)
-                        Layout.preferredWidth: 35
-                        horizontalAlignment: Text.AlignRight
+
+                        RowLayout {
+                            id: modelRow
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: 8
+
+                            PlasmaComponents.Label {
+                                text: rootItem.antigravityModels[modelData] ? (rootItem.antigravityModels[modelData].displayName || modelData) : modelData
+                                font.pixelSize: 10
+                                color: rootItem.antigravityModels[modelData] && rootItem.antigravityModels[modelData].isExhausted ? rootItem.dangerColor : Kirigami.Theme.textColor
+                                opacity: rootItem.antigravityModels[modelData] && rootItem.antigravityModels[modelData].isExhausted ? 1.0 : 0.65
+                                Layout.preferredWidth: 120
+                                elide: Text.ElideRight
+                            }
+                            Rectangle {
+                                Layout.fillWidth: true
+                                height: 6
+                                radius: 3
+                                color: Qt.rgba(1, 1, 1, 0.06)
+                                border.width: 1
+                                border.color: Qt.rgba(1, 1, 1, 0.10)
+                                Rectangle {
+                                    anchors {
+                                        left: parent.left
+                                        top: parent.top
+                                        bottom: parent.bottom
+                                        margins: 1
+                                    }
+                                    width: {
+                                        var m = rootItem.antigravityModels[modelData];
+                                        return m ? Math.max(0, (parent.width - 2) * (m.usedPct / 100)) : 0;
+                                    }
+                                    radius: 2
+                                    color: {
+                                        var m = rootItem.antigravityModels[modelData];
+                                        if (!m)
+                                            return rootItem.googleBlue;
+                                        return m.isExhausted ? rootItem.dangerColor : m.usedPct >= 70 ? rootItem.warningColor : rootItem.googleBlue;
+                                    }
+                                    Behavior on width {
+                                        NumberAnimation {
+                                            duration: 500
+                                            easing.type: Easing.OutCubic
+                                        }
+                                    }
+                                }
+                            }
+                            PlasmaComponents.Label {
+                                text: {
+                                    var m = rootItem.antigravityModels[modelData];
+                                    if (!m)
+                                        return "—";
+                                    return m.isExhausted ? "100%" : Math.round(m.usedPct) + "%";
+                                }
+                                font.pixelSize: 10
+                                font.bold: true
+                                color: rootItem.antigravityModels[modelData] ? rootItem.usageColor(rootItem.antigravityModels[modelData].usedPct) : Kirigami.Theme.textColor
+                                Layout.preferredWidth: 35
+                                horizontalAlignment: Text.AlignRight
+                            }
+                        }
                     }
                 }
             }

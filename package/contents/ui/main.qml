@@ -214,6 +214,27 @@ PlasmoidItem {
     property real claudeTotalInputTokens: 0
     property real claudeTotalOutputTokens: 0
 
+    // ── Claude Code local activity stats (from ~/.claude/stats-cache.json) ─────
+    // All-time usage history Claude Code itself surfaces via `/stats`. Parsed
+    // defensively so future schema bumps (the file carries a `version`) degrade
+    // gracefully rather than breaking the tab.
+    property bool claudeStatsAvailable: false
+    property int claudeStatsVersion: 0
+    property real claudeStatsTotalMessages: 0
+    property real claudeStatsTotalSessions: 0
+    property real claudeStatsTotalTokens: 0          // input+output across all models
+    property string claudeStatsFavoriteModel: ""     // most-used model by total tokens
+    property string claudeStatsFirstDate: ""
+    property string claudeStatsComputedDate: ""
+    property real claudeStatsActiveDays: 0
+    property real claudeStatsSpanDays: 0             // calendar days since first session
+    property real claudeStatsCurrentStreak: 0
+    property real claudeStatsLongestStreak: 0
+    property real claudeStatsLongestSessionMs: 0
+    property real claudeStatsPeakHour: -1
+    property var claudeStatsModels: ({})            // model -> {input, output, cacheRead, cacheCreation, total}
+    property var claudeStatsDailyTokens: []         // [{date, total}] sorted ascending, for sparkline
+
     // ── Antigravity / Gemini data ─────────────────────────────────────────────
     property real antigravityPct: 0
     property real antigravityGooglePct: 0
@@ -230,6 +251,11 @@ PlasmoidItem {
     property string _antigravityProjectId: ""
 
     property var antigravityModels: ({})
+    // Models grouped by quota family, mirroring the new Antigravity IDE layout
+    // (a "Gemini Models" group and a "Claude & GPT Models" group, each sharing a
+    // pooled quota + reset window). Built in the antigravity parse handler.
+    // [{ key, label, usedPct, resetTime, resetDate, isExhausted, models: [modelId,…] }]
+    property var antigravityGroups: []
 
     // ── OpenAI data ───────────────────────────────────────────────────────────
     property string _openaiApiKey: ""
@@ -1162,6 +1188,24 @@ PlasmoidItem {
         return Math.round(n).toString();
     }
 
+    // Compact human duration from milliseconds, e.g. "2d 4h", "3h 12m", "45m".
+    function formatDuration(ms) {
+        if (!ms || ms <= 0)
+            return "—";
+        var totalMins = Math.floor(ms / 60000);
+        var d = Math.floor(totalMins / 1440);
+        var h = Math.floor((totalMins % 1440) / 60);
+        var m = totalMins % 60;
+        var parts = [];
+        if (d > 0)
+            parts.push(d + "d");
+        if (h > 0)
+            parts.push(h + "h");
+        if (d === 0 && m > 0)
+            parts.push(m + "m");
+        return parts.length ? parts.join(" ") : "<1m";
+    }
+
     function formatCountdown(targetDate) {
         if (!targetDate)
             return "";
@@ -1201,6 +1245,132 @@ PlasmoidItem {
 
     function shortenModelName(name) {
         return name.replace(/gpt-4o-mini/g, "4o-mini").replace(/gpt-4o/g, "4o").replace(/gpt-4-turbo/g, "4-turbo").replace(/gpt-4-32k/g, "4-32k").replace(/gpt-4/g, "4").replace(/gpt-3\.5-turbo/g, "3.5-turbo").replace(/o1-mini/g, "o1-mini").replace(/o3-mini/g, "o3-mini").replace(/o4-mini/g, "o4-mini").replace(/claude-3-5-/g, "3.5-").replace(/claude-3-/g, "3-").replace(/claude-/g, "").replace(/-\d{8}$/, "").replace(/-20\d{2}-\d{2}-\d{2}$/, "");
+    }
+
+    // Parse ~/.claude/stats-cache.json into the claudeStats* properties.
+    // Defensive: every field is optional and derived stats are recomputed here so
+    // the widget stays correct even if Claude Code changes which fields it caches.
+    function parseClaudeStats(raw) {
+        if (!raw) {
+            root.claudeStatsAvailable = false;
+            return;
+        }
+        try {
+            var s = JSON.parse(raw);
+            root.claudeStatsVersion = s.version || 0;
+            root.claudeStatsTotalMessages = s.totalMessages || 0;
+            root.claudeStatsTotalSessions = s.totalSessions || 0;
+            root.claudeStatsFirstDate = s.firstSessionDate || "";
+            root.claudeStatsComputedDate = s.lastComputedDate || "";
+            root.claudeStatsLongestSessionMs = (s.longestSession && s.longestSession.duration) || 0;
+
+            // Per-model token usage + favorite model + grand total.
+            var models = {};
+            var totalTokens = 0;
+            var favModel = "";
+            var favTokens = -1;
+            var mu = s.modelUsage || {};
+            for (var id in mu) {
+                var m = mu[id] || {};
+                var inTok = m.inputTokens || 0;
+                var outTok = m.outputTokens || 0;
+                var tot = inTok + outTok;
+                models[id] = {
+                    input: inTok,
+                    output: outTok,
+                    cacheRead: m.cacheReadInputTokens || 0,
+                    cacheCreation: m.cacheCreationInputTokens || 0,
+                    total: tot
+                };
+                totalTokens += tot;
+                if (tot > favTokens) {
+                    favTokens = tot;
+                    favModel = id;
+                }
+            }
+            root.claudeStatsModels = models;
+            root.claudeStatsTotalTokens = totalTokens;
+            root.claudeStatsFavoriteModel = favModel;
+
+            // Daily token totals (for the sparkline), sorted ascending by date.
+            var daily = [];
+            var dmt = s.dailyModelTokens || [];
+            for (var i = 0; i < dmt.length; i++) {
+                var day = dmt[i] || {};
+                var byModel = day.tokensByModel || {};
+                var dayTot = 0;
+                for (var k in byModel)
+                    dayTot += byModel[k] || 0;
+                daily.push({
+                    date: day.date || "",
+                    total: dayTot
+                });
+            }
+            daily.sort(function (a, b) {
+                return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0);
+            });
+            root.claudeStatsDailyTokens = daily;
+
+            // Active days + streaks from dailyActivity.
+            var act = s.dailyActivity || [];
+            var dates = [];
+            for (var j = 0; j < act.length; j++) {
+                if (act[j] && act[j].date)
+                    dates.push(act[j].date);
+            }
+            dates.sort();
+            root.claudeStatsActiveDays = dates.length;
+
+            // Calendar span since first session (for the "active N/M days" framing).
+            if (root.claudeStatsFirstDate) {
+                var first = new Date(root.claudeStatsFirstDate);
+                if (!isNaN(first.getTime()))
+                    root.claudeStatsSpanDays = Math.max(1, Math.round((Date.now() - first.getTime()) / 86400000) + 1);
+            }
+
+            // Longest + current streak of consecutive calendar days.
+            var longest = 0;
+            var current = 0;
+            var run = 0;
+            var prev = null;
+            for (var d = 0; d < dates.length; d++) {
+                var cur = new Date(dates[d] + "T00:00:00");
+                if (prev !== null && Math.round((cur.getTime() - prev.getTime()) / 86400000) === 1)
+                    run += 1;
+                else
+                    run = 1;
+                if (run > longest)
+                    longest = run;
+                prev = cur;
+            }
+            // Current streak counts only if the last active day is today or yesterday.
+            if (dates.length > 0) {
+                var last = new Date(dates[dates.length - 1] + "T00:00:00");
+                var today = new Date();
+                today.setHours(0, 0, 0, 0);
+                var gap = Math.round((today.getTime() - last.getTime()) / 86400000);
+                current = (gap <= 1) ? run : 0;
+            }
+            root.claudeStatsLongestStreak = longest;
+            root.claudeStatsCurrentStreak = current;
+
+            // Peak activity hour from hourCounts.
+            var hc = s.hourCounts || {};
+            var peakH = -1;
+            var peakC = -1;
+            for (var h in hc) {
+                if (hc[h] > peakC) {
+                    peakC = hc[h];
+                    peakH = parseInt(h, 10);
+                }
+            }
+            root.claudeStatsPeakHour = peakH;
+
+            root.claudeStatsAvailable = true;
+        } catch (e) {
+            console.log("Claude stats parse error: " + e);
+            root.claudeStatsAvailable = false;
+        }
     }
 
     // ── Credentials ──────────────────────────────────────────────────────────
@@ -1260,6 +1430,17 @@ PlasmoidItem {
         }
     }
 
+    // ── Claude Code local activity stats ───────────────────────────────────────
+    Plasma5Support.DataSource {
+        id: claudeStatsSource
+        engine: "executable"
+        connectedSources: []
+        onNewData: function (src, data) {
+            disconnectSource(src);
+            root.parseClaudeStats((data["stdout"] || "").trim());
+        }
+    }
+
     Plasma5Support.DataSource {
         id: antigravityUsageSource
         engine: "executable"
@@ -1298,6 +1479,27 @@ PlasmoidItem {
                 var externalUsed = 0;
                 var externalCount = 0;
                 var earliestReset = null;
+                // Accumulator for the IDE-style quota groups (Gemini vs Claude & GPT).
+                var groupAcc = {
+                    "gemini": {
+                        key: "gemini",
+                        label: "Gemini Models",
+                        used: 0,
+                        count: 0,
+                        resetDate: null,
+                        isExhausted: false,
+                        models: []
+                    },
+                    "external": {
+                        key: "external",
+                        label: "Claude & GPT Models",
+                        used: 0,
+                        count: 0,
+                        resetDate: null,
+                        isExhausted: false,
+                        models: []
+                    }
+                };
                 for (var i = 0; i < modelsList.length; i++) {
                     var m = modelsList[i];
                     var remaining = m.remainingPercentage !== undefined ? m.remainingPercentage : -1;
@@ -1309,28 +1511,59 @@ PlasmoidItem {
                         isExhausted: !!m.isExhausted,
                         hasQuota: remaining !== -1
                     };
+                    var name = (m.label || m.modelId).toLowerCase();
+                    var fam = (name.indexOf("gemini") !== -1 || name.indexOf("google") !== -1) ? "gemini" : "external";
+                    var grp = groupAcc[fam];
                     if (remaining !== -1) {
                         totalUsed += usedPct;
                         modelCount++;
-                        var name = (m.label || m.modelId).toLowerCase();
-                        if (name.indexOf("gemini") !== -1 || name.indexOf("google") !== -1) {
+                        if (fam === "gemini") {
                             googleUsed += usedPct;
                             googleCount++;
                         } else {
                             externalUsed += usedPct;
                             externalCount++;
                         }
+                        grp.used += usedPct;
+                        grp.count++;
                     }
+                    if (m.isExhausted)
+                        grp.isExhausted = true;
+                    grp.models.push(m.modelId);
                     if (m.resetTime) {
                         var rd = new Date(m.resetTime);
-                        if (!isNaN(rd.getTime()) && (earliestReset === null || rd < earliestReset))
-                            earliestReset = rd;
+                        if (!isNaN(rd.getTime())) {
+                            if (earliestReset === null || rd < earliestReset)
+                                earliestReset = rd;
+                            // The 5-hour window is shared within a group; keep the
+                            // earliest reset as the group's countdown anchor.
+                            if (grp.resetDate === null || rd < grp.resetDate)
+                                grp.resetDate = rd;
+                        }
                     }
                 }
                 root.antigravityModels = newModels;
                 root.antigravityPct = modelCount > 0 ? totalUsed / modelCount : 0;
                 root.antigravityGooglePct = googleCount > 0 ? googleUsed / googleCount : 0;
                 root.antigravityExternalPct = externalCount > 0 ? externalUsed / externalCount : 0;
+                // Materialise the groups (Gemini first), dropping any that are empty.
+                var groupsOut = [];
+                var order = ["gemini", "external"];
+                for (var g = 0; g < order.length; g++) {
+                    var ga = groupAcc[order[g]];
+                    if (ga.models.length === 0)
+                        continue;
+                    groupsOut.push({
+                        key: ga.key,
+                        label: ga.label,
+                        usedPct: ga.count > 0 ? ga.used / ga.count : 0,
+                        resetDate: ga.resetDate,
+                        resetTime: ga.resetDate ? Qt.formatDateTime(ga.resetDate, "MMM d, hh:mm") : "",
+                        isExhausted: ga.isExhausted,
+                        models: ga.models.sort()
+                    });
+                }
+                root.antigravityGroups = groupsOut;
                 root.recordAntigravityUsage(root.antigravityPct);
                 if (earliestReset) {
                     root.antigravityResetDate = earliestReset;
@@ -1569,6 +1802,10 @@ PlasmoidItem {
             var settingsCmd = "cat \"$HOME/.claude/settings.json\" 2>/dev/null || echo '{}'";
             claudeSettingsSource.disconnectSource(settingsCmd);
             claudeSettingsSource.connectSource(settingsCmd);
+            // Local activity stats Claude Code surfaces via `/stats`.
+            var statsCmd = "cat \"$HOME/.claude/stats-cache.json\" 2>/dev/null || echo ''";
+            claudeStatsSource.disconnectSource(statsCmd);
+            claudeStatsSource.connectSource(statsCmd);
         } else if (tab === "antigravity") {
             var cmd = root.scriptDir + "get-antigravity-usage";
             antigravityUsageSource.disconnectSource(cmd);

@@ -8,6 +8,9 @@ ColumnLayout {
     id: claudeTabRoot
     property Item rootItem
 
+    // Inner sub-tab: "usage" (live quota/cost) vs "stats" (local /stats activity)
+    property string subTab: "usage"
+
     visible: rootItem.enabledTabs[rootItem.activeTab] === "claude" && !rootItem.showSettings
     Layout.fillWidth: true
     spacing: 14
@@ -137,7 +140,60 @@ ColumnLayout {
         }
     }
 
+    // ── Usage / Stats sub-tab toggle ───────────────────────────────────────────
+    Rectangle {
+        Layout.fillWidth: true
+        Layout.preferredHeight: 26
+        radius: 6
+        color: Qt.rgba(1, 1, 1, 0.04)
+        border.width: 1
+        border.color: Qt.rgba(1, 1, 1, 0.07)
+
+        RowLayout {
+            anchors.fill: parent
+            anchors.margins: 2
+            spacing: 2
+
+            Repeater {
+                model: [
+                    {
+                        id: "usage",
+                        label: "Usage"
+                    },
+                    {
+                        id: "stats",
+                        label: "Stats"
+                    }
+                ]
+                Rectangle {
+                    required property var modelData
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    radius: 5
+                    readonly property bool active: claudeTabRoot.subTab === modelData.id
+                    color: active ? Qt.rgba(0.8, 0.47, 0.36, 0.20) : "transparent"
+                    border.width: active ? 1 : 0
+                    border.color: Qt.rgba(0.8, 0.47, 0.36, 0.35)
+                    PlasmaComponents.Label {
+                        anchors.centerIn: parent
+                        text: modelData.label
+                        font.pixelSize: 11
+                        font.bold: parent.active
+                        color: parent.active ? rootItem.claudeOrange : Kirigami.Theme.textColor
+                        opacity: parent.active ? 1.0 : 0.6
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: claudeTabRoot.subTab = modelData.id
+                    }
+                }
+            }
+        }
+    }
+
     PopupRow {
+        visible: claudeTabRoot.subTab === "usage"
         label: "5 Hours"
         resetText: rootItem.sessionResetTime ? "resets " + rootItem.sessionResetTime : ""
         countdownText: rootItem.sessionCountdown === "resetting..." ? "resetting..." : (rootItem.sessionCountdown ? "in " + rootItem.sessionCountdown : "")
@@ -150,6 +206,7 @@ ColumnLayout {
     }
 
     PopupRow {
+        visible: claudeTabRoot.subTab === "usage"
         label: "7 Days"
         resetText: rootItem.weeklyResetTime ? "resets " + rootItem.weeklyResetTime : ""
         countdownText: rootItem.weeklyCountdown === "resetting..." ? "resetting..." : (rootItem.weeklyCountdown ? "in " + rootItem.weeklyCountdown : "")
@@ -167,7 +224,7 @@ ColumnLayout {
     // Pricing: sonnet-4 ($3/$15 per M), opus-4 ($15/$75 per M).
     Rectangle {
         id: apiCostEstimate
-        visible: rootItem.weeklyTokensUsed > 0 && rootItem._claudeAdminToken === ""
+        visible: claudeTabRoot.subTab === "usage" && rootItem.weeklyTokensUsed > 0 && rootItem._claudeAdminToken === ""
         Layout.fillWidth: true
         height: costEstCol.implicitHeight + 16
         radius: 6
@@ -292,7 +349,7 @@ ColumnLayout {
     }
 
     Rectangle {
-        visible: rootItem.claudeExtraTokens > 0
+        visible: claudeTabRoot.subTab === "usage" && rootItem.claudeExtraTokens > 0
         Layout.fillWidth: true
         height: 30
         radius: 6
@@ -331,7 +388,7 @@ ColumnLayout {
     }
 
     PopupRow {
-        visible: rootItem.claudeExtraUsageEnabled && rootItem.claudeExtraUsageLimit > 0
+        visible: claudeTabRoot.subTab === "usage" && rootItem.claudeExtraUsageEnabled && rootItem.claudeExtraUsageLimit > 0
         label: "Extra Purchases"
         value: rootItem.claudeExtraUsagePct
         barColor: rootItem.claudeOrange
@@ -342,7 +399,7 @@ ColumnLayout {
     ColumnLayout {
         Layout.fillWidth: true
         spacing: 8
-        visible: Object.keys(rootItem.claudeModels).length > 0
+        visible: claudeTabRoot.subTab === "usage" && Object.keys(rootItem.claudeModels).length > 0
 
         Rectangle {
             Layout.fillWidth: true
@@ -461,6 +518,291 @@ ColumnLayout {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    // ── No-stats placeholder ───────────────────────────────────────────────────
+    PlasmaComponents.Label {
+        visible: claudeTabRoot.subTab === "stats" && !rootItem.claudeStatsAvailable
+        Layout.fillWidth: true
+        Layout.topMargin: 8
+        horizontalAlignment: Text.AlignHCenter
+        text: "No local activity stats yet.\nRun Claude Code to generate ~/.claude/stats-cache.json"
+        font.pixelSize: 10
+        opacity: 0.5
+        color: Kirigami.Theme.textColor
+        wrapMode: Text.WordWrap
+    }
+
+    // ── Claude Code local activity stats (mirrors `/stats`) ────────────────────
+    ColumnLayout {
+        Layout.fillWidth: true
+        spacing: 8
+        visible: claudeTabRoot.subTab === "stats" && rootItem.claudeStatsAvailable
+
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 8
+            PlasmaComponents.Label {
+                text: "Activity Stats"
+                font.bold: true
+                font.pixelSize: 11
+                opacity: 0.7
+                color: Kirigami.Theme.textColor
+            }
+            Item {
+                Layout.fillWidth: true
+            }
+            // Favorite (most-used) model chip.
+            Rectangle {
+                visible: rootItem.claudeStatsFavoriteModel !== ""
+                implicitHeight: 16
+                implicitWidth: favLabel.implicitWidth + 14
+                radius: 3
+                color: Qt.rgba(0.8, 0.47, 0.36, 0.15)
+                border.width: 1
+                border.color: Qt.rgba(0.8, 0.47, 0.36, 0.35)
+                PlasmaComponents.Label {
+                    id: favLabel
+                    anchors.centerIn: parent
+                    text: "★ " + rootItem.shortenModelName(rootItem.claudeStatsFavoriteModel)
+                    font.pixelSize: 9
+                    font.bold: true
+                    color: rootItem.claudeOrange
+                }
+            }
+        }
+
+        // ── Stat tiles grid ────────────────────────────────────────────────
+        GridLayout {
+            Layout.fillWidth: true
+            columns: 3
+            rowSpacing: 6
+            columnSpacing: 6
+
+            StatTile {
+                tileValue: rootItem.formatTokens(rootItem.claudeStatsTotalTokens)
+                tileLabel: "tokens"
+                tileTip: "Total input+output tokens across all models (all time)"
+            }
+            StatTile {
+                tileValue: Math.round(rootItem.claudeStatsTotalSessions).toString()
+                tileLabel: "sessions"
+                tileTip: rootItem.formatTokens(rootItem.claudeStatsTotalMessages) + " messages total"
+            }
+            StatTile {
+                tileValue: Math.round(rootItem.claudeStatsActiveDays) + (rootItem.claudeStatsSpanDays > 0 ? "/" + Math.round(rootItem.claudeStatsSpanDays) : "")
+                tileLabel: "active days"
+                tileTip: rootItem.claudeStatsFirstDate ? "Since " + Qt.formatDate(new Date(rootItem.claudeStatsFirstDate), "MMM d, yyyy") : ""
+            }
+            StatTile {
+                tileValue: Math.round(rootItem.claudeStatsCurrentStreak) + "d"
+                tileLabel: "streak"
+                tileSub: "best " + Math.round(rootItem.claudeStatsLongestStreak) + "d"
+                tileTip: "Current consecutive-day streak\nLongest: " + Math.round(rootItem.claudeStatsLongestStreak) + " days"
+            }
+            StatTile {
+                tileValue: rootItem.formatDuration(rootItem.claudeStatsLongestSessionMs)
+                tileLabel: "longest session"
+            }
+            StatTile {
+                visible: rootItem.claudeStatsPeakHour >= 0
+                tileValue: rootItem.claudeStatsPeakHour >= 0 ? (rootItem.claudeStatsPeakHour < 10 ? "0" : "") + rootItem.claudeStatsPeakHour + ":00" : "—"
+                tileLabel: "peak hour"
+                tileTip: "Hour of day with the most activity"
+            }
+        }
+
+        // ── Tokens-per-day sparkline ───────────────────────────────────────
+        ColumnLayout {
+            Layout.fillWidth: true
+            spacing: 3
+            visible: rootItem.claudeStatsDailyTokens.length > 1
+
+            PlasmaComponents.Label {
+                text: "Tokens / day"
+                font.pixelSize: 9
+                opacity: 0.45
+                color: Kirigami.Theme.textColor
+            }
+            Row {
+                id: sparkRow
+                Layout.fillWidth: true
+                height: 34
+                spacing: 1
+                readonly property real maxTok: {
+                    var mx = 1;
+                    var arr = rootItem.claudeStatsDailyTokens;
+                    for (var i = 0; i < arr.length; i++)
+                        if (arr[i].total > mx)
+                            mx = arr[i].total;
+                    return mx;
+                }
+                readonly property real barW: Math.max(1, (width - (rootItem.claudeStatsDailyTokens.length - 1)) / rootItem.claudeStatsDailyTokens.length)
+                Repeater {
+                    model: rootItem.claudeStatsDailyTokens
+                    Rectangle {
+                        required property var modelData
+                        width: sparkRow.barW
+                        height: sparkRow.height
+                        color: "transparent"
+                        QQC2.ToolTip.visible: barMA.containsMouse
+                        QQC2.ToolTip.delay: 300
+                        QQC2.ToolTip.text: modelData.date + "\n" + rootItem.formatTokens(modelData.total) + " tokens"
+                        MouseArea {
+                            id: barMA
+                            anchors.fill: parent
+                            hoverEnabled: true
+                        }
+                        Rectangle {
+                            anchors.bottom: parent.bottom
+                            width: parent.width
+                            radius: 1
+                            height: Math.max(2, parent.height * (modelData.total / sparkRow.maxTok))
+                            color: rootItem.claudeOrange
+                            opacity: barMA.containsMouse ? 1.0 : 0.6
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── Per-model token usage (all time) ───────────────────────────────
+        Repeater {
+            model: {
+                var keys = Object.keys(rootItem.claudeStatsModels);
+                keys.sort(function (a, b) {
+                    return rootItem.claudeStatsModels[b].total - rootItem.claudeStatsModels[a].total;
+                });
+                return keys;
+            }
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 3
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    propagateComposedEvents: true
+                    QQC2.ToolTip.visible: containsMouse
+                    QQC2.ToolTip.delay: 400
+                    QQC2.ToolTip.text: {
+                        var m = rootItem.claudeStatsModels[modelData];
+                        if (!m)
+                            return modelData;
+                        return modelData + "\nInput:  " + rootItem.formatTokens(m.input) + "\nOutput: " + rootItem.formatTokens(m.output) + "\nCache read: " + rootItem.formatTokens(m.cacheRead) + "\nCache write: " + rootItem.formatTokens(m.cacheCreation);
+                    }
+                }
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+                    PlasmaComponents.Label {
+                        text: rootItem.shortenModelName(modelData)
+                        font.pixelSize: 10
+                        opacity: 0.65
+                        Layout.preferredWidth: 90
+                        elide: Text.ElideRight
+                        color: Kirigami.Theme.textColor
+                    }
+                    Item {
+                        Layout.fillWidth: true
+                    }
+                    PlasmaComponents.Label {
+                        text: rootItem.formatTokens(rootItem.claudeStatsModels[modelData].input) + " in"
+                        font.pixelSize: 9
+                        opacity: 0.4
+                        color: Kirigami.Theme.textColor
+                    }
+                    PlasmaComponents.Label {
+                        text: rootItem.formatTokens(rootItem.claudeStatsModels[modelData].output) + " out"
+                        font.pixelSize: 9
+                        opacity: 0.4
+                        color: Kirigami.Theme.textColor
+                    }
+                    PlasmaComponents.Label {
+                        text: rootItem.claudeStatsTotalTokens > 0 ? Math.round(rootItem.claudeStatsModels[modelData].total / rootItem.claudeStatsTotalTokens * 100) + "%" : "—"
+                        font.pixelSize: 11
+                        font.bold: true
+                        color: Kirigami.Theme.textColor
+                        Layout.preferredWidth: 38
+                        horizontalAlignment: Text.AlignRight
+                    }
+                }
+                Item {
+                    Layout.fillWidth: true
+                    height: 3
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: 1.5
+                        color: Qt.rgba(1, 1, 1, 0.05)
+                    }
+                    Rectangle {
+                        anchors.left: parent.left
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        radius: 1.5
+                        color: rootItem.claudeOrange
+                        opacity: 0.7
+                        width: rootItem.claudeStatsTotalTokens > 0 ? parent.width * (rootItem.claudeStatsModels[modelData].total / rootItem.claudeStatsTotalTokens) : 0
+                        Behavior on width {
+                            NumberAnimation {
+                                duration: 500
+                                easing.type: Easing.OutCubic
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Freshness note — Claude recomputes this cache daily, so it can lag.
+        PlasmaComponents.Label {
+            visible: rootItem.claudeStatsComputedDate !== ""
+            Layout.fillWidth: true
+            horizontalAlignment: Text.AlignRight
+            text: "computed " + rootItem.claudeStatsComputedDate
+            font.pixelSize: 8
+            opacity: 0.35
+            color: Kirigami.Theme.textColor
+        }
+    }
+
+    component StatTile: Rectangle {
+        id: tile
+        property string tileLabel: ""
+        property string tileValue: ""
+        property string tileSub: ""
+        property string tileTip: ""
+        Layout.fillWidth: true
+        Layout.preferredHeight: 40
+        radius: 5
+        color: Qt.rgba(1, 1, 1, 0.04)
+        border.width: 1
+        border.color: Qt.rgba(1, 1, 1, 0.07)
+        QQC2.ToolTip.visible: tile.tileTip !== "" && tileMA.containsMouse
+        QQC2.ToolTip.delay: 400
+        QQC2.ToolTip.text: tile.tileTip
+        MouseArea {
+            id: tileMA
+            anchors.fill: parent
+            hoverEnabled: true
+        }
+        ColumnLayout {
+            anchors.centerIn: parent
+            spacing: 0
+            PlasmaComponents.Label {
+                Layout.alignment: Qt.AlignHCenter
+                text: tile.tileValue
+                font.pixelSize: 14
+                font.bold: true
+                color: rootItem.claudeOrange
+            }
+            PlasmaComponents.Label {
+                Layout.alignment: Qt.AlignHCenter
+                text: tile.tileLabel + (tile.tileSub ? " · " + tile.tileSub : "")
+                font.pixelSize: 8
+                opacity: 0.5
+                color: Kirigami.Theme.textColor
             }
         }
     }
