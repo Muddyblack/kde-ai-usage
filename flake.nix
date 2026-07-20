@@ -41,10 +41,31 @@
               homepage = "https://github.com/Muddyblack/kde-ai-usage";
             };
           };
+
+          tray-helper = pkgs.stdenv.mkDerivation {
+            pname = "ai-usage-tray";
+            version = metadata.KPlugin.Version;
+            src = ./hyprland/tray;
+            nativeBuildInputs = with pkgs; [ cmake ninja qt6.wrapQtAppsHook ];
+            buildInputs = with pkgs; [ qt6.qtbase ];
+          };
         });
 
       apps = forAllSystems (system:
-        let pkgs = import nixpkgs { inherit system; };
+        let
+          pkgs = import nixpkgs { inherit system; };
+          quickshellDesktop = pkgs.makeDesktopItem {
+            name = "org.quickshell";
+            desktopName = "Quickshell";
+            comment = "QtQuick desktop shell runtime";
+            # xdg-desktop-portal resolves this entry in the portal daemon's
+            # environment, where a flake-only Quickshell is not on PATH.
+            exec = "${pkgs.quickshell}/bin/qs";
+            icon = "org.muddyblack.aiUsageWidget";
+            terminal = false;
+            noDisplay = true;
+            categories = [ "Utility" ];
+          };
         in {
           view = {
             type = "app";
@@ -64,6 +85,24 @@
               rm -f "$out"
               (cd "$here/package" && ${pkgs.zip}/bin/zip -r "$out" . -x '*.swp' '*~')
               echo "wrote $out"
+            '');
+          };
+          hyprland = {
+            type = "app";
+            program = toString (pkgs.writeShellScript "ai-usage-hyprland" ''
+              set -eu
+              config=${self}/hyprland/shell.qml
+              desktop_dir="''${XDG_DATA_HOME:-$HOME/.local/share}/applications"
+              ${pkgs.coreutils}/bin/mkdir -p "$desktop_dir"
+              ${pkgs.coreutils}/bin/install -m 0644 \
+                ${quickshellDesktop}/share/applications/org.quickshell.desktop \
+                "$desktop_dir/org.quickshell.desktop"
+              ${self.packages.${system}.tray-helper}/bin/ai-usage-tray \
+                ${pkgs.quickshell}/bin/qs "$config" \
+                ${self}/package/contents/tools/sh/get-usage-snapshot &
+              tray_pid=$!
+              trap 'kill "$tray_pid" 2>/dev/null || true' EXIT INT TERM
+              ${pkgs.quickshell}/bin/qs -p "$config"
             '');
           };
         });

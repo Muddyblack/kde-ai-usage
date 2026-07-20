@@ -13,6 +13,7 @@ Switch between tabs in the popup for each service:
 [*] [b]Claude[/b] — 5-hour session + 7-day weekly windows
 [*] [b]Antigravity / Google AI Studio[/b]
 [*] [b]OpenAI API[/b]
+[*] [b]Grok / xAI[/b]
 [*] [b]Mistral AI[/b]
 [*] [b]Kiro[/b]
 [*] [b]OpenRouter[/b]

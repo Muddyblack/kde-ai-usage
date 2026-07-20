@@ -3,7 +3,7 @@
 DB_PATH="${HOME}/.config/Kiro/User/globalStorage/state.vscdb"
 
 if [ ! -f "$DB_PATH" ]; then
-    echo '{"error":"Kiro state database not found"}'
+    echo '{"error":"No Kiro state found — open Kiro and sign in once"}'
     exit 0
 fi
 
@@ -23,14 +23,14 @@ close $fh;
 my $marker = "\"kiro.resourceNotifications.usageState\":";
 my $start = index($blob, $marker);
 if ($start < 0) {
-    print "{\"error\":\"Kiro usage state not found\"}\n";
+    print "{\"error\":\"No Kiro usage snapshot — open Kiro and let it refresh\"}\n";
     exit 0;
 }
 
 $start += length($marker);
 my $json_start = index($blob, "{", $start);
 if ($json_start < 0) {
-    print "{\"error\":\"Kiro usage payload missing\"}\n";
+    print "{\"error\":\"Kiro usage snapshot is empty — open Kiro and let it refresh\"}\n";
     exit 0;
 }
 

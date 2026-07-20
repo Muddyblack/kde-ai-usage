@@ -1,20 +1,153 @@
 import QtQuick
 import QtQuick.Layouts
-import QtQuick.Controls as QQC2
-import org.kde.plasma.plasmoid
-import org.kde.plasma.components as PlasmaComponents
-import org.kde.kirigami as Kirigami
 
+// Usage-history chart, ported from the Plasma UsageChart. Self-contained:
+// feed it the unified history array plus the window list for the active tab.
 Rectangle {
-    id: usageChartContainer
-    property Item rootItem
+    id: chart
 
-    visible: !rootItem.showSettings && rootItem.showUsageChart && rootItem.weeklyUsageHistory.length >= 1 && (rootItem.enabledTabs[rootItem.activeTab] === "claude" || (rootItem.enabledTabs[rootItem.activeTab] === "openai" && rootItem.codexUsageAvailable) || rootItem.enabledTabs[rootItem.activeTab] === "kiro" || rootItem.enabledTabs[rootItem.activeTab] === "antigravity" || rootItem.enabledTabs[rootItem.activeTab] === "openrouter" || rootItem.enabledTabs[rootItem.activeTab] === "mistral" || (rootItem.enabledTabs[rootItem.activeTab] === "grok" && rootItem.grokHasBilling && rootItem.grokQuotaKind !== "free-tier"))
+    // Full unified history: [{t, s?, w?, cp?, cw?, kr?, ag?, or?, mv?}]
+    property var usageHistory: []
+    // Windows available on the active tab: [{id, key, label, size}] (size in ms)
+    property var windows: []
+    property string chartWindow: ""
+    property color accent: "#7dd3fc"
+    property real chartTimeOffset: 0
+    // Gate from the host (settings toggle / settings page open) combined with
+    // the "have at least one data point" check below.
+    property bool extraVisible: true
+
+    signal windowSelected(string id)
+
+    onChartWindowChanged: chartTimeOffset = 0
+
+    readonly property var currentWindow: {
+        for (var i = 0; i < windows.length; i++)
+            if (windows[i].id === chartWindow)
+                return windows[i];
+        return windows.length > 0 ? windows[0] : null;
+    }
+    readonly property string historyKey: currentWindow ? currentWindow.key : "w"
+    readonly property real windowSize: currentWindow ? currentWindow.size : 7 * 24 * 3600000
+    // The mistral series stores raw USD; auto-scale it to the window max.
+    readonly property bool isCost: historyKey === "mv"
+    // Only rolling-window series (Claude / Codex) drop to ~0 at a reset.
+    readonly property bool windowHasResets: ["session", "day", "weekly", "codex_primary", "codex_day", "codex_weekly"].indexOf(chartWindow) >= 0
+
+    // {t, v[, raw]} view of the selected series inside the visible window
+    readonly property var series: {
+        var out = [];
+        var now_ms = new Date().getTime();
+        var maxT = now_ms - chart.chartTimeOffset;
+        var minT = maxT - chart.windowSize;
+        for (var i = 0; i < usageHistory.length; i++) {
+            var p = usageHistory[i];
+            var v = p[chart.historyKey];
+            if (v === undefined || v === null)
+                continue;
+            if (p.t >= minT && p.t <= maxT)
+                out.push({
+                    t: p.t,
+                    v: v
+                });
+        }
+        if (chart.isCost && out.length > 0) {
+            var maxV = 0;
+            for (var j = 0; j < out.length; j++)
+                if (out[j].v > maxV)
+                    maxV = out[j].v;
+            if (maxV > 0)
+                for (var k = 0; k < out.length; k++)
+                    out[k] = {
+                        t: out[k].t,
+                        v: (out[k].v / maxV) * 100,
+                        raw: out[k].v
+                    };
+        }
+        return out;
+    }
+
+    // True if the selected series has ANY point in the whole history (not just
+    // inside the visible window). Used to keep the chart frame on screen while
+    // paging back past the data, instead of vanishing and trapping the user.
+    readonly property bool hasAnySeriesData: {
+        for (var i = 0; i < usageHistory.length; i++) {
+            var v = usageHistory[i][chart.historyKey];
+            if (v !== undefined && v !== null)
+                return true;
+        }
+        return false;
+    }
+
+    readonly property var resetTimestamps: {
+        if (!windowHasResets)
+            return [];
+        var pts = chart.series;
+        var out = [];
+        for (var i = 1; i < pts.length; i++)
+            if (pts[i - 1].v - pts[i].v > 6)
+                out.push(pts[i].t);
+        return out;
+    }
+
+    readonly property real chartMaxRaw: {
+        if (!isCost)
+            return 0;
+        var pts = chart.series;
+        var m = 0;
+        for (var i = 0; i < pts.length; i++)
+            if (pts[i].raw !== undefined && pts[i].raw > m)
+                m = pts[i].raw;
+        return m;
+    }
+
+    function chartYLabel(fraction) {
+        if (isCost)
+            return chartMaxRaw > 0 ? "$" + (chartMaxRaw * fraction).toFixed(2) : "";
+        return Math.round(fraction * 100) + "%";
+    }
+
+    function rangeText() {
+        var now_ms = new Date().getTime();
+        var maxT = now_ms - chartTimeOffset;
+        var minT = maxT - windowSize;
+        var minDate = new Date(minT);
+        var maxDate = new Date(maxT);
+        if (windowSize <= 24 * 3600000) {
+            if (minDate.toDateString() === maxDate.toDateString())
+                return Qt.formatDateTime(minDate, "hh:mm") + " - " + Qt.formatDateTime(maxDate, "hh:mm") + " (" + Qt.formatDateTime(maxDate, "MMM d") + ")";
+            return Qt.formatDateTime(minDate, "MMM d, hh:mm") + " - " + Qt.formatDateTime(maxDate, "MMM d, hh:mm");
+        }
+        return Qt.formatDateTime(minDate, "MMM d") + " - " + Qt.formatDateTime(maxDate, "MMM d");
+    }
+
+    // Usage slope in %/hour over the trailing lookback, for the pulse effect.
+    function usageSlopePerHour(lookbackMs) {
+        var now_ms = new Date().getTime();
+        var first = null, last = null;
+        for (var i = 0; i < usageHistory.length; i++) {
+            var p = usageHistory[i];
+            var v = p[chart.historyKey];
+            if (v === undefined || v === null)
+                continue;
+            if (p.t < now_ms - lookbackMs)
+                continue;
+            if (first === null)
+                first = p;
+            last = p;
+        }
+        if (first === null || last === null || last.t <= first.t)
+            return null;
+        var lv = last[chart.historyKey], fv = first[chart.historyKey];
+        return (lv - fv) / ((last.t - first.t) / 3600000);
+    }
+
+    visible: extraVisible && hasAnySeriesData
     Layout.fillWidth: true
     Layout.preferredHeight: implicitHeight
     implicitHeight: 184
     radius: 10
-    color: rootItem.resolvedCardBg
+    color: Qt.rgba(1, 1, 1, 0.045)
     border.width: 1
     border.color: Qt.rgba(1, 1, 1, 0.08)
     clip: true
@@ -38,7 +171,6 @@ Rectangle {
         anchors.leftMargin: 12
         spacing: 6
 
-        // Left arrow button
         Rectangle {
             radius: 4
             implicitHeight: 16
@@ -46,11 +178,10 @@ Rectangle {
             color: leftNavMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(1, 1, 1, 0.06)
             opacity: enabled ? 1.0 : 0.3
             enabled: {
-                var key = rootItem._historyKey();
                 var oldestT = 0;
-                for (var i = 0; i < rootItem.usageHistory.length; i++) {
-                    var p = rootItem.usageHistory[i];
-                    if (p[key] !== undefined && p[key] !== null) {
+                for (var i = 0; i < chart.usageHistory.length; i++) {
+                    var p = chart.usageHistory[i];
+                    if (p[chart.historyKey] !== undefined && p[chart.historyKey] !== null) {
                         oldestT = p.t;
                         break;
                     }
@@ -58,229 +189,126 @@ Rectangle {
                 if (oldestT === 0)
                     return false;
                 var now_ms = new Date().getTime();
-                var winSize = rootItem.getChartWindowSize();
-                var maxT = now_ms - rootItem.chartTimeOffset;
-                var minT = maxT - winSize;
+                var minT = (now_ms - chart.chartTimeOffset) - chart.windowSize;
                 return minT > oldestT;
             }
-            PlasmaComponents.Label {
+            Text {
                 anchors.centerIn: parent
                 text: "<"
                 font.pixelSize: 9
                 font.bold: true
-                color: Kirigami.Theme.textColor
+                color: "#f8fafc"
             }
             MouseArea {
                 id: leftNavMouse
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: parent.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                onClicked: {
-                    rootItem.chartTimeOffset += rootItem.getChartWindowSize();
-                }
+                onClicked: chart.chartTimeOffset += chart.windowSize
             }
         }
 
-        // Center label showing current range
-        PlasmaComponents.Label {
-            text: rootItem.getChartRangeText()
+        Text {
+            text: chart.rangeText()
             font.pixelSize: 9
             font.bold: true
             opacity: 0.6
-            color: Kirigami.Theme.textColor
+            color: "#f8fafc"
         }
 
-        // Right arrow button
         Rectangle {
             radius: 4
             implicitHeight: 16
             implicitWidth: 16
             color: rightNavMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(1, 1, 1, 0.06)
             opacity: enabled ? 1.0 : 0.3
-            enabled: rootItem.chartTimeOffset > 0
-            PlasmaComponents.Label {
+            enabled: chart.chartTimeOffset > 0
+            Text {
                 anchors.centerIn: parent
                 text: ">"
                 font.pixelSize: 9
                 font.bold: true
-                color: Kirigami.Theme.textColor
+                color: "#f8fafc"
             }
             MouseArea {
                 id: rightNavMouse
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: parent.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                onClicked: {
-                    var winSize = rootItem.getChartWindowSize();
-                    rootItem.chartTimeOffset = Math.max(0, rootItem.chartTimeOffset - winSize);
-                }
+                onClicked: chart.chartTimeOffset = Math.max(0, chart.chartTimeOffset - chart.windowSize)
             }
         }
     }
 
-    // ── Window toggle — Claude: 5H/7D, Codex: 5H/7D (single-series tabs: hidden) ──
+    // ── Window toggle (5H / 24H / 7D) ──
     RowLayout {
-        id: chartWindowToggle
         anchors.top: parent.top
         anchors.right: parent.right
         anchors.topMargin: 7
         anchors.rightMargin: 8
         spacing: 4
-        visible: {
-            var tab = rootItem.enabledTabs[rootItem.activeTab];
-            if (tab === "claude") {
-                for (var i = 0; i < rootItem.usageHistory.length; i++)
-                    if (rootItem.usageHistory[i].s !== undefined && rootItem.usageHistory[i].s !== null)
-                        return true;
-                return false;
-            }
-            if (tab === "openai") {
-                for (var j = 0; j < rootItem.usageHistory.length; j++)
-                    if (rootItem.usageHistory[j].cp !== undefined && rootItem.usageHistory[j].cp !== null)
-                        return true;
-            }
-            return false;
-        }
+        visible: chart.windows.length > 1
+
         Repeater {
-            model: {
-                var tab = rootItem.enabledTabs[rootItem.activeTab];
-                if (tab === "openai")
-                    return [
-                        {
-                            id: "codex_primary",
-                            label: "5H"
-                        },
-                        {
-                            id: "codex_day",
-                            label: "24H"
-                        },
-                        {
-                            id: "codex_weekly",
-                            label: "7D"
-                        }
-                    ];
-                return [
-                    {
-                        id: "session",
-                        label: "5H"
-                    },
-                    {
-                        id: "day",
-                        label: "24H"
-                    },
-                    {
-                        id: "weekly",
-                        label: "7D"
-                    }
-                ];
-            }
+            model: chart.windows
+
             Rectangle {
+                required property var modelData
                 radius: 4
                 implicitHeight: 16
                 implicitWidth: winLabel.implicitWidth + 12
-                color: rootItem.chartWindow === modelData.id ? rootItem.activeAccent : Qt.rgba(1, 1, 1, 0.06)
-                opacity: rootItem.chartWindow === modelData.id ? 0.9 : 1.0
+                color: chart.chartWindow === modelData.id ? chart.accent : Qt.rgba(1, 1, 1, 0.06)
+                opacity: chart.chartWindow === modelData.id ? 0.9 : 1.0
                 Behavior on color {
                     ColorAnimation {
                         duration: 150
                     }
                 }
-                PlasmaComponents.Label {
+                Text {
                     id: winLabel
                     anchors.centerIn: parent
                     text: modelData.label
                     font.pixelSize: 9
-                    font.bold: rootItem.chartWindow === modelData.id
-                    color: rootItem.chartWindow === modelData.id ? "#ffffff" : Kirigami.Theme.textColor
-                    opacity: rootItem.chartWindow === modelData.id ? 1.0 : 0.6
+                    font.bold: chart.chartWindow === modelData.id
+                    color: chart.chartWindow === modelData.id ? "#ffffff" : "#f8fafc"
+                    opacity: chart.chartWindow === modelData.id ? 1.0 : 0.6
                 }
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        rootItem.chartWindow = modelData.id;
-                        Plasmoid.configuration.chartWindow = modelData.id;
-                        // Remember the granularity so it carries to other tabs
-                        var gran = rootItem._windowGranularity(modelData.id);
-                        if (gran !== "") {
-                            rootItem.chartGranularity = gran;
-                            Plasmoid.configuration.chartGranularity = gran;
-                        }
-                    }
+                    onClicked: chart.windowSelected(modelData.id)
                 }
             }
         }
     }
 
-    // Y-axis labels. For most windows the axis is a 0-100% scale; for the mistral
-    // (cost) window it's auto-scaled to the window's max spend, so labels show $.
-    readonly property real chartMaxRaw: {
-        if (rootItem.chartWindow !== "mistral")
-            return 0;
-        var pts = rootItem.weeklyUsageHistory;
-        var m = 0;
-        for (var i = 0; i < pts.length; i++)
-            if (pts[i].raw !== undefined && pts[i].raw > m)
-                m = pts[i].raw;
-        return m;
-    }
-    function chartYLabel(fraction) {
-        if (rootItem.chartWindow === "mistral")
-            return chartMaxRaw > 0 ? "$" + (chartMaxRaw * fraction).toFixed(2) : "";
-        return Math.round(fraction * 100) + "%";
-    }
-
-    // Timestamps where a reset happened inside the visible window — detected as
-    // a sharp downward step in the plotted curve (usage only climbs, then drops
-    // to ~0 at a reset). Shared by the canvas (draws the dashed line + dot) and
-    // the x-axis row (renders the time label under each line). Only the
-    // session/rolling-window curves reset this way: Claude (s/w) and Codex
-    // (cp/cw). Antigravity / OpenRouter / Mistral are monthly credit/spend
-    // curves, so a drop there isn't a reset and we skip them.
-    readonly property bool windowHasResets: {
-        var tab = rootItem.enabledTabs[rootItem.activeTab];
-        if (tab === "claude")
-            return true;
-        if (tab === "openai")
-            return rootItem.chartWindow === "codex_primary" || rootItem.chartWindow === "codex_day" || rootItem.chartWindow === "codex_weekly";
-        return false;
-    }
-    readonly property var resetTimestamps: {
-        if (!windowHasResets)
-            return [];
-        var pts = rootItem.weeklyUsageHistory;
-        var out = [];
-        for (var i = 1; i < pts.length; i++)
-            if (pts[i - 1].v - pts[i].v > 6)
-                out.push(pts[i].t);
-        return out;
-    }
-    PlasmaComponents.Label {
+    // ── Y-axis labels ──
+    Text {
         anchors.right: chartCanvas.left
         anchors.rightMargin: 4
         y: chartCanvas.y + 2
-        text: usageChartContainer.chartYLabel(1.0)
+        text: chart.chartYLabel(1.0)
         font.pixelSize: 9
         opacity: 0.35
-        color: Kirigami.Theme.textColor
+        color: "#f8fafc"
     }
-    PlasmaComponents.Label {
+    Text {
         anchors.right: chartCanvas.left
         anchors.rightMargin: 4
         y: chartCanvas.y + chartCanvas.height / 2 - 6
-        text: usageChartContainer.chartYLabel(0.5)
+        text: chart.chartYLabel(0.5)
         font.pixelSize: 9
         opacity: 0.35
-        color: Kirigami.Theme.textColor
+        color: "#f8fafc"
     }
-    PlasmaComponents.Label {
+    Text {
         anchors.right: chartCanvas.left
         anchors.rightMargin: 4
         y: chartCanvas.y + chartCanvas.height - 14
-        text: usageChartContainer.chartYLabel(0.0)
+        text: chart.chartYLabel(0.0)
         font.pixelSize: 9
         opacity: 0.35
-        color: Kirigami.Theme.textColor
+        color: "#f8fafc"
     }
 
     Canvas {
@@ -294,11 +322,9 @@ Rectangle {
         anchors.topMargin: 28
         anchors.bottomMargin: 2
 
-        property var history: rootItem.weeklyUsageHistory
-        property color accentColor: rootItem.activeAccent
-        // pulse phase 0..1, driven while usage is climbing fast; scales the latest dot's halo
+        property var history: chart.series
+        property color accentColor: chart.accent
         property real pulse: 0
-        // hover-scrub index into history (-1 = none)
         property int scrubIndex: -1
         onHistoryChanged: requestPaint()
         onAccentColorChanged: requestPaint()
@@ -309,10 +335,8 @@ Rectangle {
         onWidthChanged: requestPaint()
         onHeightChanged: requestPaint()
 
-        // Pulse when the selected window is climbing >2%/h
         readonly property bool climbingFast: {
-            var key = rootItem._historyKey();
-            var slope = rootItem.usageSlopePerHour(key, 2 * 3600000);
+            var slope = chart.usageSlopePerHour(2 * 3600000);
             return slope !== null && slope > 2;
         }
         SequentialAnimation on pulse {
@@ -343,19 +367,17 @@ Rectangle {
 
             var w = width, h = height;
             var now_ms = new Date().getTime();
-            var maxT = now_ms - rootItem.chartTimeOffset;
-            var minT = maxT - rootItem.getChartWindowSize();
-            var tRange = rootItem.getChartWindowSize();
+            var maxT = now_ms - chart.chartTimeOffset;
+            var tRange = chart.windowSize;
+            var minT = maxT - tRange;
 
             function px(i) {
                 return ((pts[i].t - minT) / tRange) * w;
             }
-            // small top/bottom margin so the glow dot isn't clipped by the canvas edge
             function py(v) {
                 return h - (v / 100) * h * 0.88 - h * 0.04;
             }
 
-            // build rgba string from the QML color object (components are 0–1)
             var acR = Math.round(accentColor.r * 255);
             var acG = Math.round(accentColor.g * 255);
             var acB = Math.round(accentColor.b * 255);
@@ -394,7 +416,6 @@ Rectangle {
                 return;
             }
 
-            // smooth cubic bezier path builder
             function buildPath() {
                 ctx.moveTo(px(0), py(pts[0].v));
                 for (var i = 0; i < pts.length - 1; i++) {
@@ -405,7 +426,7 @@ Rectangle {
                 }
             }
 
-            // glow pass — wide soft stroke behind the crisp line (fast stroke-based glow instead of heavy CPU shadow blur)
+            // glow pass — wide soft strokes behind the crisp line
             ctx.save();
             ctx.lineJoin = "round";
             ctx.lineCap = "round";
@@ -451,7 +472,6 @@ Rectangle {
             // latest point: pulsing halo + dot + white pip
             var lx = px(pts.length - 1);
             var ly = py(pts[pts.length - 1].v);
-            // halo grows + fades with the pulse phase when climbing fast
             var haloR = 7 + pulse * 8;
             var haloA = 0.18 + (1 - pulse) * 0.10;
             ctx.beginPath();
@@ -467,13 +487,7 @@ Rectangle {
             ctx.fillStyle = "rgba(255,255,255,0.9)";
             ctx.fill();
 
-            // ── Reset-boundary markers ───────────────────────────
-            // Draw a dashed vertical line wherever a reset actually happened in
-            // the plotted data. Session/weekly usage only climbs within a window
-            // and drops to ~0 at a reset, so a sharp downward step between two
-            // consecutive points marks a reset — placed at the first post-reset
-            // point, i.e. exactly where the curve falls. This is data-driven so
-            // it lands on the real boundary instead of guessing a fixed grid.
+            // ── Reset-boundary markers ──
             function drawResetLine(resetMs, label, drawLabel) {
                 var rx = ((resetMs - minT) / tRange) * w;
                 ctx.save();
@@ -494,8 +508,6 @@ Rectangle {
                     ctx.fillText(label, tx, 9);
                     ctx.restore();
                 }
-                // small accent dot where the line meets the baseline (the time
-                // itself is rendered as a QML label in the x-axis row below)
                 ctx.save();
                 ctx.beginPath();
                 ctx.arc(rx, h, 2, 0, Math.PI * 2);
@@ -503,10 +515,9 @@ Rectangle {
                 ctx.fill();
                 ctx.restore();
             }
-            var resets = usageChartContainer.resetTimestamps;
-            var resetLabel = rootItem.chartWindow === "weekly" ? "week reset" : "5h reset";
+            var resets = chart.resetTimestamps;
+            var resetLabel = chart.chartWindow.indexOf("weekly") >= 0 ? "week reset" : "5h reset";
             var labelDrawn = false;
-            // walk newest→oldest so the rightmost reset gets the top caption
             for (var ri = resets.length - 1; ri >= 0; ri--) {
                 var rt = resets[ri];
                 if (rt > minT && rt < maxT) {
@@ -539,7 +550,18 @@ Rectangle {
             }
         }
 
-        // ── Hover scrub ──────────────────────────────────────
+        // Empty-window hint: shown while paging back (or forward) into a range
+        // that has no recorded points, so the chart keeps its frame + nav arrows
+        // instead of disappearing.
+        Text {
+            anchors.centerIn: parent
+            visible: chart.series.length === 0
+            text: "No data in this range"
+            color: "#94a3b8"
+            font.pixelSize: 11
+            opacity: 0.7
+        }
+
         MouseArea {
             id: scrubArea
             anchors.fill: parent
@@ -550,10 +572,9 @@ Rectangle {
                     chartCanvas.scrubIndex = -1;
                     return;
                 }
-                // map mouse x → nearest point by timestamp (matches canvas px() formula)
                 var now_ms = new Date().getTime();
-                var maxT = now_ms - rootItem.chartTimeOffset;
-                var tRange = rootItem.getChartWindowSize();
+                var maxT = now_ms - chart.chartTimeOffset;
+                var tRange = chart.windowSize;
                 var minT = maxT - tRange;
                 var mouseT = minT + (mouse.x / chartCanvas.width) * tRange;
                 var best = 0, bestDist = Math.abs(pts[0].t - mouseT);
@@ -568,7 +589,6 @@ Rectangle {
             }
             onExited: chartCanvas.scrubIndex = -1
 
-            // Custom tooltip positioned near the scrub dot
             Rectangle {
                 id: scrubTooltip
                 visible: chartCanvas.scrubIndex >= 0
@@ -579,14 +599,13 @@ Rectangle {
                 width: tooltipRow.implicitWidth + 14
                 height: tooltipRow.implicitHeight + 8
 
-                // Position above the dot, clamped to canvas bounds
                 property real dotX: {
                     var pts = chartCanvas.history;
                     if (chartCanvas.scrubIndex < 0 || !pts || chartCanvas.scrubIndex >= pts.length)
                         return 0;
                     var now_ms = new Date().getTime();
-                    var maxT = now_ms - rootItem.chartTimeOffset;
-                    var tRange = rootItem.getChartWindowSize();
+                    var maxT = now_ms - chart.chartTimeOffset;
+                    var tRange = chart.windowSize;
                     return ((pts[chartCanvas.scrubIndex].t - (maxT - tRange)) / tRange) * chartCanvas.width;
                 }
                 property real dotY: {
@@ -606,21 +625,21 @@ Rectangle {
                     anchors.centerIn: parent
                     spacing: 0
 
-                    PlasmaComponents.Label {
+                    Text {
                         text: {
                             var pts = chartCanvas.history;
                             if (chartCanvas.scrubIndex < 0 || !pts || chartCanvas.scrubIndex >= pts.length)
                                 return "";
                             var pt = pts[chartCanvas.scrubIndex];
-                            if (rootItem.chartWindow === "mistral")
+                            if (chart.isCost)
                                 return "$" + (pt.raw !== undefined ? pt.raw : 0).toFixed(4);
                             return Math.round(pt.v) + "%";
                         }
                         font.pixelSize: 11
                         font.bold: true
-                        color: rootItem.activeAccent
+                        color: chart.accent
                     }
-                    PlasmaComponents.Label {
+                    Text {
                         text: {
                             var pts = chartCanvas.history;
                             if (chartCanvas.scrubIndex < 0 || !pts || chartCanvas.scrubIndex >= pts.length)
@@ -628,7 +647,7 @@ Rectangle {
                             return "  ·  " + Qt.formatDateTime(new Date(pts[chartCanvas.scrubIndex].t), "MMM d, hh:mm");
                         }
                         font.pixelSize: 11
-                        color: Kirigami.Theme.textColor
+                        color: "#f8fafc"
                         opacity: 0.75
                     }
                 }
@@ -636,7 +655,7 @@ Rectangle {
         }
     }
 
-    // X-axis date labels — evenly spaced ticks across the window.
+    // ── X-axis endpoint labels ──
     RowLayout {
         id: xAxisRow
         anchors.left: parent.left
@@ -647,32 +666,22 @@ Rectangle {
         anchors.bottomMargin: 5
         spacing: 0
 
-        // Only the two window endpoints are fixed labels; the reset-time labels
-        // drawn on the canvas carry the detail, so interior ticks would just
-        // collide with them. Keeps the axis clean.
         readonly property int tickCount: 2
-
-        // Hourly windows show time; wide (multi-day) windows show date + time so
-        // a label like "Jun 2" isn't ambiguous about which part of the day it is.
-        readonly property bool hourlyWindow: rootItem.chartWindow === "session" || rootItem.chartWindow === "codex_primary" || rootItem.chartWindow === "day" || rootItem.chartWindow === "codex_day"
+        readonly property bool hourlyWindow: chart.windowSize <= 24 * 3600000
 
         function formatLabel(timestamp) {
             var d = new Date(timestamp);
             if (hourlyWindow)
                 return Qt.formatTime(d, "hh:mm");
-            // wide window: stack date over time so labels stay narrow
             return Qt.formatDate(d, "MMM d") + "\n" + Qt.formatTime(d, "hh:mm");
         }
 
-        // True when a reset label sits within ~10% of this endpoint's position,
-        // so the endpoint hides and the (more meaningful) reset time wins.
         function endpointCrowded(endpointFrac) {
-            var resets = usageChartContainer.resetTimestamps;
+            var resets = chart.resetTimestamps;
             var now_ms = new Date().getTime();
-            var winSize = rootItem.getChartWindowSize();
-            var minT = (now_ms - rootItem.chartTimeOffset) - winSize;
+            var minT = (now_ms - chart.chartTimeOffset) - chart.windowSize;
             for (var i = 0; i < resets.length; i++) {
-                var f = (resets[i] - minT) / winSize;
+                var f = (resets[i] - minT) / chart.windowSize;
                 if (f > 0 && f < 1 && Math.abs(f - endpointFrac) < 0.1)
                     return true;
             }
@@ -685,32 +694,28 @@ Rectangle {
                 readonly property real frac: index / (xAxisRow.tickCount - 1)
                 Layout.fillWidth: index > 0
                 spacing: 0
-                // spacer pushes each label to its proportional position
                 Item {
                     Layout.fillWidth: index > 0
                 }
-                PlasmaComponents.Label {
+                Text {
                     visible: !xAxisRow.endpointCrowded(parent.frac)
                     text: {
                         var now_ms = new Date().getTime();
-                        var maxT = now_ms - rootItem.chartTimeOffset;
-                        var winSize = rootItem.getChartWindowSize();
-                        var minT = maxT - winSize;
-                        return xAxisRow.formatLabel(minT + winSize * parent.frac);
+                        var maxT = now_ms - chart.chartTimeOffset;
+                        var minT = maxT - chart.windowSize;
+                        return xAxisRow.formatLabel(minT + chart.windowSize * parent.frac);
                     }
                     font.pixelSize: 9
                     opacity: 0.40
                     horizontalAlignment: Text.AlignHCenter
                     lineHeight: 0.9
-                    color: Kirigami.Theme.textColor
+                    color: "#f8fafc"
                 }
             }
         }
     }
 
-    // Reset-time labels — sit on the same baseline as the endpoint labels, each
-    // centered under its reset line on the chart. Accent-colored so they read as
-    // the meaningful markers rather than the dim endpoint times.
+    // Reset-time labels centered under each reset line
     Item {
         id: resetLabelsRow
         anchors.left: parent.left
@@ -722,21 +727,19 @@ Rectangle {
         height: xAxisRow.height
 
         Repeater {
-            model: usageChartContainer.resetTimestamps
-            delegate: PlasmaComponents.Label {
+            model: chart.resetTimestamps
+            delegate: Text {
                 readonly property real frac: {
                     var now_ms = new Date().getTime();
-                    var winSize = rootItem.getChartWindowSize();
-                    var maxT = now_ms - rootItem.chartTimeOffset;
-                    var minT = maxT - winSize;
-                    return (modelData - minT) / winSize;
+                    var maxT = now_ms - chart.chartTimeOffset;
+                    var minT = maxT - chart.windowSize;
+                    return (modelData - minT) / chart.windowSize;
                 }
                 visible: frac > 0 && frac < 1
-                text: rootItem.chartWindow === "weekly" ? Qt.formatDate(new Date(modelData), "MMM d") : Qt.formatTime(new Date(modelData), "hh:mm")
+                text: chart.chartWindow.indexOf("weekly") >= 0 ? Qt.formatDate(new Date(modelData), "MMM d") : Qt.formatTime(new Date(modelData), "hh:mm")
                 font.pixelSize: 9
-                color: rootItem.activeAccent
+                color: chart.accent
                 opacity: 0.85
-                // center under the reset line, clamped inside the row
                 x: Math.max(0, Math.min(frac * resetLabelsRow.width - implicitWidth / 2, resetLabelsRow.width - implicitWidth))
             }
         }

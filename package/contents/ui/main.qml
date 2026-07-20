@@ -77,6 +77,13 @@ PlasmoidItem {
                 lines.push("Limit: $" + root.openrouterLimitUSD.toFixed(2));
             if (root.openrouterIsFreeTier)
                 lines.push("Free tier");
+        } else if (tab === "grok") {
+            lines.push(root.grokHasBilling ? ("Grok credits: " + Math.round(root.grokPct) + "% used") : "Grok CLI connected; billing quota unavailable");
+            if (root.grokTeamName || root.grokEmail)
+                lines.push(root.grokTeamName || root.grokEmail);
+            if (root.grokBillingPeriodEnd)
+                lines.push("Resets: " + root.grokBillingPeriodEnd);
+            lines.push(root.grokSessionCount + " local CLI sessions");
         }
         if (root.errorMsg !== "")
             lines.push("⚠ " + root.errorMsg);
@@ -95,6 +102,7 @@ PlasmoidItem {
     property bool kiroEnabled: Plasmoid.configuration.kiroEnabled
     property bool mistralEnabled: Plasmoid.configuration.mistralEnabled
     property bool openrouterEnabled: Plasmoid.configuration.openrouterEnabled
+    property bool grokEnabled: Plasmoid.configuration.grokEnabled
 
     // Computed list of enabled tab IDs in display order
     property var enabledTabs: {
@@ -111,6 +119,8 @@ PlasmoidItem {
             t.push("mistral");
         if (root.openrouterEnabled)
             t.push("openrouter");
+        if (root.grokEnabled)
+            t.push("grok");
         return t;
     }
 
@@ -334,6 +344,25 @@ PlasmoidItem {
     property var openrouterRateLimit: ({})
     property string openrouterError: ""
 
+    // ── Grok CLI / xAI data ──────────────────────────────────────────────────
+    property string _grokApiKey: ""
+    property bool grokLoggedIn: false
+    property real grokPct: 0
+    property real grokUsed: 0
+    property real grokMonthlyLimit: 0
+    property string grokEmail: ""
+    property string grokTeamName: ""
+    property string grokTierId: ""
+    property string grokBillingPeriodEnd: ""
+    property int grokSessionCount: 0
+    property real grokTotalTokens: 0
+    property int grokTotalToolCalls: 0
+    property string grokError: ""
+    property bool grokHasBilling: false
+    property string grokQuotaKind: ""
+    property string grokQuotaWindow: ""
+    property bool grokQuotaExhausted: false
+
     // ── Common ────────────────────────────────────────────────────────────────
     property string errorMsg: ""
     property bool stale: false
@@ -391,6 +420,8 @@ PlasmoidItem {
             return "openrouter";
         if (tab === "mistral")
             return "mistral";
+        if (tab === "grok")
+            return "grok";
         return "weekly";
     }
 
@@ -411,6 +442,8 @@ PlasmoidItem {
             return "or";
         if (root.chartWindow === "mistral")
             return "mv";
+        if (root.chartWindow === "grok")
+            return "gr";
         return "w";
     }
 
@@ -425,7 +458,7 @@ PlasmoidItem {
         if (win === "weekly" || win === "codex_weekly") {
             return 7 * 24 * 3600000; // 7 days in ms
         }
-        if (win === "kiro" || win === "antigravity" || win === "openrouter" || win === "mistral") {
+        if (win === "kiro" || win === "antigravity" || win === "openrouter" || win === "mistral" || win === "grok") {
             return 30 * 24 * 3600000; // 30 days in ms
         }
         return 7 * 24 * 3600000;
@@ -580,6 +613,27 @@ PlasmoidItem {
             history.push({
                 t: now,
                 or: pct
+            });
+        }
+        if (history.length > root.historyLimit)
+            history = history.slice(history.length - root.historyLimit);
+        root.usageHistory = history;
+        var json = JSON.stringify(history);
+        Plasmoid.configuration.usageHistory = json;
+        root.autosaveHistory(json);
+    }
+
+    function recordGrokUsage(pct) {
+        var history = root.usageHistory.slice();
+        var now = new Date().getTime();
+        if (history.length > 0 && now - history[history.length - 1].t < 120000) {
+            var last = history[history.length - 1];
+            last.gr = pct;
+            history[history.length - 1] = last;
+        } else {
+            history.push({
+                t: now,
+                gr: pct
             });
         }
         if (history.length > root.historyLimit)
@@ -839,6 +893,7 @@ PlasmoidItem {
     readonly property color kiroPurple: "#8b5cf6"
     readonly property color mistralOrange: "#ff7000"
     readonly property color openrouterPurple: "#9333ea"
+    readonly property color grokWhite: "#e6e6e6"
     readonly property color sessionColor: "#e05252"
     readonly property color weeklyColor: "#f5a623"
     readonly property color warningColor: "#ffa64d"
@@ -857,6 +912,8 @@ PlasmoidItem {
             return root.mistralOrange;
         if (tabId === "openrouter")
             return root.openrouterPurple;
+        if (tabId === "grok")
+            return root.grokWhite;
         return Kirigami.Theme.textColor;
     }
 
@@ -873,6 +930,8 @@ PlasmoidItem {
             return "Mistral";
         if (tabId === "openrouter")
             return "OpenRouter";
+        if (tabId === "grok")
+            return "Grok";
         return tabId;
     }
 
@@ -1788,6 +1847,52 @@ PlasmoidItem {
         }
     }
 
+    Plasma5Support.DataSource {
+        id: grokUsageSource
+        engine: "executable"
+        connectedSources: []
+        onNewData: function (src, data) {
+            disconnectSource(src);
+            if (root.enabledTabs[root.activeTab] !== "grok")
+                return;
+            var output = (data["stdout"] || "").trim();
+            if (!output || output === "{}") {
+                root.grokLoggedIn = false;
+                root.errorMsg = "Grok: run grok --oauth or configure an xAI key";
+                root.stale = root.lastUpdate !== "";
+                return;
+            }
+            try {
+                var res = JSON.parse(output);
+                root._grokApiKey = res.xaiApiKey || "";
+                root.grokLoggedIn = res.loggedIn === true;
+                root.grokPct = Math.max(0, Math.min(100, res.creditUsagePercent || 0));
+                root.grokUsed = res.used || res.onDemandUsed || 0;
+                root.grokMonthlyLimit = res.monthlyLimit || res.onDemandCap || 0;
+                root.grokEmail = res.email || "";
+                root.grokTeamName = res.teamName || "";
+                root.grokTierId = res.tierId || "";
+                root.grokBillingPeriodEnd = res.billingPeriodEnd || "";
+                root.grokSessionCount = res.sessionCount || 0;
+                root.grokTotalTokens = res.totalTokens || 0;
+                root.grokTotalToolCalls = res.totalToolCalls || 0;
+                root.grokError = res.billingError || "";
+                root.grokHasBilling = res.hasBilling === true;
+                root.grokQuotaKind = res.quotaKind || "";
+                root.grokQuotaWindow = res.quotaWindow || "";
+                root.grokQuotaExhausted = res.quotaExhausted === true;
+                root.errorMsg = root.grokError;
+                root.stale = false;
+                root.lastUpdate = Qt.formatTime(new Date(), "hh:mm");
+                if (root.grokHasBilling)
+                    root.recordGrokUsage(root.grokPct);
+            } catch (e) {
+                root.errorMsg = "Grok: parse error";
+                root.stale = root.lastUpdate !== "";
+            }
+        }
+    }
+
     function loadCreds() {
         var tab = root.enabledTabs[root.activeTab];
         if (tab === "claude") {
@@ -1832,6 +1937,12 @@ PlasmoidItem {
             var cmd = envPrefix + root.scriptDir + "get-openrouter-usage";
             openrouterCredSource.disconnectSource(cmd);
             openrouterCredSource.connectSource(cmd);
+        } else if (tab === "grok") {
+            var cfgKey = Plasmoid.configuration.grokApiKey || "";
+            var envPrefix = cfgKey ? "WIDGET_GROK_API_KEY=\"$(printf %s '" + Qt.btoa(cfgKey) + "' | base64 -d)\" " : "";
+            var cmd = envPrefix + root.scriptDir + "get-grok-usage";
+            grokUsageSource.disconnectSource(cmd);
+            grokUsageSource.connectSource(cmd);
         }
     }
 
@@ -2425,6 +2536,16 @@ PlasmoidItem {
                 costText: root.openrouterKeyValid ? (root.openrouterUsageUSD > 0 ? "$" + root.openrouterUsageUSD.toFixed(3) : "✓ key") : "—"
                 tooltipText: "OpenRouter" + (root.openrouterLabel ? "\n" + root.openrouterLabel : "") + (root.openrouterUsageUSD > 0 ? "\nUsed: $" + root.openrouterUsageUSD.toFixed(4) : "") + (root.openrouterLimitUSD !== null ? "\nLimit: $" + root.openrouterLimitUSD.toFixed(2) : "")
             }
+
+            PanelSlot {
+                pct: root.grokPct
+                iconColor: root.grokWhite
+                stale: root.stale && root.panelTab === "grok"
+                visible: root.panelTab === "grok" && !root.showSettings
+                showCost: !root.grokHasBilling
+                costText: root.grokHasBilling ? "" : "CLI"
+                tooltipText: root.grokHasBilling ? ("Grok credits: " + Math.round(root.grokPct) + "% used") : "Grok CLI connected; billing quota is not exposed"
+            }
         }
     }
 
@@ -2612,6 +2733,8 @@ PlasmoidItem {
                                 return "Mistral Usage";
                             if (tab === "openrouter")
                                 return "OpenRouter Usage";
+                            if (tab === "grok")
+                                return "Grok Usage";
                             return "AI Usage Monitor";
                         }
                         font.bold: true
@@ -2813,6 +2936,10 @@ PlasmoidItem {
             }
 
             OpenRouterTab {
+                rootItem: root
+            }
+
+            GrokTab {
                 rootItem: root
             }
 

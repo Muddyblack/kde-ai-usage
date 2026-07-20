@@ -1,0 +1,410 @@
+import QtQuick
+import QtQuick.Layouts
+import QtQuick.Controls.Basic as QC
+
+// In-popup settings page, ported from the Plasma SettingsPanel: provider
+// toggles, refresh interval, usage-chart toggle, and API-key fields. Everything
+// is persisted through shell.setSetting()/saveSettings() into the JSON config
+// that the snapshot script reads.
+ColumnLayout {
+    id: page
+
+    property var shell
+
+    spacing: 12
+
+    // small helper: a filled accent switch knob
+    component Toggle: QC.Switch {
+        id: sw
+        implicitHeight: 22
+        indicator: Rectangle {
+            implicitWidth: 38
+            implicitHeight: 20
+            x: 0
+            y: (sw.height - height) / 2
+            radius: 10
+            color: sw.checked ? "#4f9dde" : Qt.rgba(1, 1, 1, 0.10)
+            border.width: 1
+            border.color: Qt.rgba(1, 1, 1, 0.18)
+            Behavior on color {
+                ColorAnimation {
+                    duration: 150
+                }
+            }
+            Rectangle {
+                width: 16
+                height: 16
+                radius: 8
+                y: 2
+                x: sw.checked ? parent.width - width - 2 : 2
+                color: "#f8fafc"
+                Behavior on x {
+                    NumberAnimation {
+                        duration: 150
+                        easing.type: Easing.OutCubic
+                    }
+                }
+            }
+        }
+    }
+
+    component SectionLabel: Text {
+        font.bold: true
+        font.pixelSize: 10
+        opacity: 0.5
+        color: "#f8fafc"
+    }
+
+    component SettingCombo: QC.ComboBox {
+        id: combo
+        implicitHeight: 26
+        font.pixelSize: 10
+        contentItem: Text {
+            leftPadding: 8
+            text: combo.displayText
+            font: combo.font
+            color: "#f8fafc"
+            verticalAlignment: Text.AlignVCenter
+        }
+        background: Rectangle {
+            radius: 5
+            color: Qt.rgba(1, 1, 1, 0.06)
+            border.width: 1
+            border.color: Qt.rgba(1, 1, 1, 0.12)
+        }
+        popup: QC.Popup {
+            y: combo.height + 2
+            width: combo.width
+            padding: 1
+            background: Rectangle {
+                radius: 5
+                color: "#12141a"
+                border.width: 1
+                border.color: Qt.rgba(1, 1, 1, 0.14)
+            }
+            contentItem: ListView {
+                implicitHeight: contentHeight
+                model: combo.popup.visible ? combo.delegateModel : null
+                clip: true
+            }
+        }
+        delegate: QC.ItemDelegate {
+            width: combo.width
+            implicitHeight: 26
+            contentItem: Text {
+                text: modelData
+                color: "#f8fafc"
+                font.pixelSize: 10
+                verticalAlignment: Text.AlignVCenter
+            }
+            background: Rectangle {
+                color: highlighted ? Qt.rgba(1, 1, 1, 0.10) : "transparent"
+            }
+            highlighted: combo.highlightedIndex === index
+        }
+    }
+
+    // ── Services ─────────────────────────────────────────────────────────────
+    SectionLabel {
+        text: "SERVICES"
+    }
+
+    GridLayout {
+        Layout.fillWidth: true
+        columns: 2
+        columnSpacing: 16
+        rowSpacing: 4
+
+        Repeater {
+            model: page.shell.allProviders
+
+            RowLayout {
+                required property var modelData
+                Layout.fillWidth: true
+                spacing: 6
+
+                Rectangle {
+                    Layout.preferredWidth: 7
+                    Layout.preferredHeight: 7
+                    radius: 3.5
+                    color: modelData.accent
+                    Layout.alignment: Qt.AlignVCenter
+                }
+                Text {
+                    text: modelData.label
+                    font.pixelSize: 11
+                    color: "#f8fafc"
+                    Layout.fillWidth: true
+                }
+                Toggle {
+                    checked: page.shell.providerEnabled(modelData.id)
+                    onToggled: {
+                        page.shell.setSetting("providers", modelData.id, checked);
+                        page.shell.refresh();
+                    }
+                }
+            }
+        }
+    }
+
+    // ── Preferences ──────────────────────────────────────────────────────────
+    RowLayout {
+        Layout.fillWidth: true
+        spacing: 6
+        Rectangle {
+            Layout.preferredWidth: 7
+            Layout.preferredHeight: 7
+            radius: 3.5
+            color: "#e2e8f0"
+            Layout.alignment: Qt.AlignVCenter
+        }
+        Text {
+            text: "Pill"
+            font.pixelSize: 11
+            color: "#f8fafc"
+            Layout.preferredWidth: 90
+        }
+        SettingCombo {
+            Layout.preferredWidth: 130
+            readonly property var values: ["always", "hover", "tray"]
+            model: ["Always", "Edge hover", "Tray only"]
+            currentIndex: Math.max(0, values.indexOf(page.shell.settings.pillMode || "always"))
+            onActivated: page.shell.setSetting2("pillMode", values[currentIndex])
+        }
+        Item {
+            Layout.fillWidth: true
+        }
+    }
+
+    RowLayout {
+        Layout.fillWidth: true
+        spacing: 6
+        Rectangle {
+            Layout.preferredWidth: 7
+            Layout.preferredHeight: 7
+            radius: 3.5
+            color: "#7dd3fc"
+            Layout.alignment: Qt.AlignVCenter
+        }
+        Text {
+            text: "Position"
+            font.pixelSize: 11
+            color: "#f8fafc"
+            Layout.preferredWidth: 90
+        }
+        SettingCombo {
+            Layout.preferredWidth: 130
+            readonly property var values: ["top-left", "top-center", "top-right", "bottom-left", "bottom-center", "bottom-right"]
+            model: ["Top left", "Top center", "Top right", "Bottom left", "Bottom center", "Bottom right"]
+            currentIndex: Math.max(0, values.indexOf(page.shell.settings.position || "top-right"))
+            onActivated: page.shell.setSetting2("position", values[currentIndex])
+        }
+        Item {
+            Layout.fillWidth: true
+        }
+    }
+
+    RowLayout {
+        Layout.fillWidth: true
+        spacing: 6
+        Rectangle {
+            Layout.preferredWidth: 7
+            Layout.preferredHeight: 7
+            radius: 3.5
+            color: "#f5a623"
+            Layout.alignment: Qt.AlignVCenter
+        }
+        Text {
+            text: "Usage chart"
+            font.pixelSize: 11
+            color: "#f8fafc"
+            Layout.preferredWidth: 90
+        }
+        Toggle {
+            checked: page.shell.settings.showChart !== false
+            onToggled: page.shell.setSetting2("showChart", checked)
+        }
+        Item {
+            Layout.fillWidth: true
+        }
+    }
+
+    RowLayout {
+        Layout.fillWidth: true
+        spacing: 6
+        Rectangle {
+            Layout.preferredWidth: 7
+            Layout.preferredHeight: 7
+            radius: 3.5
+            color: Qt.rgba(1, 1, 1, 0.3)
+            Layout.alignment: Qt.AlignVCenter
+        }
+        Text {
+            text: "Refresh"
+            font.pixelSize: 11
+            color: "#f8fafc"
+            Layout.preferredWidth: 90
+        }
+        QC.ComboBox {
+            id: pollCombo
+            implicitHeight: 26
+            Layout.preferredWidth: 120
+            font.pixelSize: 10
+            readonly property var secs: [60, 120, 300, 600, 900, 1800]
+            model: ["1 min", "2 min", "5 min", "10 min", "15 min", "30 min"]
+            currentIndex: Math.max(0, secs.indexOf(page.shell.settings.pollSec || 300))
+            onActivated: page.shell.setSetting2("pollSec", secs[currentIndex])
+
+            contentItem: Text {
+                leftPadding: 8
+                text: pollCombo.displayText
+                font: pollCombo.font
+                color: "#f8fafc"
+                verticalAlignment: Text.AlignVCenter
+            }
+            background: Rectangle {
+                radius: 5
+                color: Qt.rgba(1, 1, 1, 0.06)
+                border.width: 1
+                border.color: Qt.rgba(1, 1, 1, 0.12)
+            }
+            popup: QC.Popup {
+                y: pollCombo.height + 2
+                width: pollCombo.width
+                padding: 1
+                background: Rectangle {
+                    radius: 5
+                    color: "#12141a"
+                    border.width: 1
+                    border.color: Qt.rgba(1, 1, 1, 0.14)
+                }
+                contentItem: ListView {
+                    implicitHeight: contentHeight
+                    model: pollCombo.popup.visible ? pollCombo.delegateModel : null
+                    clip: true
+                }
+            }
+            delegate: QC.ItemDelegate {
+                width: pollCombo.width
+                implicitHeight: 24
+                contentItem: Text {
+                    text: modelData
+                    color: "#f8fafc"
+                    font.pixelSize: 10
+                    verticalAlignment: Text.AlignVCenter
+                }
+                background: Rectangle {
+                    color: highlighted ? Qt.rgba(1, 1, 1, 0.10) : "transparent"
+                }
+                highlighted: pollCombo.highlightedIndex === index
+            }
+        }
+        Item {
+            Layout.fillWidth: true
+        }
+    }
+
+    // ── History ──────────────────────────────────────────────────────────────
+    RowLayout {
+        Layout.fillWidth: true
+        spacing: 6
+        Rectangle {
+            Layout.preferredWidth: 7
+            Layout.preferredHeight: 7
+            radius: 3.5
+            color: page.shell.activeAccent
+            Layout.alignment: Qt.AlignVCenter
+        }
+        Text {
+            text: "History"
+            font.pixelSize: 11
+            color: "#f8fafc"
+            Layout.preferredWidth: 90
+        }
+        SettingsButton {
+            text: "Export"
+            onClicked: page.shell.exportHistory()
+        }
+        Item {
+            Layout.fillWidth: true
+        }
+        Text {
+            text: page.shell.usageHistory.length + " points"
+            font.pixelSize: 9
+            opacity: 0.5
+            color: "#f8fafc"
+        }
+    }
+
+    Text {
+        visible: page.shell.historyMsg !== ""
+        text: page.shell.historyMsg
+        font.pixelSize: 9
+        opacity: 0.6
+        color: "#f8fafc"
+        Layout.fillWidth: true
+        wrapMode: Text.WordWrap
+    }
+
+    Rectangle {
+        Layout.fillWidth: true
+        Layout.preferredHeight: 1
+        color: Qt.rgba(1, 1, 1, 0.08)
+    }
+
+    // ── API keys ─────────────────────────────────────────────────────────────
+    SectionLabel {
+        text: "API KEYS"
+    }
+
+    ColumnLayout {
+        Layout.fillWidth: true
+        spacing: 6
+
+        KeyField {
+            shell: page.shell
+            label: "Claude Admin"
+            placeholder: "sk-ant-api03-…"
+            settingKey: "claudeAdmin"
+        }
+        KeyField {
+            shell: page.shell
+            label: "OpenAI API"
+            placeholder: "sk-proj-…"
+            settingKey: "openai"
+        }
+        KeyField {
+            shell: page.shell
+            label: "Google AI"
+            placeholder: "AIza…"
+            settingKey: "google"
+        }
+        KeyField {
+            shell: page.shell
+            label: "Mistral"
+            placeholder: "or $MISTRAL_API_KEY"
+            settingKey: "mistral"
+        }
+        KeyField {
+            shell: page.shell
+            label: "OpenRouter"
+            placeholder: "or $OPENROUTER_API_KEY"
+            settingKey: "openrouter"
+        }
+        KeyField {
+            shell: page.shell
+            label: "xAI / Grok"
+            placeholder: "optional; uses Grok CLI login"
+            settingKey: "grok"
+        }
+    }
+
+    Text {
+        Layout.fillWidth: true
+        text: "Keys are stored in " + page.shell.configPath + " and passed to the fetch scripts. Leave blank to use env vars / existing logins."
+        font.pixelSize: 9
+        opacity: 0.4
+        color: "#f8fafc"
+        wrapMode: Text.WordWrap
+    }
+}

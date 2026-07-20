@@ -1,0 +1,270 @@
+#!/usr/bin/env bash
+# get-grok-usage — Resolve Grok CLI OAuth (and optional xAI API key), then fetch
+# credit/billing data from the same cli-chat-proxy endpoint the Grok Build CLI
+# uses for `/usage`. Also aggregates local session stats from ~/.grok/sessions.
+
+set -u
+
+AUTH_FILE="${HOME}/.grok/auth.json"
+SETTINGS_FILE="${HOME}/.grok/user-settings.json"
+CURL="${CURL:-curl}"
+CLIENT_VER="0.2.106"
+
+# Optional API key (widget setting → env → common file paths). Not required for
+# CLI OAuth billing, but reported when present for account status.
+API_KEY="${WIDGET_XAI_API_KEY:-${WIDGET_GROK_API_KEY:-}}"
+[ -z "$API_KEY" ] && [ -n "${XAI_API_KEY:-}" ] && API_KEY="$XAI_API_KEY"
+[ -z "$API_KEY" ] && [ -n "${GROK_API_KEY:-}" ] && API_KEY="$GROK_API_KEY"
+[ -z "$API_KEY" ] && [ -f "$HOME/.config/xai/api-key" ] && API_KEY=$(tr -d '\n\r ' <"$HOME/.config/xai/api-key" 2>/dev/null)
+[ -z "$API_KEY" ] && [ -f "$HOME/.xai/api-key" ] && API_KEY=$(tr -d '\n\r ' <"$HOME/.xai/api-key" 2>/dev/null)
+[ -z "$API_KEY" ] && [ -f "$HOME/.config/grok/api-key" ] && API_KEY=$(tr -d '\n\r ' <"$HOME/.config/grok/api-key" 2>/dev/null)
+
+ACCESS_TOKEN=""
+EMAIL=""
+USER_ID=""
+TEAM_ID=""
+AUTH_MODE=""
+EXPIRES_AT=""
+FIRST_NAME=""
+DEFAULT_MODEL=""
+
+if [ -f "$SETTINGS_FILE" ]; then
+    DEFAULT_MODEL=$(jq -r '.defaultModel // empty' "$SETTINGS_FILE" 2>/dev/null)
+fi
+
+if [ -f "$AUTH_FILE" ]; then
+    # auth.json is a map of issuer::client_id → credential objects. Prefer the
+    # most recently created entry with a non-empty access token ("key").
+    eval "$(jq -r '
+      [to_entries[] | select((.value.key // "") != "")
+       | .value + { _ct: (.value.create_time // "") }]
+      | sort_by(._ct) | reverse | .[0] // {}
+      | @sh "ACCESS_TOKEN=\(.key // "") EMAIL=\(.email // "") USER_ID=\(.user_id // .principal_id // "") TEAM_ID=\(.team_id // "") AUTH_MODE=\(.auth_mode // "") EXPIRES_AT=\(.expires_at // "") FIRST_NAME=\(.first_name // "")"
+    ' "$AUTH_FILE" 2>/dev/null)"
+fi
+
+if [ -z "$ACCESS_TOKEN" ] && [ -z "$API_KEY" ]; then
+    echo "{}"
+    exit 0
+fi
+
+# Local Grok CLI session stats (signals.json under ~/.grok/sessions).
+LOCAL_STATS='{"sessionCount":0,"totalToolCalls":0,"totalTokens":0,"models":[],"totalSessionSeconds":0}'
+if [ -d "$HOME/.grok/sessions" ]; then
+    LOCAL_STATS=$(find "$HOME/.grok/sessions" -name 'signals.json' -type f 2>/dev/null \
+        | head -n 200 \
+        | while IFS= read -r f; do cat "$f" 2>/dev/null; done \
+        | jq -s '
+            {
+              sessionCount: length,
+              totalToolCalls: (map(.toolCallCount // 0) | add // 0),
+              totalTokens: (map(.contextTokensUsed // 0) | add // 0),
+              models: ([.[].modelsUsed[]?] | unique),
+              totalSessionSeconds: (map(.sessionDurationSeconds // 0) | add // 0)
+            }
+          ' 2>/dev/null || printf '%s' "$LOCAL_STATS")
+    [ -z "$LOCAL_STATS" ] && LOCAL_STATS='{"sessionCount":0,"totalToolCalls":0,"totalTokens":0,"models":[],"totalSessionSeconds":0}'
+fi
+
+# ── Account / team metadata ──────────────────────────────────────────────────
+TEAM_NAME=""
+TEAM_BLOCKED=false
+BLOCKED_REASONS="[]"
+TIER_ID=""
+
+if [ -n "$ACCESS_TOKEN" ]; then
+    ME_JSON=$("$CURL" -sS --max-time 8 \
+        -H "Authorization: Bearer $ACCESS_TOKEN" \
+        -H "Accept: application/json" \
+        -H "User-Agent: xai-grok-cli/$CLIENT_VER" \
+        "https://api.x.ai/v1/me" 2>/dev/null || printf '{}')
+    if printf '%s' "$ME_JSON" | jq -e . >/dev/null 2>&1; then
+        [ -z "$USER_ID" ] && USER_ID=$(printf '%s' "$ME_JSON" | jq -r '.user_id // empty')
+        [ -z "$TEAM_ID" ] && TEAM_ID=$(printf '%s' "$ME_JSON" | jq -r '.team_id // empty')
+        if [ "$(printf '%s' "$ME_JSON" | jq -r '.team_blocked // false')" = "true" ]; then
+            TEAM_BLOCKED=true
+        fi
+    fi
+
+    TEAM_JSON=$("$CURL" -sS --max-time 8 \
+        -H "Authorization: Bearer $ACCESS_TOKEN" \
+        -H "Accept: application/json" \
+        "https://management-api.x.ai/auth/teams" 2>/dev/null || printf '{}')
+    if printf '%s' "$TEAM_JSON" | jq -e '.teams' >/dev/null 2>&1; then
+        TEAM_NAME=$(printf '%s' "$TEAM_JSON" | jq -r --arg tid "$TEAM_ID" '
+            (.teams // [])
+            | (map(select(.teamId == $tid)) | .[0]) // .[0] // {}
+            | .name // empty
+        ')
+        TIER_ID=$(printf '%s' "$TEAM_JSON" | jq -r --arg tid "$TEAM_ID" '
+            (.teams // [])
+            | (map(select(.teamId == $tid)) | .[0]) // .[0] // {}
+            | (.tierId // .tier // "" | tostring)
+        ')
+        BLOCKED_REASONS=$(printf '%s' "$TEAM_JSON" | jq -c --arg tid "$TEAM_ID" '
+            (.teams // [])
+            | (map(select(.teamId == $tid)) | .[0]) // .[0] // {}
+            | (.blockedReasons // [])
+        ')
+        if [ "$(printf '%s' "$BLOCKED_REASONS" | jq 'length')" -gt 0 ]; then
+            TEAM_BLOCKED=true
+        fi
+    else
+        BLOCKED_REASONS="[]"
+    fi
+fi
+
+# ── Billing / credits (Grok CLI `/usage`) ────────────────────────────────────
+CREDITS_JSON="{}"
+BILLING_JSON="{}"
+BILLING_ERROR=""
+FREE_USAGE_JSON='{}'
+LOCAL_BILLING_JSON='{}'
+
+# Grok Build 0.2.x writes structured quota and billing events locally. The
+# free-tier allowance is only exposed in a 429 event, not by /v1/billing.
+if [ -f "$HOME/.grok/logs/unified.jsonl" ]; then
+    FREE_USAGE_JSON=$(tail -n 5000 "$HOME/.grok/logs/unified.jsonl" 2>/dev/null | jq -Rsc '
+      [split("\n")[] | fromjson?
+       | select(. != null)
+       | {ts: (.ts // ""), text: (.ctx.message // .ctx.reason // .ctx.error // "")}
+       | select(.text | contains("free-usage-exhausted"))
+       | . + ((.text | capture("tokens \\(actual/limit\\): (?<used>[0-9]+)/(?<limit>[0-9]+)")) // {})]
+      | last // {}
+    ' 2>/dev/null || printf '{}')
+    FREE_EVENT_TIME=$(printf '%s' "$FREE_USAGE_JSON" | jq -r '.ts // empty' 2>/dev/null)
+    if [ -n "$FREE_EVENT_TIME" ]; then
+        FREE_EVENT_EPOCH=$(date -d "$FREE_EVENT_TIME" +%s 2>/dev/null || printf '0')
+        NOW_EPOCH=$(date +%s)
+        if [ "$FREE_EVENT_EPOCH" -le 0 ] || [ $((NOW_EPOCH - FREE_EVENT_EPOCH)) -ge 86400 ]; then
+            FREE_USAGE_JSON='{}'
+        fi
+    fi
+    LOCAL_BILLING_JSON=$(tail -n 5000 "$HOME/.grok/logs/unified.jsonl" 2>/dev/null | jq -Rsc '
+      [split("\n")[] | fromjson?
+       | select(.msg == "billing: fetched credits config")
+       | {config: (.ctx.config // {}), subscriptionTier: (.ctx.subscriptionTier // "")}]
+      | last // {}
+    ' 2>/dev/null || printf '{}')
+fi
+
+if [ -n "$ACCESS_TOKEN" ]; then
+    CREDITS_BODY=$("$CURL" -sS -w "\n%{http_code}" --max-time 12 \
+        -H "Authorization: Bearer $ACCESS_TOKEN" \
+        -H "Accept: application/json" \
+        -H "x-grok-client-version: $CLIENT_VER" \
+        -H "User-Agent: xai-grok-cli/$CLIENT_VER" \
+        "https://cli-chat-proxy.grok.com/v1/billing?format=credits" 2>/dev/null || printf '\n000')
+    CREDITS_CODE=$(printf '%s' "$CREDITS_BODY" | tail -n 1)
+    CREDITS_PAYLOAD=$(printf '%s' "$CREDITS_BODY" | sed '$d')
+    if [ "$CREDITS_CODE" = "200" ] && printf '%s' "$CREDITS_PAYLOAD" | jq -e . >/dev/null 2>&1; then
+        CREDITS_JSON="$CREDITS_PAYLOAD"
+    elif [ "$CREDITS_CODE" = "401" ] || [ "$CREDITS_CODE" = "403" ]; then
+        BILLING_ERROR="Grok auth expired — run grok --oauth"
+    elif [ "$CREDITS_CODE" != "000" ] && [ -n "$CREDITS_CODE" ]; then
+        BILLING_ERROR="Billing HTTP $CREDITS_CODE"
+    fi
+
+    BILLING_BODY=$("$CURL" -sS -w "\n%{http_code}" --max-time 12 \
+        -H "Authorization: Bearer $ACCESS_TOKEN" \
+        -H "Accept: application/json" \
+        -H "x-grok-client-version: $CLIENT_VER" \
+        -H "User-Agent: xai-grok-cli/$CLIENT_VER" \
+        "https://cli-chat-proxy.grok.com/v1/billing" 2>/dev/null || printf '\n000')
+    BILLING_CODE=$(printf '%s' "$BILLING_BODY" | tail -n 1)
+    BILLING_PAYLOAD=$(printf '%s' "$BILLING_BODY" | sed '$d')
+    if [ "$BILLING_CODE" = "200" ] && printf '%s' "$BILLING_PAYLOAD" | jq -e . >/dev/null 2>&1; then
+        BILLING_JSON="$BILLING_PAYLOAD"
+    fi
+fi
+
+# creditUsagePercent is preferred when the CLI returns it (SuperGrok / capped
+# plans); otherwise derive from used/monthlyLimit or onDemandUsed/onDemandCap.
+jq -n \
+    --arg token "$ACCESS_TOKEN" \
+    --arg apiKey "$API_KEY" \
+    --arg email "$EMAIL" \
+    --arg userId "$USER_ID" \
+    --arg teamId "$TEAM_ID" \
+    --arg teamName "$TEAM_NAME" \
+    --arg authMode "$AUTH_MODE" \
+    --arg expiresAt "$EXPIRES_AT" \
+    --arg firstName "$FIRST_NAME" \
+    --arg defaultModel "$DEFAULT_MODEL" \
+    --arg tierId "$TIER_ID" \
+    --argjson teamBlocked "$TEAM_BLOCKED" \
+    --argjson blockedReasons "$BLOCKED_REASONS" \
+    --argjson local "$LOCAL_STATS" \
+    --argjson credits "$CREDITS_JSON" \
+    --argjson billing "$BILLING_JSON" \
+    --argjson localBilling "$LOCAL_BILLING_JSON" \
+    --argjson freeUsage "$FREE_USAGE_JSON" \
+    --arg billingError "$BILLING_ERROR" \
+    '
+    def num(v):
+      if v == null then 0
+      elif (v | type) == "object" then (v.val // 0)
+      else (v | tonumber? // 0) end;
+
+    (if (($credits.config // {}) | length) > 0 then $credits.config else ($localBilling.config // {}) end) as $cc |
+    ($billing.config // {}) as $bc |
+
+    (num($cc.creditUsagePercent // $cc.credit_usage_percent // null)) as $creditPctRaw |
+    (num($freeUsage.used // $bc.used // $bc.includedUsed // null)) as $used |
+    (num($freeUsage.limit // $bc.monthlyLimit // $cc.monthlyLimit // null)) as $monthlyLimit |
+    (num($cc.onDemandUsed // $bc.onDemandUsed // null)) as $onDemandUsed |
+    (num($cc.onDemandCap // $bc.onDemandCap // null)) as $onDemandCap |
+    (num($cc.prepaidBalance // $bc.prepaidBalance // null)) as $prepaid |
+    ($cc.isUnifiedBillingUser // $bc.isUnifiedBillingUser // false) as $unified |
+
+    ($cc.billingPeriodStart // $cc.currentPeriod.start // $bc.billingPeriodStart // "") as $periodStart |
+    ($cc.billingPeriodEnd // $cc.currentPeriod.end // $bc.billingPeriodEnd // "") as $periodEnd |
+    ($cc.currentPeriod.type // "") as $periodType |
+
+    (
+      if (num($freeUsage.limit)) > 0 then ([((num($freeUsage.used)) / (num($freeUsage.limit)) * 100), 100] | min)
+      elif $creditPctRaw > 0 then $creditPctRaw
+      elif $monthlyLimit > 0 then ([($used / $monthlyLimit * 100), 100] | min)
+      elif $onDemandCap > 0 then ([($onDemandUsed / $onDemandCap * 100), 100] | min)
+      else 0 end
+    ) as $pct |
+
+    {
+      loggedIn: ($token != ""),
+      grokAccessToken: $token,
+      xaiApiKey: $apiKey,
+      email: $email,
+      firstName: $firstName,
+      userId: $userId,
+      teamId: $teamId,
+      teamName: $teamName,
+      authMode: $authMode,
+      expiresAt: $expiresAt,
+      defaultModel: $defaultModel,
+      tierId: (if $tierId != "" then $tierId else ($localBilling.subscriptionTier // "") end),
+      teamBlocked: $teamBlocked,
+      blockedReasons: $blockedReasons,
+      creditUsagePercent: $pct,
+      used: $used,
+      monthlyLimit: $monthlyLimit,
+      onDemandUsed: $onDemandUsed,
+      onDemandCap: $onDemandCap,
+      prepaidBalance: $prepaid,
+      isUnifiedBilling: $unified,
+      periodType: $periodType,
+      billingPeriodStart: $periodStart,
+      billingPeriodEnd: $periodEnd,
+      sessionCount: ($local.sessionCount // 0),
+      totalToolCalls: ($local.totalToolCalls // 0),
+      totalTokens: ($local.totalTokens // 0),
+      models: ($local.models // []),
+      totalSessionSeconds: ($local.totalSessionSeconds // 0),
+      billingError: $billingError,
+      quotaKind: (if (num($freeUsage.limit)) > 0 then "free-tier" else "billing" end),
+      quotaExhausted: ((num($freeUsage.limit)) > 0 and (num($freeUsage.used)) >= (num($freeUsage.limit))),
+      quotaWindow: (if (num($freeUsage.limit)) > 0 then "rolling 24h" else $periodType end),
+      hasBilling: ((num($freeUsage.limit)) > 0)
+                   or (($credits | type) == "object" and ($credits | length) > 0)
+                   or (($billing | type) == "object" and ($billing | length) > 0)
+    }
+    '

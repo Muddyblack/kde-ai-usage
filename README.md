@@ -43,13 +43,13 @@
   <img src="./readme/settings.svg?v=7" alt="Settings panel" width="340" valign="top"/>
 </p>
 
-A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple services. Monitor your **Claude** (5-hour session & 7-day weekly), **Antigravity/Google AI Studio**, **OpenAI API**, **Kiro**, **Mistral AI**, and **OpenRouter** usage at a glance with animated segmented bars, live countdown timers, account status, and per-model breakdowns.
+A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple services. Monitor your **Claude** (5-hour session & 7-day weekly), **Antigravity/Google AI Studio**, **OpenAI API**, **Grok CLI**, **Kiro**, **Mistral AI**, and **OpenRouter** usage at a glance with animated segmented bars, live countdown timers, account status, and per-model breakdowns.
 
 ---
 
 ## Features
 
-- **Multi-service support** — Switch between Claude, Antigravity, OpenAI, Kiro, Mistral, and OpenRouter tabs in the popup
+- **Multi-service support** — Switch between Claude, Antigravity, OpenAI, Grok, Kiro, Mistral, and OpenRouter tabs in the popup
 - **Panel view** — Compact percentage readouts in the taskbar, color-coded by usage level, with an inline spark-line trend
 - **Popup view** — Segmented bars showing exact fill level with reset times and countdowns
 - **Usage chart** — Smooth, glowing area chart of historical usage with a 5H / 24H / 7D window toggle and hover-scrub (point + timestamp on hover). The 24H window plots the session percentage across the whole day, so each 5-hour limit climbing toward 100% and resetting shows up as a sawtooth burn pattern.
@@ -72,44 +72,20 @@ A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple serv
 
 ## Supported Services
 
-### Claude (Anthropic)
-- **5-hour session window** — Rolling 5-hour usage limit
-- **7-day weekly window** — Rolling 7-day usage limit
-- **Auto-detection** — Reads credentials from `~/.claude/.credentials.json`
-- **Model tracking** — Opus, Sonnet, Haiku usage breakdown (coming soon)
+| Service | What the widget shows | Support status |
+|---|---|---|
+| Claude (Anthropic) | Rolling 5-hour and 7-day usage windows and reset times | Supported |
+| Antigravity / Google AI Studio | Overall quota, per-model Gemini usage, and reset times | Supported |
+| OpenAI | 30-day API token/cost usage plus local Codex/ChatGPT account status | Supported |
+| Grok (xAI) | CLI billing credits when exposed, free-tier exhaustion, and local session totals | Free tier tested; paid plans unverified |
+| Kiro | Monthly credits, remaining balance, reset date, overage, and inferred plan | Supported |
+| Mistral AI | Key status, available models, and local vibe CLI cost/token statistics | Supported |
+| OpenRouter | Spend, credit limit, usage percentage, and account label | Untested |
 
-### Antigravity (Google AI Studio)
-- **Overall quota** — Combined usage across all models
-- **Per-model breakdown** — Individual Gemini model usage
-- **Multi-account support** — Works with `antigravity-usage` CLI
-- **Reset tracking** — Shows when quota resets
-
-### OpenAI
-- **API usage** — Shows 30-day organization token and estimated cost data from the OpenAI Usage API when an API key is configured
-- **Codex account status** — Detects Codex/ChatGPT login from `~/.codex/auth.json`
-- **Separate surfaces** — Codex/ChatGPT plan limits are not the same as OpenAI API organization billing usage
-- **Credential lookup** — Reads the widget setting first, then `$OPENAI_API_KEY`, `~/.config/openai-api-key`, `~/.openai/api-key`, and Codex auth metadata when available
-
-### Kiro
-- **Monthly credit usage** — Shows current credit usage, remaining credits, and the billing reset date
-- **Local-only source** — Reads Kiro's local app state from `~/.config/Kiro/User/globalStorage/state.vscdb`
-- **Plan detection** — Labels common tiers like Free / Pro / Pro+ / Power from the stored usage limit
-- **No API key required** — Works from Kiro's cached usage snapshot after you sign in once
-- **Chart support** — Feeds the monthly credit percentage into the widget's history chart
-
-### Mistral AI
-- **Key validation** — Confirms the API key is accepted by Mistral
-- **Model list** — Shows available models, with the active vibe CLI model highlighted
-- **vibe CLI stats** — Reads `~/.vibe/logs/session/*/meta.json` to show cumulative cost, session count, total tokens, and last session title
-- **Cost bar** — Spend bar scaled against a $50 soft cap, backed by 30-day chart history
-- **Credential lookup** — Reads the widget setting first, then `$MISTRAL_API_KEY`, `~/.vibe/.env`, `~/.config/mistral/api-key`, `~/.mistral/api-key`
-- **Requires** — A Mistral API key (or vibe CLI installed with a key in `~/.vibe/.env`)
-
-### OpenRouter *(untested)*
-- **Spend tracking** — Shows USD spent against your credit limit (if one is set)
-- **Usage bar** — Fills proportionally to spend vs limit; empty if no limit is set
-- **Account label** — Displays the account name / identifier from the API
-- **Requires** — An OpenRouter API key set in widget settings
+Provider APIs do not all expose the same information. In particular, Codex/ChatGPT
+plan limits are separate from OpenAI API organization usage, and Grok's free tier
+does not expose progressive usage before its limit is exhausted. See
+[How it works](#how-it-works) for provider-specific details.
 
 ---
 
@@ -120,39 +96,17 @@ A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple serv
 | KDE Plasma 6.0+ | `X-Plasma-API-Minimum-Version: 6.0` |
 | `plasma5support` | Provides the `executable` DataEngine for reading credentials |
 
-### For Claude Support
-| Dependency | Notes |
-|---|---|
-| Claude Code | Logged-in session required — credentials read from `~/.claude/.credentials.json` |
+Enable only the services you use. Each one has its own setup requirement:
 
-### For Antigravity Support
-| Dependency | Notes |
+| Service | What you need |
 |---|---|
-| Node.js 18+ | Required to run `antigravity-usage` CLI |
-| `antigravity-usage` | Install with `npm install -g antigravity-usage` |
-| Google Account | With AI Studio / Antigravity access |
-
-### For OpenAI Support
-| Dependency | Notes |
-|---|---|
-| OpenAI API key | Required for API token and cost usage via the organization Usage API |
-| Codex CLI | Optional; logged-in Codex sessions are shown as account status only |
-
-### For Kiro Support
-| Dependency | Notes |
-|---|---|
-| Kiro IDE | Sign in once so Kiro writes usage state to `~/.config/Kiro/User/globalStorage/state.vscdb` |
-
-### For Mistral Support
-| Dependency | Notes |
-|---|---|
-| Mistral API key | Widget settings, `$MISTRAL_API_KEY`, `~/.vibe/.env`, or `~/.config/mistral/api-key` |
-| vibe CLI | Optional; session logs in `~/.vibe/logs/session/` provide cost and token stats without an API key |
-
-### For OpenRouter Support *(untested)*
-| Dependency | Notes |
-|---|---|
-| OpenRouter API key | Set in widget settings — no local config file is read |
+| Claude | Claude Code, signed in locally |
+| Antigravity | Node.js 18+, the `antigravity-usage` CLI, and a Google account with access |
+| OpenAI | An OpenAI API key for API usage; Codex CLI login is optional and provides account status only |
+| Grok | Grok CLI authenticated with `grok --oauth`; an xAI API key is optional. The helper also needs `jq` and `curl` |
+| Kiro | Kiro IDE, signed in at least once |
+| Mistral AI | A Mistral API key; vibe CLI is optional and adds local session statistics |
+| OpenRouter | An OpenRouter API key entered in widget settings |
 
 All configuration is done in the widget's settings panel (right-click the widget → *Configure*). See [How it works](#how-it-works) below for what each tab reads and where credentials are resolved from.
 
@@ -213,6 +167,28 @@ kpackagetool6 -t Plasma/Applet -r org.muddyblack.aiUsageWidgetTest
 }
 ```
 
+### Hyprland / Caelestia
+
+Run the Quickshell widget together with its standard StatusNotifier tray icon:
+
+```bash
+# From a cloned checkout
+nix run .#hyprland
+
+# Or run the current GitHub version directly
+nix run github:Muddyblack/kde-ai-usage#hyprland
+```
+
+During development, use `nix run path:.#hyprland` if newly created files have
+not been added to Git yet; regular users do not need the `path:` form.
+
+The tray icon works with any panel that hosts freedesktop StatusNotifier items,
+including Caelestia and Waybar. The **Pill** setting offers **Always**, **Edge
+hover**, and **Tray only** modes. Edge-hover mode keeps only a small screen-edge
+hotspot and reveals the usage pill without polling. Six top/bottom position
+presets place both the pill and popup consistently. Clicking the tray icon
+toggles the popup; clicking outside the popup closes it.
+
 ### Package as `.plasmoid`
 
 ```bash
@@ -232,6 +208,9 @@ The widget reads credentials from the `antigravity-usage` CLI configuration (sto
 
 ### OpenAI
 The OpenAI tab has two independent sections. API usage is fetched from the official OpenAI organization usage endpoint with an API key and summarized over the last 30 days. Codex account status is read locally from `~/.codex/auth.json`; it confirms the Codex/ChatGPT login and plan metadata when present, but it does not provide API billing usage.
+
+### Grok *(free tier tested; paid plans untested)*
+The Grok tab reads the Grok CLI login from `~/.grok/auth.json`, fetches the same credit/billing data used by the CLI, and summarizes local CLI sessions from `~/.grok/sessions`. For the tested free tier, the CLI only records the exact token allowance after it returns `free-usage-exhausted`, so the widget can show the confirmed exhausted amount and rolling 24-hour window but cannot infer progressive usage before that event. Paid-plan billing parsing is implemented but remains unverified. An xAI API key is optional; CLI OAuth is the primary source for quota data.
 
 ### Kiro
 The Kiro tab reads Kiro's locally cached usage state from `~/.config/Kiro/User/globalStorage/state.vscdb`. No API key is needed. The widget extracts the stored credit breakdown, usage percentage, reset date, overage information, and inferred plan tier from that local snapshot, then feeds the percentage into the 30-day chart history.
