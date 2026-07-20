@@ -1,0 +1,528 @@
+#!/usr/bin/env bash
+set -u
+
+TOOLS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CURL="${CURL:-curl}"
+
+# Settings written by the shell's in-popup settings page: provider toggles and
+# API keys. Keys are handed to the fetch tools via the same WIDGET_* env vars
+# the Plasma widget uses.
+CONFIG="${AI_USAGE_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/ai-usage-widget/hyprland-settings.json}"
+cfg='{}'
+[ -f "$CONFIG" ] && cfg="$(cat "$CONFIG" 2>/dev/null)" && printf '%s' "$cfg" | jq -e . >/dev/null 2>&1 || cfg='{}'
+
+provider_enabled() {
+  printf '%s' "$cfg" | jq -e --arg id "$1" '.providers[$id] != false' >/dev/null 2>&1
+}
+
+cfg_key() {
+  printf '%s' "$cfg" | jq -r --arg k "$1" '.keys[$k] // empty' 2>/dev/null
+}
+
+k="$(cfg_key claudeAdmin)";  [ -n "$k" ] && export WIDGET_CLAUDE_ADMIN_KEY="$k"
+k="$(cfg_key openai)";       [ -n "$k" ] && export WIDGET_OPENAI_API_KEY="$k"
+k="$(cfg_key google)";       [ -n "$k" ] && export WIDGET_GOOGLE_API_KEY="$k"
+k="$(cfg_key mistral)";      [ -n "$k" ] && export WIDGET_MISTRAL_API_KEY="$k"
+k="$(cfg_key openrouter)";   [ -n "$k" ] && export WIDGET_OPENROUTER_API_KEY="$k"
+k="$(cfg_key grok)";         [ -n "$k" ] && export WIDGET_GROK_API_KEY="$k"
+
+tmp="$(mktemp)"
+trap 'rm -f "$tmp"' EXIT
+
+json_string() {
+  jq -Rn --arg v "${1:-}" '$v'
+}
+
+compact_time() {
+  local value="${1:-}"
+  [ -z "$value" ] && return 0
+  date -d "$value" '+%b %-d, %H:%M' 2>/dev/null || printf '%s' "$value"
+}
+
+# ISO/RFC date → epoch seconds ("0" when missing/unparseable)
+epoch_time() {
+  local value="${1:-}"
+  [ -z "$value" ] && { printf '0'; return 0; }
+  date -d "$value" '+%s' 2>/dev/null || printf '0'
+}
+
+add_provider() {
+  local payload="$1"
+  [ -z "$payload" ] && return 0
+  printf '%s' "$payload" | jq -e . >/dev/null 2>&1 || return 0
+  printf '%s\n' "$payload" >> "$tmp"
+}
+
+provider_error() {
+  local id="$1" label="$2" accent="$3" error="$4"
+  jq -n \
+    --arg id "$id" \
+    --arg label "$label" \
+    --arg accent "$accent" \
+    --arg error "$error" \
+    '{
+      id: $id,
+      label: $label,
+      accent: $accent,
+      ok: false,
+      stale: true,
+      pct: 0,
+      summary: "unavailable",
+      detail: $error,
+      error: $error,
+      slots: [ { pct: 0, color: $accent, text: "—", tooltip: $error } ],
+      hist: {},
+      rows: []
+    }'
+}
+
+fetch_claude() {
+  local creds token admin usage err session weekly session_reset weekly_reset session_reset_at weekly_reset_at session_tokens session_limit weekly_tokens weekly_limit
+  creds="$("$TOOLS/get-claude-credentials" 2>/dev/null || printf '{}')"
+  token="$(printf '%s' "$creds" | jq -r '.claudeAiOauth.accessToken // empty' 2>/dev/null)"
+  admin="$(printf '%s' "$creds" | jq -r '.claudeAdminApiKey // empty' 2>/dev/null)"
+
+  if [ -z "$token" ]; then
+    if [ -n "$admin" ]; then
+      provider_error "claude" "Claude" "#cc785c" "OAuth missing; admin key found"
+    else
+      provider_error "claude" "Claude" "#cc785c" "Claude login not found"
+    fi
+    return
+  fi
+
+  usage="$("$CURL" -fsS --max-time 12 \
+    -H "Authorization: Bearer $token" \
+    -H "anthropic-beta: oauth-2025-04-20" \
+    -H "User-Agent: claude-code/2.1.0" \
+    "https://api.anthropic.com/api/oauth/usage" 2>&1)"
+  if [ $? -ne 0 ] || ! printf '%s' "$usage" | jq -e . >/dev/null 2>&1; then
+    err="$(printf '%s' "$usage" | head -n 1)"
+    provider_error "claude" "Claude" "#cc785c" "${err:-Claude usage request failed}"
+    return
+  fi
+
+  session="$(printf '%s' "$usage" | jq -r '.five_hour.utilization // 0')"
+  weekly="$(printf '%s' "$usage" | jq -r '.seven_day.utilization // 0')"
+  session_reset="$(compact_time "$(printf '%s' "$usage" | jq -r '.five_hour.resets_at // empty')")"
+  weekly_reset="$(compact_time "$(printf '%s' "$usage" | jq -r '.seven_day.resets_at // empty')")"
+  session_reset_at="$(epoch_time "$(printf '%s' "$usage" | jq -r '.five_hour.resets_at // empty')")"
+  weekly_reset_at="$(epoch_time "$(printf '%s' "$usage" | jq -r '.seven_day.resets_at // empty')")"
+  session_tokens="$(printf '%s' "$usage" | jq -r '.five_hour.tokens_used // 0')"
+  session_limit="$(printf '%s' "$usage" | jq -r '.five_hour.token_limit // 0')"
+  weekly_tokens="$(printf '%s' "$usage" | jq -r '.seven_day.tokens_used // 0')"
+  weekly_limit="$(printf '%s' "$usage" | jq -r '.seven_day.token_limit // 0')"
+
+  jq -n \
+    --arg id "claude" \
+    --arg label "Claude" \
+    --arg accent "#cc785c" \
+    --argjson session "${session:-0}" \
+    --argjson weekly "${weekly:-0}" \
+    --arg sessionReset "$session_reset" \
+    --arg weeklyReset "$weekly_reset" \
+    --argjson sessionResetAt "${session_reset_at:-0}" \
+    --argjson weeklyResetAt "${weekly_reset_at:-0}" \
+    --argjson sessionLimit "${session_limit:-0}" \
+    --argjson weeklyLimit "${weekly_limit:-0}" \
+    --arg sessionDetail "$session_tokens / $session_limit tokens" \
+    --arg weeklyDetail "$weekly_tokens / $weekly_limit tokens" \
+    '($sessionDetail | if $sessionLimit > 0 then . else "" end) as $sd |
+     ($weeklyDetail | if $weeklyLimit > 0 then . else "" end) as $wd |
+     {
+      id: $id,
+      label: $label,
+      accent: $accent,
+      ok: true,
+      stale: false,
+      pct: $session,
+      summary: (($session | round | tostring) + "%"),
+      detail: "",
+      error: "",
+      slots: [
+        { pct: $session, color: "#e05252",
+          tooltip: ("Claude 5-hour: " + ($session | round | tostring) + "%" + (if $sd != "" then "\n" + $sd else "" end)) },
+        { pct: $weekly, color: "#f5a623",
+          tooltip: ("Claude 7-day: " + ($weekly | round | tostring) + "%" + (if $wd != "" then "\n" + $wd else "" end)) }
+      ],
+      hist: { s: $session, w: $weekly },
+      rows: [
+        { label: "5-hour session", value: $session, resetText: $sessionReset, resetAt: $sessionResetAt, detail: $sd },
+        { label: "7-day window", value: $weekly, resetText: $weeklyReset, resetAt: $weeklyResetAt, detail: $wd }
+      ]
+    }'
+}
+
+fetch_antigravity() {
+  local res pct gpct epct greset ereset greset_at ereset_at plan credits
+  # Capture first, fall back only when empty — the tool can print an
+  # {"error":…} document AND exit non-zero, and appending "{}" to that would
+  # make a two-document stream that breaks every jq below.
+  res="$("$TOOLS/get-antigravity-usage" 2>/dev/null)" || true
+  [ -z "$res" ] && res='{}'
+  if ! printf '%s' "$res" | jq -e . >/dev/null 2>&1 || [ "$res" = "{}" ]; then
+    provider_error "antigravity" "Antigravity" "#4285f4" "Antigravity usage not configured"
+    return
+  fi
+  if printf '%s' "$res" | jq -e '.error' >/dev/null 2>&1; then
+    provider_error "antigravity" "Antigravity" "#4285f4" "$(printf '%s' "$res" | jq -r '.error')"
+    return
+  fi
+
+  # Same grouping as the Plasma widget: models whose label/id mentions
+  # gemini/google form the "Gemini" pool; everything else is "external".
+  pct="$(printf '%s' "$res" | jq '[.models[]? | select(.remainingPercentage != null) | ((1 - .remainingPercentage) * 100)] | if length > 0 then add / length else 0 end' 2>/dev/null || printf '0')"
+  gpct="$(printf '%s' "$res" | jq '[.models[]? | select(.remainingPercentage != null) | select(((.label // .modelId // "") | ascii_downcase | test("gemini|google"))) | ((1 - .remainingPercentage) * 100)] | if length > 0 then add / length else 0 end' 2>/dev/null || printf '0')"
+  epct="$(printf '%s' "$res" | jq '[.models[]? | select(.remainingPercentage != null) | select(((.label // .modelId // "") | ascii_downcase | test("gemini|google")) | not) | ((1 - .remainingPercentage) * 100)] | if length > 0 then add / length else 0 end' 2>/dev/null || printf '0')"
+  [ -z "$pct" ] && pct=0
+  [ -z "$gpct" ] && gpct=0
+  [ -z "$epct" ] && epct=0
+  greset_raw="$(printf '%s' "$res" | jq -r '[.models[]? | select(((.label // .modelId // "") | ascii_downcase | test("gemini|google"))) | .resetTime // empty] | sort | .[0] // empty')"
+  ereset_raw="$(printf '%s' "$res" | jq -r '[.models[]? | select(((.label // .modelId // "") | ascii_downcase | test("gemini|google")) | not) | .resetTime // empty] | sort | .[0] // empty')"
+  greset="$(compact_time "$greset_raw")"
+  ereset="$(compact_time "$ereset_raw")"
+  greset_at="$(epoch_time "$greset_raw")"
+  ereset_at="$(epoch_time "$ereset_raw")"
+  plan="$(printf '%s' "$res" | jq -r '.planType // .method // ""')"
+  credits="$(printf '%s' "$res" | jq -r 'if .promptCredits then ((.promptCredits.available // 0 | tostring) + " / " + (.promptCredits.monthly // 0 | tostring) + " credits") else "" end')"
+
+  jq -n \
+    --arg id "antigravity" \
+    --arg label "Antigravity" \
+    --arg accent "#4285f4" \
+    --argjson pct "${pct:-0}" \
+    --argjson gpct "${gpct:-0}" \
+    --argjson epct "${epct:-0}" \
+    --arg greset "$greset" \
+    --arg ereset "$ereset" \
+    --argjson gresetAt "${greset_at:-0}" \
+    --argjson eresetAt "${ereset_at:-0}" \
+    --arg plan "$plan" \
+    --arg credits "$credits" \
+    '{
+      id: $id,
+      label: $label,
+      accent: $accent,
+      ok: true,
+      stale: false,
+      pct: $pct,
+      summary: (($pct | round | tostring) + "%"),
+      detail: $plan,
+      error: "",
+      slots: [
+        { pct: $gpct, color: "#4285f4",
+          tooltip: ("Gemini (Google) quota: " + ($gpct | round | tostring) + "%" + (if $plan != "" then "\nPlan: " + $plan else "" end)) },
+        { pct: $epct, color: "#34a853",
+          tooltip: ("External models quota: " + ($epct | round | tostring) + "%" + (if $plan != "" then "\nPlan: " + $plan else "" end)) }
+      ],
+      hist: { ag: $pct },
+      rows: [
+        { label: "Gemini models", value: $gpct, resetText: $greset, resetAt: $gresetAt, detail: $credits },
+        { label: "Claude & GPT models", value: $epct, resetText: $ereset, resetAt: $eresetAt, detail: "" }
+      ]
+    }'
+}
+
+fetch_openai() {
+  local creds token account api_key usage primary weekly reset reset_at wreset wreset_at plan email err
+  creds="$("$TOOLS/get-openai-usage" 2>/dev/null || printf '{}')"
+  token="$(printf '%s' "$creds" | jq -r '.codexAccessToken // empty' 2>/dev/null)"
+  account="$(printf '%s' "$creds" | jq -r '.accountId // empty' 2>/dev/null)"
+  api_key="$(printf '%s' "$creds" | jq -r '.openaiApiKey // empty' 2>/dev/null)"
+  plan="$(printf '%s' "$creds" | jq -r '.planType // empty' 2>/dev/null)"
+  email="$(printf '%s' "$creds" | jq -r '.email // empty' 2>/dev/null)"
+
+  if [ -z "$token" ] && [ -z "$api_key" ]; then
+    provider_error "openai" "OpenAI" "#10a37f" "OpenAI API key or Codex login not found"
+    return
+  fi
+
+  if [ -n "$token" ]; then
+    if [ -n "$account" ]; then
+      usage="$("$CURL" -fsS --max-time 12 \
+        -H "Authorization: Bearer $token" \
+        -H "chatgpt-account-id: $account" \
+        -H "User-Agent: codex-cli" \
+        "https://chatgpt.com/backend-api/codex/usage" 2>&1)"
+    else
+      usage="$("$CURL" -fsS --max-time 12 \
+        -H "Authorization: Bearer $token" \
+        -H "User-Agent: codex-cli" \
+        "https://chatgpt.com/backend-api/codex/usage" 2>&1)"
+    fi
+    if [ $? -eq 0 ] && printf '%s' "$usage" | jq -e . >/dev/null 2>&1; then
+      # Single jq pass over the endpoint response, including per-model
+      # additional_rate_limits (mirrors the Plasma OpenAI tab).
+      printf '%s' "$usage" | jq --arg plan "$plan" --arg email "$email" '
+        def fmt_reset: if . > 0 then (. | strflocaltime("%b %-d, %H:%M")) else "" end;
+        (.rate_limit // {}) as $rl |
+        (($rl.primary_window // {}).used_percent // 0) as $primary |
+        (($rl.secondary_window // {}).used_percent // 0) as $weekly |
+        (($rl.primary_window // {}).reset_at // 0) as $presetAt |
+        (($rl.secondary_window // {}).reset_at // 0) as $wresetAt |
+        (.plan_type // $plan) as $planT |
+        {
+          id: "openai",
+          label: "OpenAI",
+          accent: "#10a37f",
+          ok: true,
+          stale: false,
+          pct: $primary,
+          summary: (($primary | round | tostring) + "%"),
+          detail: ($planT + (if $email != "" then " - " + $email else "" end)),
+          error: "",
+          slots: [
+            { pct: $primary, color: "#10a37f",
+              tooltip: ("Codex 5h: " + ((100 - $primary) | round | tostring) + "% left") },
+            { pct: $weekly, color: "#10a37f",
+              tooltip: ("Codex weekly: " + ((100 - $weekly) | round | tostring) + "% left") }
+          ],
+          hist: { cp: $primary, cw: $weekly },
+          rows: ([
+            { label: "Codex 5-hour", value: $primary, resetText: ($presetAt | fmt_reset), resetAt: $presetAt, detail: "ChatGPT/Codex plan window" },
+            { label: "Codex weekly", value: $weekly, resetText: ($wresetAt | fmt_reset), resetAt: $wresetAt, detail: "Secondary plan window" }
+          ] + ([ (.additional_rate_limits // [])[] |
+            (.limit_name // "Model") as $nm |
+            (.rate_limit // {}) as $arl |
+            (if ($arl.limit_reached // false) then "Limit reached" else "" end) as $lr |
+            [
+              { label: ($nm + " · 5-hour"),
+                value: (($arl.primary_window // {}).used_percent // 0),
+                resetText: ((($arl.primary_window // {}).reset_at // 0) | fmt_reset),
+                resetAt: (($arl.primary_window // {}).reset_at // 0),
+                detail: $lr }
+            ] + (if ($arl.secondary_window // null) != null then
+              [ { label: ($nm + " · weekly"),
+                  value: ($arl.secondary_window.used_percent // 0),
+                  resetText: (($arl.secondary_window.reset_at // 0) | fmt_reset),
+                  resetAt: ($arl.secondary_window.reset_at // 0),
+                  detail: "" } ]
+              else [] end)
+          ] | flatten))
+        }'
+      return
+    fi
+    err="$(printf '%s' "$usage" | head -n 1)"
+  fi
+
+  jq -n \
+    --arg id "openai" \
+    --arg label "OpenAI" \
+    --arg accent "#10a37f" \
+    --arg detail "${email:-API key configured}" \
+    --arg error "${err:-}" \
+    '{
+      id: $id,
+      label: $label,
+      accent: $accent,
+      ok: true,
+      stale: ($error != ""),
+      pct: 0,
+      summary: "API",
+      detail: $detail,
+      error: $error,
+      slots: [ { pct: 0, color: $accent, text: "API", tooltip: $detail } ],
+      hist: {},
+      rows: [
+        { label: "API credentials", value: 0, resetText: "", resetAt: 0, detail: "Configured; billing chart is not in this MVP yet" }
+      ]
+    }'
+}
+
+fetch_kiro() {
+  local res pct reset reset_at plan used limit detail
+  res="$("$TOOLS/get-kiro-usage" 2>/dev/null)" || true
+  [ -z "$res" ] && res='{}'
+  if ! printf '%s' "$res" | jq -e . >/dev/null 2>&1 || [ "$res" = "{}" ]; then
+    provider_error "kiro" "Kiro" "#8b5cf6" "No Kiro usage data — open Kiro and sign in once"
+    return
+  fi
+  if printf '%s' "$res" | jq -e '.error' >/dev/null 2>&1; then
+    provider_error "kiro" "Kiro" "#8b5cf6" "$(printf '%s' "$res" | jq -r '.error')"
+    return
+  fi
+
+  pct="$(printf '%s' "$res" | jq -r '.percentageUsed // 0')"
+  reset_raw="$(printf '%s' "$res" | jq -r '.resetDate // empty')"
+  reset="$(compact_time "$reset_raw")"
+  reset_at="$(epoch_time "$reset_raw")"
+  plan="$(printf '%s' "$res" | jq -r '.planType // ""')"
+  used="$(printf '%s' "$res" | jq -r '.currentUsage // 0')"
+  limit="$(printf '%s' "$res" | jq -r '.usageLimit // 0')"
+  detail="$used / $limit credits"
+
+  jq -n \
+    --arg id "kiro" \
+    --arg label "Kiro" \
+    --arg accent "#8b5cf6" \
+    --argjson pct "${pct:-0}" \
+    --arg reset "$reset" \
+    --argjson resetAt "${reset_at:-0}" \
+    --arg plan "$plan" \
+    --arg detail "$detail" \
+    '{
+      id: $id,
+      label: $label,
+      accent: $accent,
+      ok: true,
+      stale: false,
+      pct: $pct,
+      summary: (($pct | round | tostring) + "%"),
+      detail: $plan,
+      error: "",
+      slots: [
+        { pct: $pct, color: $accent,
+          tooltip: ("Kiro" + (if $plan != "" then "\nPlan: " + ($plan | ascii_upcase) else "" end) + "\nCredits: " + $detail) }
+      ],
+      hist: { kr: $pct },
+      rows: [
+        { label: "Monthly credits", value: $pct, resetText: $reset, resetAt: $resetAt, detail: $detail }
+      ]
+    }'
+}
+
+fetch_mistral() {
+  local res valid cost pct models
+  res="$("$TOOLS/get-mistral-usage" 2>/dev/null)" || true
+  [ -z "$res" ] && res='{}'
+  if ! printf '%s' "$res" | jq -e . >/dev/null 2>&1 || [ "$res" = "{}" ]; then
+    provider_error "mistral" "Mistral" "#ff7000" "Mistral API key not configured"
+    return
+  fi
+
+  valid="$(printf '%s' "$res" | jq -r '.keyValid // false')"
+  cost="$(printf '%s' "$res" | jq -r '.vibeTotalCost // 0')"
+  pct="$(awk -v c="${cost:-0}" 'BEGIN { v = c / 50 * 100; if (v > 100) v = 100; printf "%.4f", v }')"
+  models="$(printf '%s' "$res" | jq -r '(.availableModels // []) | length')"
+
+  jq -n \
+    --arg id "mistral" \
+    --arg label "Mistral" \
+    --arg accent "#ff7000" \
+    --argjson pct "${pct:-0}" \
+    --argjson cost "${cost:-0}" \
+    --arg valid "$valid" \
+    --arg models "$models" \
+    '{
+      id: $id,
+      label: $label,
+      accent: $accent,
+      ok: ($valid == "true"),
+      stale: false,
+      pct: $pct,
+      summary: ("$" + ($cost | tostring)),
+      detail: ($models + " models available"),
+      error: "",
+      slots: [
+        { pct: 0, color: $accent,
+          text: (if $cost > 0 then "$" + (($cost * 100 | round) / 100 | tostring) elif $valid == "true" then "✓ key" else "—" end),
+          tooltip: ("Mistral AI" + (if $valid == "true" then "\nAPI key configured" else "\nNo key set" end) + (if $cost > 0 then "\nSpend (vibe): $" + ($cost | tostring) else "" end)) }
+      ],
+      hist: (if $cost > 0 then { mv: $cost } else {} end),
+      rows: [
+        { label: "vibe CLI spend", value: $pct, resetText: "$50 soft cap", resetAt: 0, detail: ("$" + ($cost | tostring) + " total") }
+      ]
+    }'
+}
+
+fetch_openrouter() {
+  local res usage limit pct label
+  res="$("$TOOLS/get-openrouter-usage" 2>/dev/null)" || true
+  [ -z "$res" ] && res='{}'
+  if ! printf '%s' "$res" | jq -e . >/dev/null 2>&1 || [ "$res" = "{}" ]; then
+    provider_error "openrouter" "OpenRouter" "#9333ea" "OpenRouter API key not configured"
+    return
+  fi
+  if printf '%s' "$res" | jq -e '.error and (.openrouterApiKey | not)' >/dev/null 2>&1; then
+    provider_error "openrouter" "OpenRouter" "#9333ea" "$(printf '%s' "$res" | jq -r '.error')"
+    return
+  fi
+
+  usage="$(printf '%s' "$res" | jq -r '.usageUSD // 0')"
+  limit="$(printf '%s' "$res" | jq -r '.limitUSD // 0')"
+  label="$(printf '%s' "$res" | jq -r '.label // ""')"
+  pct="$(awk -v u="${usage:-0}" -v l="${limit:-0}" 'BEGIN { if (l <= 0) print 0; else { v = u / l * 100; if (v > 100) v = 100; printf "%.4f", v } }')"
+
+  jq -n \
+    --arg id "openrouter" \
+    --arg label "OpenRouter" \
+    --arg accent "#9333ea" \
+    --argjson pct "${pct:-0}" \
+    --argjson usage "${usage:-0}" \
+    --argjson limit "${limit:-0}" \
+    --arg account "$label" \
+    '{
+      id: $id,
+      label: $label,
+      accent: $accent,
+      ok: true,
+      stale: false,
+      pct: $pct,
+      summary: ("$" + ($usage | tostring)),
+      detail: $account,
+      error: "",
+      slots: [
+        { pct: $pct, color: $accent,
+          text: (if $usage > 0 then "$" + (($usage * 1000 | round) / 1000 | tostring) else "✓ key" end),
+          tooltip: ("OpenRouter" + (if $account != "" then "\n" + $account else "" end) + "\nUsed: $" + ($usage | tostring) + (if $limit > 0 then "\nLimit: $" + ($limit | tostring) else "" end)) }
+      ],
+      hist: (if $pct > 0 then { or: $pct } else {} end),
+      rows: [
+        { label: "Credit usage", value: $pct, resetText: "", resetAt: 0, detail: ("$" + ($usage | tostring) + " / $" + ($limit | tostring)) }
+      ]
+    }'
+}
+
+fetch_grok() {
+  local res pct used limit reset reset_at detail sessions tokens tools has_billing has_chart quota_kind
+  res="$("$TOOLS/get-grok-usage" 2>/dev/null)" || true
+  [ -z "$res" ] && res='{}'
+  if ! printf '%s' "$res" | jq -e . >/dev/null 2>&1 || [ "$res" = "{}" ]; then
+    provider_error "grok" "Grok" "#e6e6e6" "Run grok --oauth or configure an xAI API key"
+    return
+  fi
+  pct="$(printf '%s' "$res" | jq -r '.creditUsagePercent // 0')"
+  used="$(printf '%s' "$res" | jq -r '.used // .onDemandUsed // 0')"
+  limit="$(printf '%s' "$res" | jq -r '.monthlyLimit // .onDemandCap // 0')"
+  if [ "$(printf '%s' "$res" | jq -r '.quotaKind // ""')" = "free-tier" ]; then
+    reset="$(printf '%s' "$res" | jq -r '.quotaWindow // "rolling 24h"')"
+    reset_at=0
+  else
+    reset="$(printf '%s' "$res" | jq -r '.billingPeriodEnd // empty')"
+    reset_at="$(epoch_time "$reset")"
+  fi
+  sessions="$(printf '%s' "$res" | jq -r '.sessionCount // 0')"
+  tokens="$(printf '%s' "$res" | jq -r '.totalTokens // 0')"
+  tools="$(printf '%s' "$res" | jq -r '.totalToolCalls // 0')"
+  has_billing="$(printf '%s' "$res" | jq -r '.hasBilling // false')"
+  quota_kind="$(printf '%s' "$res" | jq -r '.quotaKind // ""')"
+  has_chart=true
+  [ "$quota_kind" = "free-tier" ] && has_chart=false
+  detail="$(printf '%s' "$res" | jq -r '.teamName // .email // .tierId // "Grok CLI"')"
+  jq -n --argjson pct "${pct:-0}" --argjson used "${used:-0}" --argjson limit "${limit:-0}" \
+    --arg reset "$(compact_time "$reset")" --argjson resetAt "${reset_at:-0}" --arg detail "$detail" \
+    --arg sessions "$sessions" --arg tokens "$tokens" --arg tools "$tools" --argjson hasBilling "$has_billing" --argjson hasChart "$has_chart" \
+    '{id:"grok",label:"Grok",accent:"#e6e6e6",ok:true,stale:false,pct:$pct,
+      summary:(if $hasBilling then (($pct|round|tostring)+"%") else "CLI" end),detail:$detail,error:"",hasChart:$hasChart,
+      slots:[{pct:$pct,color:"#e6e6e6",text:(if $hasBilling then null else "CLI" end),tooltip:(if $hasBilling then "Grok credits: "+($pct|round|tostring)+"% used" else "Grok CLI connected; billing quota is not exposed" end)}],
+      hist:(if $hasChart then {gr:$pct} else {} end),rows:(
+        (if $hasBilling then [{label:"Credit usage",value:$pct,resetText:$reset,resetAt:$resetAt,detail:(if $limit>0 then (($used|tostring)+" / "+($limit|tostring)) else "" end)}]
+         else [{label:"Billing quota",value:0,showMeter:false,resetText:"",resetAt:0,detail:"Not exposed for this Grok account"}] end)
+        + [{label:"Local CLI activity",value:0,showMeter:false,resetText:"",resetAt:0,detail:($sessions+(if $sessions=="1" then " session · " else " sessions · " end)+$tokens+" tokens · "+$tools+" tool calls")}])}'
+}
+
+provider_enabled claude      && add_provider "$(fetch_claude 2>/dev/null)"
+provider_enabled antigravity && add_provider "$(fetch_antigravity 2>/dev/null)"
+provider_enabled openai      && add_provider "$(fetch_openai 2>/dev/null)"
+provider_enabled kiro        && add_provider "$(fetch_kiro 2>/dev/null)"
+provider_enabled mistral     && add_provider "$(fetch_mistral 2>/dev/null)"
+provider_enabled openrouter  && add_provider "$(fetch_openrouter 2>/dev/null)"
+provider_enabled grok        && add_provider "$(fetch_grok 2>/dev/null)"
+
+jq -s \
+  --argjson updatedAt "$(date +%s)" \
+  '{
+    updatedAt: $updatedAt,
+    active: (map(select(.ok == true)) | .[0].id // "claude"),
+    providers: .
+  }' "$tmp"

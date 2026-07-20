@@ -62,6 +62,11 @@ ColumnLayout {
                     color: "#9333ea"
                 },
                 {
+                    id: "grok",
+                    label: "Grok",
+                    color: "#e6e6e6"
+                },
+                {
                     id: "__spacer",
                     label: "",
                     color: "transparent"
@@ -98,6 +103,8 @@ ColumnLayout {
                             return Plasmoid.configuration.mistralEnabled;
                         if (modelData.id === "openrouter")
                             return Plasmoid.configuration.openrouterEnabled;
+                        if (modelData.id === "grok")
+                            return Plasmoid.configuration.grokEnabled;
                         return false;
                     }
                     onToggled: {
@@ -113,6 +120,8 @@ ColumnLayout {
                             Plasmoid.configuration.mistralEnabled = checked;
                         if (modelData.id === "openrouter")
                             Plasmoid.configuration.openrouterEnabled = checked;
+                        if (modelData.id === "grok")
+                            Plasmoid.configuration.grokEnabled = checked;
                     }
                 }
             }
@@ -518,6 +527,12 @@ ColumnLayout {
             placeholder: "or $OPENROUTER_API_KEY"
             configKey: "openrouterApiKey"
             rowVisible: Plasmoid.configuration.openrouterEnabled
+        }
+        KeyRow {
+            label: "xAI / Grok"
+            placeholder: "optional; uses Grok CLI login"
+            configKey: "grokApiKey"
+            rowVisible: Plasmoid.configuration.grokEnabled
         }
     }
 }
