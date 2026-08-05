@@ -70,6 +70,11 @@
           view = {
             type = "app";
             program = toString (pkgs.writeShellScript "view" ''
+              if [ ! -f "$PWD/package/metadata.json" ]; then
+                echo "error: no plasmoid at $PWD/package" >&2
+                echo "  'nix run .#view' previews your working copy, so run it from the repo root." >&2
+                exit 1
+              fi
               exec nix shell nixpkgs#kdePackages.plasma-sdk nixpkgs#kdePackages.plasma-desktop -c plasmoidviewer \
                 -a "$PWD/package" -f "''${1:-planar}"
             '');
