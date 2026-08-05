@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+if ! command -v codex >/dev/null 2>&1; then
+    printf '%s\n' '{}'
+    exit 0
+fi
+
+initialize='{"id":1,"method":"initialize","params":{"clientInfo":{"name":"kde-ai-usage","version":"1"},"capabilities":{"experimentalApi":true}}}'
+read_limits='{"id":2,"method":"account/rateLimits/read","params":null}'
+
+coproc CODEX_SERVER { codex app-server --stdio 2>/dev/null; }
+codex_out="${CODEX_SERVER[0]}"
+codex_in="${CODEX_SERVER[1]}"
+codex_pid="$CODEX_SERVER_PID"
+result=""
+initialized=false
+
+printf '%s\n' "$initialize" >&"$codex_in"
+while IFS= read -r -t 5 -u "$codex_out" line; do
+    if [ "$(jq -r '.id // empty' <<<"$line" 2>/dev/null)" = "1" ]; then
+        initialized=true
+        break
+    fi
+done
+
+if [ "$initialized" = true ]; then
+    printf '%s\n' "$read_limits" >&"$codex_in"
+    while IFS= read -r -t 5 -u "$codex_out" line; do
+        if [ "$(jq -r '.id // empty' <<<"$line" 2>/dev/null)" = "2" ]; then
+            result="$(jq -c '.result // empty' <<<"$line" 2>/dev/null)"
+            break
+        fi
+    done
+fi
+
+exec {codex_in}>&-
+exec {codex_out}<&-
+kill "$codex_pid" 2>/dev/null || true
+wait "$codex_pid" 2>/dev/null || true
+
+if [ -n "$result" ]; then
+    printf '%s\n' "$result"
+else
+    printf '%s\n' '{}'
+fi

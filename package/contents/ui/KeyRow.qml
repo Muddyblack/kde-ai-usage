@@ -43,6 +43,14 @@ RowLayout {
                 return Plasmoid.configuration.mistralApiKey || "";
             if (kr.configKey === "openrouterApiKey")
                 return Plasmoid.configuration.openrouterApiKey || "";
+            if (kr.configKey === "grokApiKey")
+                return Plasmoid.configuration.grokApiKey || "";
+            if (kr.configKey === "zaiToken")
+                return Plasmoid.configuration.zaiToken || "";
+            if (kr.configKey === "githubToken")
+                return Plasmoid.configuration.githubToken || "";
+            if (kr.configKey === "deepseekApiKey")
+                return Plasmoid.configuration.deepseekApiKey || "";
             return "";
         }
         onEditingFinished: {
@@ -56,6 +64,14 @@ RowLayout {
                 Plasmoid.configuration.mistralApiKey = text;
             if (kr.configKey === "openrouterApiKey")
                 Plasmoid.configuration.openrouterApiKey = text;
+            if (kr.configKey === "grokApiKey")
+                Plasmoid.configuration.grokApiKey = text;
+            if (kr.configKey === "zaiToken")
+                Plasmoid.configuration.zaiToken = text;
+            if (kr.configKey === "githubToken")
+                Plasmoid.configuration.githubToken = text;
+            if (kr.configKey === "deepseekApiKey")
+                Plasmoid.configuration.deepseekApiKey = text;
         }
     }
     QQC2.ToolButton {

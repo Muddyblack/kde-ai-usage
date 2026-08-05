@@ -397,6 +397,31 @@ ColumnLayout {
             placeholder: "optional; uses Grok CLI login"
             settingKey: "grok"
         }
+        KeyField {
+            shell: page.shell
+            label: "Z.AI"
+            placeholder: "or $ZAI_TOKEN"
+            settingKey: "zai"
+        }
+        KeyField {
+            shell: page.shell
+            label: "GitHub"
+            placeholder: "token with Plan (read)"
+            settingKey: "github"
+        }
+        KeyField {
+            shell: page.shell
+            label: "Copilot quota"
+            placeholder: "300"
+            settingKey: "copilotQuota"
+            secret: false
+        }
+        KeyField {
+            shell: page.shell
+            label: "DeepSeek"
+            placeholder: "or $DEEPSEEK_API_KEY"
+            settingKey: "deepseek"
+        }
     }
 
     Text {

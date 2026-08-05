@@ -12,7 +12,14 @@ cfg='{}'
 [ -f "$CONFIG" ] && cfg="$(cat "$CONFIG" 2>/dev/null)" && printf '%s' "$cfg" | jq -e . >/dev/null 2>&1 || cfg='{}'
 
 provider_enabled() {
-  printf '%s' "$cfg" | jq -e --arg id "$1" '.providers[$id] != false' >/dev/null 2>&1
+  case "$1" in
+    zai|copilot|deepseek)
+      printf '%s' "$cfg" | jq -e --arg id "$1" '.providers[$id] == true' >/dev/null 2>&1
+      ;;
+    *)
+      printf '%s' "$cfg" | jq -e --arg id "$1" '.providers[$id] != false' >/dev/null 2>&1
+      ;;
+  esac
 }
 
 cfg_key() {
@@ -25,6 +32,14 @@ k="$(cfg_key google)";       [ -n "$k" ] && export WIDGET_GOOGLE_API_KEY="$k"
 k="$(cfg_key mistral)";      [ -n "$k" ] && export WIDGET_MISTRAL_API_KEY="$k"
 k="$(cfg_key openrouter)";   [ -n "$k" ] && export WIDGET_OPENROUTER_API_KEY="$k"
 k="$(cfg_key grok)";         [ -n "$k" ] && export WIDGET_GROK_API_KEY="$k"
+k="$(cfg_key zai)";         [ -n "$k" ] && export WIDGET_ZAI_TOKEN="$k"
+k="$(cfg_key github)";      [ -n "$k" ] && export WIDGET_GITHUB_TOKEN="$k"
+k="$(cfg_key deepseek)";    [ -n "$k" ] && export WIDGET_DEEPSEEK_API_KEY="$k"
+copilot_quota="$(printf '%s' "$cfg" | jq -r '.copilotQuota // .keys.copilotQuota // 300' 2>/dev/null)"
+case "$copilot_quota" in
+  ''|*[!0-9]*) copilot_quota=300 ;;
+esac
+export WIDGET_COPILOT_QUOTA="$copilot_quota"
 
 tmp="$(mktemp)"
 trap 'rm -f "$tmp"' EXIT
@@ -511,6 +526,126 @@ fetch_grok() {
         + [{label:"Local CLI activity",value:0,showMeter:false,resetText:"",resetAt:0,detail:($sessions+(if $sessions=="1" then " session · " else " sessions · " end)+$tokens+" tokens · "+$tools+" tool calls")}])}'
 }
 
+fetch_zai() {
+  local res token_pct tools_pct token_reset_at tools_reset_at token_detail tools_detail level
+  res="$("$TOOLS/get-zai-usage" 2>/dev/null)" || true
+  [ -z "$res" ] && res='{}'
+  if ! printf '%s' "$res" | jq -e . >/dev/null 2>&1 || [ "$res" = "{}" ]; then
+    provider_error "zai" "Z.AI" "#126ef4" "Z.AI token not configured"
+    return
+  fi
+  if printf '%s' "$res" | jq -e '.error' >/dev/null 2>&1; then
+    provider_error "zai" "Z.AI" "#126ef4" "$(printf '%s' "$res" | jq -r '.error')"
+    return
+  fi
+
+  token_pct="$(printf '%s' "$res" | jq -r '.tokenPct // 0')"
+  tools_pct="$(printf '%s' "$res" | jq -r '.toolsPct // 0')"
+  token_reset_at="$(printf '%s' "$res" | jq -r 'if (.tokenResetMs // 0) > 0 then (now + (.tokenResetMs / 1000) | floor) else 0 end')"
+  tools_reset_at="$(printf '%s' "$res" | jq -r 'if (.toolsResetMs // 0) > 0 then (now + (.toolsResetMs / 1000) | floor) else 0 end')"
+  token_detail="$(printf '%s' "$res" | jq -r 'if .tokenUsed != null and .tokenLimit != null then ((.tokenUsed | tostring) + " / " + (.tokenLimit | tostring) + " tokens") else "" end')"
+  tools_detail="$(printf '%s' "$res" | jq -r 'if .toolsRemaining != null then ((.toolsRemaining | tostring) + " remaining") else "" end')"
+  level="$(printf '%s' "$res" | jq -r '.level // ""')"
+
+  jq -n \
+    --argjson tokenPct "${token_pct:-0}" \
+    --argjson toolsPct "${tools_pct:-0}" \
+    --argjson tokenResetAt "${token_reset_at:-0}" \
+    --argjson toolsResetAt "${tools_reset_at:-0}" \
+    --arg tokenDetail "$token_detail" \
+    --arg toolsDetail "$tools_detail" \
+    --arg level "$level" \
+    '{
+      id: "zai", label: "Z.AI", accent: "#126ef4", ok: true, stale: false,
+      pct: $tokenPct, summary: (($tokenPct | round | tostring) + "%"), detail: $level, error: "",
+      slots: [
+        {pct: $tokenPct, color: "#126ef4", tooltip: ("Z.AI tokens: " + ($tokenPct | round | tostring) + "%")},
+        {pct: $toolsPct, color: "#60a5fa", tooltip: ("Z.AI tools: " + ($toolsPct | round | tostring) + "%")}
+      ],
+      hist: {za: $tokenPct},
+      rows: [
+        {label: "5-hour tokens", value: $tokenPct, resetText: "", resetAt: $tokenResetAt, detail: $tokenDetail},
+        {label: "Monthly tools", value: $toolsPct, resetText: "", resetAt: $toolsResetAt, detail: $toolsDetail}
+      ]
+    }'
+}
+
+fetch_copilot() {
+  local res pct used quota username reset_at
+  res="$("$TOOLS/get-copilot-usage" 2>/dev/null)" || true
+  [ -z "$res" ] && res='{}'
+  if ! printf '%s' "$res" | jq -e . >/dev/null 2>&1 || [ "$res" = "{}" ]; then
+    provider_error "copilot" "Copilot" "#8b5cf6" "GitHub token not configured"
+    return
+  fi
+  if printf '%s' "$res" | jq -e '.error' >/dev/null 2>&1; then
+    provider_error "copilot" "Copilot" "#8b5cf6" "$(printf '%s' "$res" | jq -r '.error')"
+    return
+  fi
+
+  pct="$(printf '%s' "$res" | jq -r '.pct // 0')"
+  used="$(printf '%s' "$res" | jq -r '.used // 0')"
+  quota="$(printf '%s' "$res" | jq -r '.quota // 300')"
+  username="$(printf '%s' "$res" | jq -r '.username // ""')"
+  reset_at="$(date -u -d "$(date -u +%Y-%m-01) +1 month" +%s 2>/dev/null || printf '0')"
+
+  jq -n \
+    --argjson pct "${pct:-0}" \
+    --argjson used "${used:-0}" \
+    --argjson quota "${quota:-300}" \
+    --arg username "$username" \
+    --argjson resetAt "${reset_at:-0}" \
+    '{
+      id: "copilot", label: "Copilot", accent: "#8b5cf6", ok: true, stale: false,
+      pct: $pct, summary: (($pct | round | tostring) + "%"),
+      detail: (if $username != "" then "@" + $username else "Personal billing" end), error: "",
+      slots: [{pct: $pct, color: "#8b5cf6", tooltip: ("Copilot premium requests: " + ($used | tostring) + " / " + ($quota | tostring))}],
+      hist: {gh: $pct},
+      rows: [{label: "Premium requests", value: $pct, resetText: "", resetAt: $resetAt, detail: (($used | tostring) + " / " + ($quota | tostring) + " requests")}]
+    }'
+}
+
+fetch_deepseek() {
+  local res total granted topped currency available symbol
+  res="$("$TOOLS/get-deepseek-balance" 2>/dev/null)" || true
+  [ -z "$res" ] && res='{}'
+  if ! printf '%s' "$res" | jq -e . >/dev/null 2>&1 || [ "$res" = "{}" ]; then
+    provider_error "deepseek" "DeepSeek" "#4f8cff" "DeepSeek API key not configured"
+    return
+  fi
+  if printf '%s' "$res" | jq -e '.error' >/dev/null 2>&1; then
+    provider_error "deepseek" "DeepSeek" "#4f8cff" "$(printf '%s' "$res" | jq -r '.error')"
+    return
+  fi
+
+  total="$(printf '%s' "$res" | jq -r '.primaryTotal // 0')"
+  granted="$(printf '%s' "$res" | jq -r '.primaryGranted // 0')"
+  topped="$(printf '%s' "$res" | jq -r '.primaryToppedUp // 0')"
+  currency="$(printf '%s' "$res" | jq -r '.primaryCurrency // ""')"
+  available="$(printf '%s' "$res" | jq -r '.isAvailable // false')"
+  case "$currency" in USD) symbol='$' ;; CNY) symbol='¥' ;; *) symbol='' ;; esac
+
+  jq -n \
+    --argjson total "${total:-0}" \
+    --argjson granted "${granted:-0}" \
+    --argjson topped "${topped:-0}" \
+    --arg currency "$currency" \
+    --arg symbol "$symbol" \
+    --argjson available "$available" \
+    '{
+      id: "deepseek", label: "DeepSeek", accent: "#4f8cff", ok: true, stale: false,
+      pct: 0, summary: ($symbol + ($total | tostring)),
+      detail: (if $available then "Available for API calls" else "Low balance" end), error: "",
+      currency: $currency,
+      slots: [{pct: 0, color: "#4f8cff", text: ($symbol + ($total | tostring)), tooltip: ("DeepSeek balance: " + $symbol + ($total | tostring))}],
+      hist: {ds: $total},
+      rows: [
+        {label: "Total balance", value: 0, showMeter: false, resetText: "", resetAt: 0, detail: ($symbol + ($total | tostring) + (if $currency != "" and $symbol == "" then " " + $currency else "" end))},
+        {label: "Granted / topped up", value: 0, showMeter: false, resetText: "", resetAt: 0, detail: ($symbol + ($granted | tostring) + " / " + $symbol + ($topped | tostring))}
+      ]
+    }'
+}
+
 provider_enabled claude      && add_provider "$(fetch_claude 2>/dev/null)"
 provider_enabled antigravity && add_provider "$(fetch_antigravity 2>/dev/null)"
 provider_enabled openai      && add_provider "$(fetch_openai 2>/dev/null)"
@@ -518,6 +653,9 @@ provider_enabled kiro        && add_provider "$(fetch_kiro 2>/dev/null)"
 provider_enabled mistral     && add_provider "$(fetch_mistral 2>/dev/null)"
 provider_enabled openrouter  && add_provider "$(fetch_openrouter 2>/dev/null)"
 provider_enabled grok        && add_provider "$(fetch_grok 2>/dev/null)"
+provider_enabled zai         && add_provider "$(fetch_zai 2>/dev/null)"
+provider_enabled copilot     && add_provider "$(fetch_copilot 2>/dev/null)"
+provider_enabled deepseek    && add_provider "$(fetch_deepseek 2>/dev/null)"
 
 jq -s \
   --argjson updatedAt "$(date +%s)" \

@@ -1,5 +1,5 @@
 {
-  description = "KDE Plasma 6 session & weekly token usage widget (currently supports Claude)";
+  description = "AI usage widget for KDE Plasma 6 and Hyprland/Quickshell";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
@@ -35,7 +35,7 @@
             '';
 
             meta = with pkgs.lib; {
-              description = "KDE Plasma 6 session & weekly token usage widget (currently supports Claude)";
+              description = "Multi-provider AI usage widget for KDE Plasma 6";
               license = licenses.mit;
               platforms = platforms.linux;
               homepage = "https://github.com/Muddyblack/kde-ai-usage";
@@ -70,6 +70,11 @@
           view = {
             type = "app";
             program = toString (pkgs.writeShellScript "view" ''
+              if [ ! -f "$PWD/package/metadata.json" ]; then
+                echo "error: no plasmoid at $PWD/package" >&2
+                echo "  'nix run .#view' previews your working copy, so run it from the repo root." >&2
+                exit 1
+              fi
               exec nix shell nixpkgs#kdePackages.plasma-sdk nixpkgs#kdePackages.plasma-desktop -c plasmoidviewer \
                 -a "$PWD/package" -f "''${1:-planar}"
             '');
@@ -91,6 +96,17 @@
             type = "app";
             program = toString (pkgs.writeShellScript "ai-usage-hyprland" ''
               set -eu
+              export PATH=${pkgs.lib.makeBinPath [
+                pkgs.bash
+                pkgs.coreutils
+                pkgs.curl
+                pkgs.findutils
+                pkgs.gawk
+                pkgs.gnugrep
+                pkgs.gnused
+                pkgs.jq
+                pkgs.perl
+              ]}:"$PATH"
               config=${self}/hyprland/shell.qml
               desktop_dir="''${XDG_DATA_HOME:-$HOME/.local/share}/applications"
               ${pkgs.coreutils}/bin/mkdir -p "$desktop_dir"

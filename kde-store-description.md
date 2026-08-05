@@ -17,6 +17,9 @@ Switch between tabs in the popup for each service:
 [*] [b]Mistral AI[/b]
 [*] [b]Kiro[/b]
 [*] [b]OpenRouter[/b]
+[*] [b]Z.AI[/b] [i](untested)[/i] — 5-hour token quota + monthly tools quota
+[*] [b]GitHub Copilot[/b] — monthly premium request usage for personally billed plans
+[*] [b]DeepSeek[/b] [i](untested)[/i] — current account balance + granted/topped-up split
 [/list]
 
 [b]Why I like using it[/b]
@@ -39,6 +42,8 @@ Compact percentage readouts right in the taskbar — color-coded (amber at 70%, 
 [b]Setup[/b]
 
 Reads your credentials from local config files — nothing leaves your machine except the calls to each provider's own usage API. Refresh interval is configurable (1–30 min, default 5).
+
+Credential notes: Z.AI uses the widget setting, [icode]$ZAI_TOKEN[/icode], or [icode]~/.config/zai/token[/icode]. GitHub Copilot uses the widget setting, [icode]$GITHUB_TOKEN[/icode], or [icode]~/.config/github-copilot/token[/icode]; a fine-grained token needs Plan: read permission. The current user endpoint covers personally billed plans, not organization/enterprise-billed usage. DeepSeek uses the widget setting, [icode]$DEEPSEEK_API_KEY[/icode], or [icode]~/.config/deepseek/api-key[/icode].
 
 [b]Requires Plasma 6.0+.[/b]
 

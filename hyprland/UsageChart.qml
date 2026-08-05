@@ -6,12 +6,13 @@ import QtQuick.Layouts
 Rectangle {
     id: chart
 
-    // Full unified history: [{t, s?, w?, cp?, cw?, kr?, ag?, or?, mv?}]
+    // Full unified history: [{t, s?, w?, cp?, cw?, kr?, ag?, or?, mv?, gr?, za?, gh?, ds?}]
     property var usageHistory: []
     // Windows available on the active tab: [{id, key, label, size}] (size in ms)
     property var windows: []
     property string chartWindow: ""
     property color accent: "#7dd3fc"
+    property string currency: ""
     property real chartTimeOffset: 0
     // Gate from the host (settings toggle / settings page open) combined with
     // the "have at least one data point" check below.
@@ -29,8 +30,8 @@ Rectangle {
     }
     readonly property string historyKey: currentWindow ? currentWindow.key : "w"
     readonly property real windowSize: currentWindow ? currentWindow.size : 7 * 24 * 3600000
-    // The mistral series stores raw USD; auto-scale it to the window max.
-    readonly property bool isCost: historyKey === "mv"
+    // Mistral spend and DeepSeek balance are raw money values; auto-scale them.
+    readonly property bool isCost: historyKey === "mv" || historyKey === "ds"
     // Only rolling-window series (Claude / Codex) drop to ~0 at a reset.
     readonly property bool windowHasResets: ["session", "day", "weekly", "codex_primary", "codex_day", "codex_weekly"].indexOf(chartWindow) >= 0
 
@@ -102,8 +103,10 @@ Rectangle {
     }
 
     function chartYLabel(fraction) {
-        if (isCost)
-            return chartMaxRaw > 0 ? "$" + (chartMaxRaw * fraction).toFixed(2) : "";
+        if (isCost) {
+            var symbol = currency === "CNY" ? "¥" : (currency === "USD" || historyKey === "mv" ? "$" : "");
+            return chartMaxRaw > 0 ? symbol + (chartMaxRaw * fraction).toFixed(2) + (symbol === "" && currency !== "" ? " " + currency : "") : "";
+        }
         return Math.round(fraction * 100) + "%";
     }
 
@@ -631,8 +634,14 @@ Rectangle {
                             if (chartCanvas.scrubIndex < 0 || !pts || chartCanvas.scrubIndex >= pts.length)
                                 return "";
                             var pt = pts[chartCanvas.scrubIndex];
-                            if (chart.isCost)
-                                return "$" + (pt.raw !== undefined ? pt.raw : 0).toFixed(4);
+                            if (chart.isCost) {
+                                var value = (pt.raw !== undefined ? pt.raw : 0).toFixed(4);
+                                if (chart.currency === "CNY")
+                                    return "¥" + value;
+                                if (chart.currency === "USD" || chart.historyKey === "mv")
+                                    return "$" + value;
+                                return value + (chart.currency !== "" ? " " + chart.currency : "");
+                            }
                             return Math.round(pt.v) + "%";
                         }
                         font.pixelSize: 11
