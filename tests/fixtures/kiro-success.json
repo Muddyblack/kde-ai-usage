@@ -1,0 +1,23 @@
+{
+  "id": "kiro",
+  "now": 1785000000,
+  "inputs": {
+    "usage": {
+      "planType": "pro",
+      "displayName": "Credit",
+      "displayNamePlural": "Credits",
+      "currentUsage": 250,
+      "usageLimit": 1000,
+      "percentageUsed": 25,
+      "remaining": 750,
+      "currentOverages": 2,
+      "overageCap": 100,
+      "overageCharges": 0.8,
+      "overageRate": 0.04,
+      "resetDate": "2026-08-01T00:00:00Z",
+      "currencyCode": "USD",
+      "currencySymbol": "$"
+    },
+    "status": null
+  }
+}

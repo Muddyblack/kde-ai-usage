@@ -1,0 +1,126 @@
+{
+  "id": "claude",
+  "now": 1785000000,
+  "inputs": {
+    "credentials": {
+      "claudeAiOauth": {
+        "accessToken": "sk-oauth-secret",
+        "subscriptionType": "max",
+        "rateLimitTier": "default_max_20x"
+      },
+      "claudeAdminApiKey": "sk-ant-admin-secret",
+      "organizationUuid": "org-1234"
+    },
+    "usage": {
+      "unexpected": "shape"
+    },
+    "usageError": "",
+    "orgUsage": null,
+    "settings": {
+      "effortLevel": "high",
+      "autoDreamEnabled": true
+    },
+    "stats": {
+      "version": 3,
+      "totalMessages": 900,
+      "totalSessions": 40,
+      "firstSessionDate": "2026-07-01",
+      "lastComputedDate": "2026-07-24",
+      "longestSession": {
+        "duration": 7200000,
+        "messageCount": 120
+      },
+      "modelUsage": {
+        "claude-opus-4": {
+          "inputTokens": 100,
+          "outputTokens": 50,
+          "cacheReadInputTokens": 10,
+          "cacheCreationInputTokens": 5,
+          "costUSD": 1.5,
+          "webSearchRequests": 2,
+          "contextWindow": 200000
+        },
+        "claude-haiku-4": {
+          "inputTokens": 10,
+          "outputTokens": 5,
+          "costUSD": 0.1
+        }
+      },
+      "dailyModelTokens": [
+        {
+          "date": "2026-07-23",
+          "tokensByModel": {
+            "claude-opus-4": 100,
+            "claude-haiku-4": 20
+          }
+        },
+        {
+          "date": "2026-07-22",
+          "tokensByModel": {
+            "claude-opus-4": 40
+          }
+        }
+      ],
+      "dailyActivity": [
+        {
+          "date": "2026-07-22",
+          "toolCallCount": 5
+        },
+        {
+          "date": "2026-07-23",
+          "toolCallCount": 7
+        },
+        {
+          "date": "2026-07-24",
+          "toolCallCount": 1
+        }
+      ],
+      "hourCounts": {
+        "9": 4,
+        "14": 9,
+        "22": 9
+      }
+    },
+    "status": {
+      "status": {
+        "indicator": "minor",
+        "description": "Partially degraded service"
+      },
+      "components": [
+        {
+          "name": "API",
+          "status": "degraded_performance"
+        },
+        {
+          "name": "Console",
+          "status": "operational"
+        },
+        {
+          "name": "Group",
+          "status": "degraded_performance",
+          "group": true
+        }
+      ],
+      "incidents": [
+        {
+          "name": "Elevated errors",
+          "status": "investigating",
+          "incident_updates": [
+            {
+              "body": "  We are looking into it.  "
+            }
+          ]
+        },
+        {
+          "name": "Old thing",
+          "status": "resolved",
+          "incident_updates": [
+            {
+              "body": "fixed"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

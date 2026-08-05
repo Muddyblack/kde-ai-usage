@@ -1,0 +1,42 @@
+{
+  "id": "openai",
+  "now": 1785000000,
+  "inputs": {
+    "credentials": {
+      "codexAccessToken": "codex-secret",
+      "codexLoggedIn": true,
+      "planType": "pro"
+    },
+    "codex": {
+      "rate_limit": {
+        "primary_window": {
+          "used_percent": 70,
+          "limit_window_seconds": 604800,
+          "reset_at": 1785500000
+        },
+        "secondary_window": {
+          "used_percent": 20,
+          "limit_window_seconds": 18000,
+          "reset_at": 1785010000
+        }
+      },
+      "additional_rate_limits": [
+        {
+          "limit_name": "GPT-5",
+          "rate_limit": {
+            "limit_reached": true,
+            "primary_window": {
+              "used_percent": 100,
+              "limit_window_seconds": 18000,
+              "reset_at": 1785009000
+            }
+          }
+        }
+      ]
+    },
+    "codexError": "",
+    "orgUsage": null,
+    "stats": {},
+    "status": null
+  }
+}

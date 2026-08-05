@@ -1,0 +1,40 @@
+{
+  "id": "antigravity",
+  "now": 1785000000,
+  "inputs": {
+    "usage": {
+      "email": "dev@example.com",
+      "planType": "PRO",
+      "promptCredits": {
+        "available": 100,
+        "monthly": 500
+      },
+      "models": [
+        {
+          "label": "Gemini 3 Pro",
+          "modelId": "gemini-3-pro",
+          "remainingPercentage": 0.4,
+          "resetTime": "2026-07-20T10:00:00Z"
+        },
+        {
+          "label": "Gemini 3 Flash",
+          "modelId": "gemini-3-flash",
+          "remainingPercentage": 0.8,
+          "resetTime": "2026-07-21T10:00:00Z"
+        },
+        {
+          "label": "Claude Sonnet 4.5",
+          "modelId": "claude-sonnet-4-5",
+          "remainingPercentage": 0.0,
+          "isExhausted": true,
+          "resetTime": "2026-07-22T10:00:00Z"
+        },
+        {
+          "label": "Autocomplete",
+          "modelId": "autocomplete-1"
+        }
+      ]
+    },
+    "status": null
+  }
+}

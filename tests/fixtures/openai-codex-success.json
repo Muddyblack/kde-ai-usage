@@ -1,0 +1,131 @@
+{
+  "id": "openai",
+  "now": 1785000000,
+  "inputs": {
+    "credentials": {
+      "openaiApiKey": "sk-openai-secret",
+      "codexAccessToken": "codex-secret",
+      "email": "dev@example.com",
+      "planType": "plus",
+      "orgId": "org-9",
+      "accountId": "acct-9",
+      "authMode": "chatgpt",
+      "codexLoggedIn": true
+    },
+    "codex": {
+      "rateLimits": {
+        "primary": {
+          "usedPercent": 58,
+          "windowDurationMins": 300,
+          "resetsAt": 1785010000
+        },
+        "secondary": {
+          "usedPercent": 30,
+          "windowDurationMins": 10080,
+          "resetsAt": 1785500000
+        }
+      },
+      "rateLimitsByLimitId": {
+        "codex": {
+          "limitId": "codex",
+          "primary": {
+            "usedPercent": 58,
+            "windowDurationMins": 300,
+            "resetsAt": 1785010000
+          }
+        },
+        "spark": {
+          "limitId": "spark",
+          "limitName": "Spark",
+          "rateLimitReachedType": "hard",
+          "primary": {
+            "usedPercent": 90,
+            "windowDurationMins": 300,
+            "resetsAt": 1785009000
+          },
+          "secondary": {
+            "usedPercent": 9,
+            "windowDurationMins": 10080,
+            "resetsAt": 1785600000
+          }
+        }
+      }
+    },
+    "codexError": "",
+    "orgUsage": {
+      "data": [
+        {
+          "results": [
+            {
+              "model": "gpt-4o",
+              "input_tokens": 2000000,
+              "output_tokens": 500000
+            },
+            {
+              "model": "o3-mini",
+              "input_tokens": 1000,
+              "output_tokens": 100
+            }
+          ]
+        },
+        {
+          "results": [
+            {
+              "model": "gpt-4o",
+              "input_tokens": 1000000,
+              "output_tokens": 0
+            }
+          ]
+        }
+      ]
+    },
+    "stats": {
+      "totalSessions": 12,
+      "totalMessages": 300,
+      "totalTokens": 9000,
+      "totalToolCalls": 40,
+      "firstSessionDate": "2026-07-10",
+      "lastComputedDate": "2026-07-24",
+      "model": "gpt-5-codex",
+      "effortLevel": "medium",
+      "longestSession": {
+        "duration": 3600000,
+        "messageCount": 60
+      },
+      "modelUsage": {
+        "gpt-5-codex": {
+          "inputTokens": 5000,
+          "outputTokens": 3000,
+          "cachedInput": 100,
+          "reasoningTokens": 900,
+          "totalTokens": 9000,
+          "sessions": 12,
+          "contextWindow": 272000
+        }
+      },
+      "dailyModelTokens": [
+        {
+          "date": "2026-07-24",
+          "total": 4000
+        },
+        {
+          "date": "2026-07-23",
+          "total": 5000
+        }
+      ],
+      "dailyActivity": [
+        {
+          "date": "2026-07-23"
+        },
+        {
+          "date": "2026-07-24"
+        }
+      ],
+      "hourCounts": {
+        "10": 3,
+        "11": 3
+      }
+    },
+    "status": null
+  }
+}
