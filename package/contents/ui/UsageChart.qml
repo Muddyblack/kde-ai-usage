@@ -4,12 +4,13 @@ import QtQuick.Controls as QQC2
 import org.kde.plasma.plasmoid
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
+import "../code/UsageWindows.js" as UsageWindows
 
 Rectangle {
     id: usageChartContainer
     property Item rootItem
 
-    visible: !rootItem.showSettings && rootItem.showUsageChart && rootItem.weeklyUsageHistory.length >= 1 && (rootItem.enabledTabs[rootItem.activeTab] === "claude" || (rootItem.enabledTabs[rootItem.activeTab] === "openai" && rootItem.codexUsageAvailable) || rootItem.enabledTabs[rootItem.activeTab] === "kiro" || rootItem.enabledTabs[rootItem.activeTab] === "antigravity" || rootItem.enabledTabs[rootItem.activeTab] === "openrouter" || rootItem.enabledTabs[rootItem.activeTab] === "mistral" || (rootItem.enabledTabs[rootItem.activeTab] === "grok" && rootItem.grokHasBilling && rootItem.grokQuotaKind !== "free-tier"))
+    visible: !rootItem.showSettings && rootItem.showUsageChart && rootItem.weeklyUsageHistory.length >= 1 && (rootItem.enabledTabs[rootItem.activeTab] === "claude" || (rootItem.enabledTabs[rootItem.activeTab] === "openai" && rootItem.codexUsageAvailable) || rootItem.enabledTabs[rootItem.activeTab] === "kiro" || rootItem.enabledTabs[rootItem.activeTab] === "antigravity" || rootItem.enabledTabs[rootItem.activeTab] === "openrouter" || rootItem.enabledTabs[rootItem.activeTab] === "mistral" || rootItem.enabledTabs[rootItem.activeTab] === "grok" || rootItem.enabledTabs[rootItem.activeTab] === "zai" || rootItem.enabledTabs[rootItem.activeTab] === "copilot" || rootItem.enabledTabs[rootItem.activeTab] === "deepseek")
     Layout.fillWidth: true
     Layout.preferredHeight: implicitHeight
     implicitHeight: 184
@@ -121,59 +122,22 @@ Rectangle {
     // ── Window toggle — Claude: 5H/7D, Codex: 5H/7D (single-series tabs: hidden) ──
     RowLayout {
         id: chartWindowToggle
+        readonly property var choices: {
+            var tab = rootItem.enabledTabs[rootItem.activeTab];
+            if (tab === "openai")
+                return UsageWindows.chartChoices("openai", rootItem.codexSessionAvailable, rootItem.codexWeeklyAvailable);
+            if (tab === "claude")
+                return UsageWindows.chartChoices("claude", rootItem.sessionAvailable, rootItem.weeklyAvailable);
+            return [];
+        }
         anchors.top: parent.top
         anchors.right: parent.right
         anchors.topMargin: 7
         anchors.rightMargin: 8
         spacing: 4
-        visible: {
-            var tab = rootItem.enabledTabs[rootItem.activeTab];
-            if (tab === "claude") {
-                for (var i = 0; i < rootItem.usageHistory.length; i++)
-                    if (rootItem.usageHistory[i].s !== undefined && rootItem.usageHistory[i].s !== null)
-                        return true;
-                return false;
-            }
-            if (tab === "openai") {
-                for (var j = 0; j < rootItem.usageHistory.length; j++)
-                    if (rootItem.usageHistory[j].cp !== undefined && rootItem.usageHistory[j].cp !== null)
-                        return true;
-            }
-            return false;
-        }
+        visible: choices.length > 1
         Repeater {
-            model: {
-                var tab = rootItem.enabledTabs[rootItem.activeTab];
-                if (tab === "openai")
-                    return [
-                        {
-                            id: "codex_primary",
-                            label: "5H"
-                        },
-                        {
-                            id: "codex_day",
-                            label: "24H"
-                        },
-                        {
-                            id: "codex_weekly",
-                            label: "7D"
-                        }
-                    ];
-                return [
-                    {
-                        id: "session",
-                        label: "5H"
-                    },
-                    {
-                        id: "day",
-                        label: "24H"
-                    },
-                    {
-                        id: "weekly",
-                        label: "7D"
-                    }
-                ];
-            }
+            model: chartWindowToggle.choices
             Rectangle {
                 radius: 4
                 implicitHeight: 16
@@ -215,7 +179,7 @@ Rectangle {
     // Y-axis labels. For most windows the axis is a 0-100% scale; for the mistral
     // (cost) window it's auto-scaled to the window's max spend, so labels show $.
     readonly property real chartMaxRaw: {
-        if (rootItem.chartWindow !== "mistral")
+        if (rootItem.chartWindow !== "mistral" && rootItem.chartWindow !== "deepseek")
             return 0;
         var pts = rootItem.weeklyUsageHistory;
         var m = 0;
@@ -227,6 +191,8 @@ Rectangle {
     function chartYLabel(fraction) {
         if (rootItem.chartWindow === "mistral")
             return chartMaxRaw > 0 ? "$" + (chartMaxRaw * fraction).toFixed(2) : "";
+        if (rootItem.chartWindow === "deepseek")
+            return chartMaxRaw > 0 ? rootItem.formatMoney(chartMaxRaw * fraction, rootItem.deepseekPrimaryCurrency) : "";
         return Math.round(fraction * 100) + "%";
     }
 
@@ -504,7 +470,7 @@ Rectangle {
                 ctx.restore();
             }
             var resets = usageChartContainer.resetTimestamps;
-            var resetLabel = rootItem.chartWindow === "weekly" ? "week reset" : "5h reset";
+            var resetLabel = rootItem.chartWindow === "weekly" || rootItem.chartWindow === "codex_weekly" ? "week reset" : "5h reset";
             var labelDrawn = false;
             // walk newest→oldest so the rightmost reset gets the top caption
             for (var ri = resets.length - 1; ri >= 0; ri--) {
@@ -614,6 +580,8 @@ Rectangle {
                             var pt = pts[chartCanvas.scrubIndex];
                             if (rootItem.chartWindow === "mistral")
                                 return "$" + (pt.raw !== undefined ? pt.raw : 0).toFixed(4);
+                            if (rootItem.chartWindow === "deepseek")
+                                return rootItem.formatMoney(pt.raw !== undefined ? pt.raw : 0, rootItem.deepseekPrimaryCurrency);
                             return Math.round(pt.v) + "%";
                         }
                         font.pixelSize: 11
@@ -732,7 +700,7 @@ Rectangle {
                     return (modelData - minT) / winSize;
                 }
                 visible: frac > 0 && frac < 1
-                text: rootItem.chartWindow === "weekly" ? Qt.formatDate(new Date(modelData), "MMM d") : Qt.formatTime(new Date(modelData), "hh:mm")
+                text: rootItem.chartWindow === "weekly" || rootItem.chartWindow === "codex_weekly" ? Qt.formatDate(new Date(modelData), "MMM d") : Qt.formatTime(new Date(modelData), "hh:mm")
                 font.pixelSize: 9
                 color: rootItem.activeAccent
                 opacity: 0.85

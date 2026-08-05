@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+set -u
+
+API_KEY="${WIDGET_ZAI_TOKEN:-}"
+[ -z "$API_KEY" ] && [ -n "${ZAI_TOKEN:-}" ] && API_KEY="$ZAI_TOKEN"
+[ -z "$API_KEY" ] && [ -n "${HOME:-}" ] && [ -f "$HOME/.config/zai/token" ] && API_KEY=$(tr -d '\n\r ' < "$HOME/.config/zai/token" 2>/dev/null)
+
+if [ -z "$API_KEY" ]; then
+    echo "{}"
+    exit 0
+fi
+
+if ! command -v jq >/dev/null 2>&1; then
+    printf '%s\n' '{"zaiToken":"","keyValid":false,"error":"jq is required"}'
+    exit 0
+fi
+
+if [ -n "${ZAI_RESPONSE_FILE:-}" ] && [ -f "$ZAI_RESPONSE_FILE" ]; then
+    BODY=$(< "$ZAI_RESPONSE_FILE")
+    HTTP_CODE=200
+else
+    RESPONSE=$(curl -s -w "\n%{http_code}" \
+        -H "Authorization: Bearer $API_KEY" \
+        -H "Accept: application/json" \
+        -H "User-Agent: kde-ai-usage/zai" \
+        --max-time 10 \
+        "https://api.z.ai/api/monitor/usage/quota/limit" 2>/dev/null)
+    HTTP_CODE="${RESPONSE##*$'\n'}"
+    BODY="${RESPONSE%$'\n'*}"
+fi
+
+case "$HTTP_CODE" in
+    200)
+        if ! echo "$BODY" | jq --arg key "$API_KEY" '
+            if (.success == false) then
+                {
+                    zaiToken: "",
+                    keyValid: false,
+                    error: (.msg // "Z.AI API error")
+                }
+            elif (
+                .success == true
+                and (.data | type) == "object"
+                and (.data.limits | type) == "array"
+                and ((.data.limits | map(select(.type == "TOKENS_LIMIT" or .type == "TIME_LIMIT")) | length) > 0)
+            ) then
+                (.data // {}) as $d |
+                (($d.limits // []) | map(select(.type == "TOKENS_LIMIT"))[0] // {}) as $tok |
+                (($d.limits // []) | map(select(.type == "TIME_LIMIT"))[0] // {}) as $tools |
+                {
+                    zaiToken: $key,
+                    keyValid: true,
+                    level: ($d.level // ""),
+                    tokenPct: ($tok.percentage // 0),
+                    tokenResetMs: ($tok.nextResetTime // null),
+                    tokenUsed: ($tok.used // $tok.usage // null),
+                    tokenLimit: ($tok.limit // $tok.total // null),
+                    toolsPct: ($tools.percentage // 0),
+                    toolsRemaining: ($tools.remaining // null),
+                    toolsResetMs: ($tools.nextResetTime // null),
+                    models: ($tools.usageDetails // [])
+                }
+            else
+                {
+                    zaiToken: "",
+                    keyValid: false,
+                    error: "Z.AI unexpected response"
+                }
+            end' 2>/dev/null; then
+            jq -n '{zaiToken: "", keyValid: false, error: "Z.AI invalid JSON"}'
+        fi
+        ;;
+    401|403)
+        jq -n '{zaiToken: "", keyValid: false, error: "Invalid Z.AI token"}'
+        ;;
+    000)
+        jq -n '{zaiToken: "", keyValid: false, error: "Z.AI network error"}'
+        ;;
+    *)
+        jq -n --arg code "$HTTP_CODE" '{zaiToken: "", keyValid: false, error: ("Z.AI HTTP " + $code)}'
+        ;;
+esac

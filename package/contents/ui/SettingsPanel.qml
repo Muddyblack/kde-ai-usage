@@ -67,6 +67,21 @@ ColumnLayout {
                     color: "#e6e6e6"
                 },
                 {
+                    id: "zai",
+                    label: "Z.AI",
+                    color: "#126ef4"
+                },
+                {
+                    id: "copilot",
+                    label: "Copilot",
+                    color: "#8b5cf6"
+                },
+                {
+                    id: "deepseek",
+                    label: "DeepSeek",
+                    color: "#4f8cff"
+                },
+                {
                     id: "__spacer",
                     label: "",
                     color: "transparent"
@@ -105,6 +120,12 @@ ColumnLayout {
                             return Plasmoid.configuration.openrouterEnabled;
                         if (modelData.id === "grok")
                             return Plasmoid.configuration.grokEnabled;
+                        if (modelData.id === "zai")
+                            return Plasmoid.configuration.zaiEnabled;
+                        if (modelData.id === "copilot")
+                            return Plasmoid.configuration.copilotEnabled;
+                        if (modelData.id === "deepseek")
+                            return Plasmoid.configuration.deepseekEnabled;
                         return false;
                     }
                     onToggled: {
@@ -122,6 +143,12 @@ ColumnLayout {
                             Plasmoid.configuration.openrouterEnabled = checked;
                         if (modelData.id === "grok")
                             Plasmoid.configuration.grokEnabled = checked;
+                        if (modelData.id === "zai")
+                            Plasmoid.configuration.zaiEnabled = checked;
+                        if (modelData.id === "copilot")
+                            Plasmoid.configuration.copilotEnabled = checked;
+                        if (modelData.id === "deepseek")
+                            Plasmoid.configuration.deepseekEnabled = checked;
                     }
                 }
             }
@@ -266,9 +293,7 @@ ColumnLayout {
                     cursorShape: Qt.PointingHandCursor
                     hoverEnabled: true
                     onClicked: {
-                        rootItem.colorTarget = "popup";
-                        rootItem.colorDialog.selectedColor = rootItem.popupBgColor;
-                        rootItem.colorDialog.open();
+                        rootItem.openColorDialog("popup", rootItem.popupBgColor);
                     }
                     QQC2.ToolTip.delay: 400
                     QQC2.ToolTip.visible: containsMouse
@@ -345,9 +370,7 @@ ColumnLayout {
                     cursorShape: Qt.PointingHandCursor
                     hoverEnabled: true
                     onClicked: {
-                        rootItem.colorTarget = "card";
-                        rootItem.colorDialog.selectedColor = rootItem.cardBgColor;
-                        rootItem.colorDialog.open();
+                        rootItem.openColorDialog("card", rootItem.cardBgColor);
                     }
                     QQC2.ToolTip.delay: 400
                     QQC2.ToolTip.visible: containsMouse
@@ -529,10 +552,67 @@ ColumnLayout {
             rowVisible: Plasmoid.configuration.openrouterEnabled
         }
         KeyRow {
-            label: "xAI / Grok"
-            placeholder: "optional; uses Grok CLI login"
+            label: "Grok / xAI"
+            placeholder: "or $GROK_API_KEY"
             configKey: "grokApiKey"
             rowVisible: Plasmoid.configuration.grokEnabled
+        }
+        KeyRow {
+            label: "Z.AI Token"
+            placeholder: "or $ZAI_TOKEN"
+            configKey: "zaiToken"
+            rowVisible: Plasmoid.configuration.zaiEnabled
+        }
+        KeyRow {
+            label: "GitHub Token"
+            placeholder: "or $GITHUB_TOKEN"
+            configKey: "githubToken"
+            rowVisible: Plasmoid.configuration.copilotEnabled
+        }
+        KeyRow {
+            label: "DeepSeek"
+            placeholder: "or $DEEPSEEK_API_KEY"
+            configKey: "deepseekApiKey"
+            rowVisible: Plasmoid.configuration.deepseekEnabled
+        }
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 4
+            visible: Plasmoid.configuration.copilotEnabled
+
+            PlasmaComponents.Label {
+                text: "Copilot Quota"
+                font.pixelSize: 10
+                opacity: 0.6
+                color: Kirigami.Theme.textColor
+                Layout.preferredWidth: 76
+                elide: Text.ElideRight
+            }
+            QQC2.TextField {
+                text: Plasmoid.configuration.copilotQuota !== undefined && Plasmoid.configuration.copilotQuota !== null ? Plasmoid.configuration.copilotQuota.toString() : "300"
+                placeholderText: "300"
+                implicitHeight: 26
+                Layout.preferredWidth: 64
+                font.pixelSize: 10
+                validator: RegularExpressionValidator {
+                    regularExpression: /^[0-9]*$/
+                }
+                onEditingFinished: {
+                    var val = parseInt(text);
+                    if (isNaN(val))
+                        val = 300;
+                    Plasmoid.configuration.copilotQuota = val;
+                    text = val.toString();
+                }
+            }
+            PlasmaComponents.Label {
+                text: "monthly premium requests"
+                font.pixelSize: 9
+                opacity: 0.45
+                color: Kirigami.Theme.textColor
+                Layout.fillWidth: true
+                elide: Text.ElideRight
+            }
         }
     }
 }

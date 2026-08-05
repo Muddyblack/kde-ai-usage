@@ -67,6 +67,21 @@ ShellRoot {
             id: "grok",
             label: "Grok",
             accent: "#e6e6e6"
+        },
+        {
+            id: "zai",
+            label: "Z.AI",
+            accent: "#126ef4"
+        },
+        {
+            id: "copilot",
+            label: "Copilot",
+            accent: "#8b5cf6"
+        },
+        {
+            id: "deepseek",
+            label: "DeepSeek",
+            accent: "#4f8cff"
         }
     ]
 
@@ -92,6 +107,8 @@ ShellRoot {
     readonly property bool pillShown: root.pillMode === "always" || root.trayPillRevealed || (root.pillMode === "hover" && (root.pillRevealed || root.popupOpen))
 
     function providerEnabled(id) {
+        if (id === "zai" || id === "copilot" || id === "deepseek")
+            return root.settings.providers[id] === true;
         return root.settings.providers[id] !== false;
     }
 
@@ -182,7 +199,7 @@ ShellRoot {
     property bool popupOpen: false
     property int updatedAt: 0
 
-    // Unified usage history: [{t, s, w, cp, cw, kr, ag, or, mv, gr}] — same format
+    // Unified usage history: [{t, s, w, cp, cw, kr, ag, or, mv, gr, za, gh, ds}] — same format
     // as the Plasma widget so the chart survives across both.
     property var usageHistory: []
     readonly property int historyLimit: 500
@@ -297,6 +314,33 @@ ShellRoot {
                 {
                     id: "grok",
                     key: "gr",
+                    label: "30D",
+                    size: 720 * H
+                }
+            ];
+        if (id === "zai")
+            return [
+                {
+                    id: "zai",
+                    key: "za",
+                    label: "30D",
+                    size: 720 * H
+                }
+            ];
+        if (id === "copilot")
+            return [
+                {
+                    id: "copilot",
+                    key: "gh",
+                    label: "30D",
+                    size: 720 * H
+                }
+            ];
+        if (id === "deepseek")
+            return [
+                {
+                    id: "deepseek",
+                    key: "ds",
                     label: "30D",
                     size: 720 * H
                 }
@@ -1011,6 +1055,7 @@ ShellRoot {
                     windows: root.windowsForProvider(root.activeId)
                     chartWindow: root.chartWindow
                     accent: root.activeAccent
+                    currency: root.activeProvider() ? (root.activeProvider().currency || "") : ""
                     onWindowSelected: function (id) {
                         root.selectChartWindow(id);
                     }

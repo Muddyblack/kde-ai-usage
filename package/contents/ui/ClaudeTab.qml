@@ -193,7 +193,7 @@ ColumnLayout {
     }
 
     PopupRow {
-        visible: claudeTabRoot.subTab === "usage"
+        visible: claudeTabRoot.subTab === "usage" && rootItem.sessionAvailable
         label: "5 Hours"
         resetText: rootItem.sessionResetTime ? "resets " + rootItem.sessionResetTime : ""
         countdownText: rootItem.sessionCountdown === "resetting..." ? "resetting..." : (rootItem.sessionCountdown ? "in " + rootItem.sessionCountdown : "")
@@ -206,7 +206,7 @@ ColumnLayout {
     }
 
     PopupRow {
-        visible: claudeTabRoot.subTab === "usage"
+        visible: claudeTabRoot.subTab === "usage" && rootItem.weeklyAvailable
         label: "7 Days"
         resetText: rootItem.weeklyResetTime ? "resets " + rootItem.weeklyResetTime : ""
         countdownText: rootItem.weeklyCountdown === "resetting..." ? "resetting..." : (rootItem.weeklyCountdown ? "in " + rootItem.weeklyCountdown : "")
@@ -605,12 +605,32 @@ ColumnLayout {
             StatTile {
                 tileValue: rootItem.formatDuration(rootItem.claudeStatsLongestSessionMs)
                 tileLabel: "longest session"
+                tileSub: rootItem.claudeStatsLongestSessionMessages > 0 ? Math.round(rootItem.claudeStatsLongestSessionMessages) + " msgs" : ""
             }
             StatTile {
                 visible: rootItem.claudeStatsPeakHour >= 0
                 tileValue: rootItem.claudeStatsPeakHour >= 0 ? (rootItem.claudeStatsPeakHour < 10 ? "0" : "") + rootItem.claudeStatsPeakHour + ":00" : "—"
                 tileLabel: "peak hour"
                 tileTip: "Hour of day with the most activity"
+            }
+            // Recorded by newer Claude CLI builds; hidden on older stats caches.
+            StatTile {
+                visible: rootItem.claudeStatsTotalCostUSD > 0
+                tileValue: "$" + rootItem.claudeStatsTotalCostUSD.toFixed(2)
+                tileLabel: "spend"
+                tileTip: "Total cost across all models (all time)"
+            }
+            StatTile {
+                visible: rootItem.claudeStatsTotalToolCalls > 0
+                tileValue: rootItem.formatTokens(rootItem.claudeStatsTotalToolCalls)
+                tileLabel: "tool calls"
+                tileTip: "Total tool invocations across all sessions"
+            }
+            StatTile {
+                visible: rootItem.claudeStatsTotalWebSearches > 0
+                tileValue: rootItem.formatTokens(rootItem.claudeStatsTotalWebSearches)
+                tileLabel: "web searches"
+                tileTip: "Total web search requests across all models"
             }
         }
 
@@ -690,7 +710,7 @@ ColumnLayout {
                         var m = rootItem.claudeStatsModels[modelData];
                         if (!m)
                             return modelData;
-                        return modelData + "\nInput:  " + rootItem.formatTokens(m.input) + "\nOutput: " + rootItem.formatTokens(m.output) + "\nCache read: " + rootItem.formatTokens(m.cacheRead) + "\nCache write: " + rootItem.formatTokens(m.cacheCreation);
+                        return modelData + "\nInput:  " + rootItem.formatTokens(m.input) + "\nOutput: " + rootItem.formatTokens(m.output) + "\nCache read: " + rootItem.formatTokens(m.cacheRead) + "\nCache write: " + rootItem.formatTokens(m.cacheCreation) + (m.cost > 0 ? "\nCost: $" + m.cost.toFixed(2) : "") + (m.webSearches > 0 ? "\nWeb searches: " + m.webSearches : "");
                     }
                 }
                 RowLayout {
@@ -717,6 +737,13 @@ ColumnLayout {
                         text: rootItem.formatTokens(rootItem.claudeStatsModels[modelData].output) + " out"
                         font.pixelSize: 9
                         opacity: 0.4
+                        color: Kirigami.Theme.textColor
+                    }
+                    PlasmaComponents.Label {
+                        visible: (rootItem.claudeStatsModels[modelData].cost || 0) > 0
+                        text: "$" + (rootItem.claudeStatsModels[modelData].cost || 0).toFixed(2)
+                        font.pixelSize: 9
+                        opacity: 0.55
                         color: Kirigami.Theme.textColor
                     }
                     PlasmaComponents.Label {
@@ -767,43 +794,7 @@ ColumnLayout {
         }
     }
 
-    component StatTile: Rectangle {
-        id: tile
-        property string tileLabel: ""
-        property string tileValue: ""
-        property string tileSub: ""
-        property string tileTip: ""
-        Layout.fillWidth: true
-        Layout.preferredHeight: 40
-        radius: 5
-        color: Qt.rgba(1, 1, 1, 0.04)
-        border.width: 1
-        border.color: Qt.rgba(1, 1, 1, 0.07)
-        QQC2.ToolTip.visible: tile.tileTip !== "" && tileMA.containsMouse
-        QQC2.ToolTip.delay: 400
-        QQC2.ToolTip.text: tile.tileTip
-        MouseArea {
-            id: tileMA
-            anchors.fill: parent
-            hoverEnabled: true
-        }
-        ColumnLayout {
-            anchors.centerIn: parent
-            spacing: 0
-            PlasmaComponents.Label {
-                Layout.alignment: Qt.AlignHCenter
-                text: tile.tileValue
-                font.pixelSize: 14
-                font.bold: true
-                color: rootItem.claudeOrange
-            }
-            PlasmaComponents.Label {
-                Layout.alignment: Qt.AlignHCenter
-                text: tile.tileLabel + (tile.tileSub ? " · " + tile.tileSub : "")
-                font.pixelSize: 8
-                opacity: 0.5
-                color: Kirigami.Theme.textColor
-            }
-        }
+    component StatTile: StatTileBase {
+        accentColor: rootItem.claudeOrange
     }
 }

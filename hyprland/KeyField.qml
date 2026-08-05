@@ -11,6 +11,7 @@ RowLayout {
     property string label: ""
     property string placeholder: ""
     property string settingKey: ""
+    property bool secret: true
 
     Layout.fillWidth: true
     spacing: 6
@@ -47,7 +48,7 @@ RowLayout {
                 color: "#f8fafc"
                 placeholderText: keyRow.placeholder
                 placeholderTextColor: Qt.rgba(1, 1, 1, 0.3)
-                echoMode: keyRow.revealed ? TextInput.Normal : TextInput.Password
+                echoMode: !keyRow.secret || keyRow.revealed ? TextInput.Normal : TextInput.Password
                 verticalAlignment: TextInput.AlignVCenter
                 background: null
                 selectByMouse: true
@@ -58,6 +59,7 @@ RowLayout {
             }
 
             Text {
+                visible: keyRow.secret
                 text: keyRow.revealed ? "🙈" : "👁"
                 font.pixelSize: 12
                 opacity: revealMouse.containsMouse ? 1.0 : 0.5
