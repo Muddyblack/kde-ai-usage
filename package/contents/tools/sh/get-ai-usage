@@ -388,11 +388,23 @@ else
     done
 fi
 
-tmp="$(mktemp)"
-trap 'rm -f "$tmp"' EXIT
+# Providers are independent and every one of them is dominated by network
+# latency, so fan them out instead of walking the list. Each job owns its own
+# output file — nothing is appended to a shared one — and the results are
+# joined in $selected order afterwards, so both the providers[] order and the
+# `active` pick below stay deterministic no matter which job finishes first.
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
 
 for id in $selected; do
-    collect "$id" | normalize >>"$tmp"
+    collect "$id" | normalize >"$work/p-$id" &
+done
+wait
+
+tmp="$work/joined"
+: >"$tmp"
+for id in $selected; do
+    [ -s "$work/p-$id" ] && cat "$work/p-$id" >>"$tmp"
 done
 
 jq -s -L "$JQ_DIR" \
