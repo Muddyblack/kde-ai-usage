@@ -37,7 +37,7 @@ ColumnLayout {
     }
 
     ColumnLayout {
-        visible: !rootItem.grokLoggedIn && rootItem._grokApiKey === ""
+        visible: !rootItem.grokLoggedIn && !rootItem.grokHasKey
         Layout.fillWidth: true
         spacing: 6
         PlasmaComponents.Label {
@@ -64,7 +64,7 @@ ColumnLayout {
     }
 
     PlasmaComponents.Label {
-        visible: (rootItem.grokLoggedIn || rootItem._grokApiKey !== "") && !rootItem.grokHasBilling
+        visible: (rootItem.grokLoggedIn || rootItem.grokHasKey) && !rootItem.grokHasBilling
         text: "Billing quota is not exposed for this Grok account."
         font.pixelSize: 10
         opacity: 0.55

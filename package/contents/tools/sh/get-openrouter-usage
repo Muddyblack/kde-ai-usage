@@ -1,46 +1,38 @@
 #!/usr/bin/env bash
 # get-openrouter-usage — Resolve OpenRouter API key and fetch usage/credits.
 #   GET https://openrouter.ai/api/v1/key → usage, limit, rate_limit info
+set -u
 
-API_KEY="${WIDGET_OPENROUTER_API_KEY:-}"
-[ -z "$API_KEY" ] && [ -n "$OPENROUTER_API_KEY" ]                        && API_KEY="$OPENROUTER_API_KEY"
-[ -z "$API_KEY" ] && [ -f "$HOME/.config/openrouter/api-key" ]           && API_KEY=$(cat "$HOME/.config/openrouter/api-key" 2>/dev/null | tr -d '\n\r ')
-[ -z "$API_KEY" ] && [ -f "$HOME/.openrouter/api-key" ]                  && API_KEY=$(cat "$HOME/.openrouter/api-key"          2>/dev/null | tr -d '\n\r ')
-[ -z "$API_KEY" ] && [ -f "$HOME/.config/openrouter.key" ]               && API_KEY=$(cat "$HOME/.config/openrouter.key"        2>/dev/null | tr -d '\n\r ')
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/http.sh"
+require_jq
 
+API_KEY="$(resolve_key WIDGET_OPENROUTER_API_KEY OPENROUTER_API_KEY \
+    "$HOME/.config/openrouter/api-key" "$HOME/.openrouter/api-key" "$HOME/.config/openrouter.key")"
 if [ -z "$API_KEY" ]; then
-    echo "{}"; exit 0
+    echo "{}"
+    exit 0
 fi
 
-RESPONSE=$(curl -s -w "\n%{http_code}" \
+HTTP_TIMEOUT=8 http_json OPENROUTER_RESPONSE_FILE "https://openrouter.ai/api/v1/key" \
     -H "Authorization: Bearer $API_KEY" \
-    -H "Content-Type: application/json" \
-    --max-time 8 \
-    "https://openrouter.ai/api/v1/key" 2>/dev/null)
+    -H "Content-Type: application/json"
 
-HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-BODY=$(echo "$RESPONSE" | head -n -1)
+if [ "$HTTP_STATUS" != "200" ]; then
+    http_error_json "OpenRouter" "$HTTP_STATUS" "Invalid API key (401)"
+    exit 0
+fi
 
-case "$HTTP_CODE" in
-    200)
-        # Single jq pass — extract all fields and build output JSON
-        echo "$BODY" | jq --arg key "$API_KEY" '
-            (.data // .) as $d |
-            {
-                openrouterApiKey:    $key,
-                keyValid:            true,
-                label:               ($d.label            // ""),
-                usageUSD:            ($d.usage            // 0),
-                limitUSD:            ($d.limit            // null),
-                limitRemainingUSD:   ($d.limit_remaining  // null),
-                isFreeTier:          ($d.is_free_tier     // false),
-                rateLimit:           ($d.rate_limit       // {})
-            }'
-        ;;
-    401)
-        jq -n '{openrouterApiKey: "", keyValid: false, error: "Invalid API key (401)"}'
-        ;;
-    *)
-        jq -n --arg code "$HTTP_CODE" '{openrouterApiKey: "", keyValid: false, error: ("HTTP " + $code)}'
-        ;;
-esac
+if ! printf '%s' "$HTTP_BODY" | jq '
+    (.data // .) as $d |
+    {
+        hasKey:            true,
+        keyValid:          true,
+        label:             ($d.label           // ""),
+        usageUSD:          ($d.usage           // 0),
+        limitUSD:          ($d.limit           // null),
+        limitRemainingUSD: ($d.limit_remaining // null),
+        isFreeTier:        ($d.is_free_tier    // false),
+        rateLimit:         ($d.rate_limit      // {})
+    }' 2>/dev/null; then
+    error_json "OpenRouter invalid JSON"
+fi

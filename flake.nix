@@ -115,7 +115,7 @@
                 "$desktop_dir/org.quickshell.desktop"
               ${self.packages.${system}.tray-helper}/bin/ai-usage-tray \
                 ${pkgs.quickshell}/bin/qs "$config" \
-                ${self}/package/contents/tools/sh/get-usage-snapshot &
+                ${self}/package/contents/tools/sh/get-ai-usage &
               tray_pid=$!
               trap 'kill "$tray_pid" 2>/dev/null || true' EXIT INT TERM
               ${pkgs.quickshell}/bin/qs -p "$config"

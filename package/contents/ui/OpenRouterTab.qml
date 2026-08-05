@@ -99,7 +99,7 @@ ColumnLayout {
 
     // No key message
     ColumnLayout {
-        visible: !rootItem.openrouterKeyValid && rootItem._openrouterApiKey === ""
+        visible: !rootItem.openrouterKeyValid && !rootItem.openrouterHasKey
         Layout.fillWidth: true
         spacing: 6
         PlasmaComponents.Label {

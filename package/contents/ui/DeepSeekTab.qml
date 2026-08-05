@@ -58,7 +58,7 @@ ColumnLayout {
     }
 
     ColumnLayout {
-        visible: !rootItem.deepseekKeyValid && rootItem._deepseekApiKey === "" && rootItem.deepseekError === ""
+        visible: !rootItem.deepseekKeyValid && !rootItem.deepseekHasKey && rootItem.deepseekError === ""
         Layout.fillWidth: true
         spacing: 6
         PlasmaComponents.Label {

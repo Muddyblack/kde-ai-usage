@@ -25,7 +25,7 @@ int main(int argc, char **argv) {
 
     const QString qsPath = QString::fromLocal8Bit(argv[1]);
     const QString configPath = QString::fromLocal8Bit(argv[2]);
-    const QString snapshotPath = QString::fromLocal8Bit(argv[3]);
+    const QString backendPath = QString::fromLocal8Bit(argv[3]);
 
     auto call = [&](const QString &method) {
         QProcess::startDetached(qsPath, {"ipc", "-p", configPath, "call", "panel", method});
@@ -61,20 +61,20 @@ int main(int argc, char **argv) {
     QSystemTrayIcon tray{QIcon(iconPixmap)};
     tray.setToolTip("AI Usage");
 
-    QProcess snapshot;
+    QProcess backend;
     auto updateTooltip = [&] {
-        if (snapshot.state() != QProcess::NotRunning)
+        if (backend.state() != QProcess::NotRunning)
             return;
-        snapshot.start(snapshotPath);
+        backend.start(backendPath, {"--all"});
     };
-    QObject::connect(&snapshot, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), [&](int, QProcess::ExitStatus) {
-        const auto document = QJsonDocument::fromJson(snapshot.readAllStandardOutput());
+    QObject::connect(&backend, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), [&](int, QProcess::ExitStatus) {
+        const auto document = QJsonDocument::fromJson(backend.readAllStandardOutput());
         const auto providers = document.object().value("providers").toArray();
         QStringList lines{"AI Usage"};
         for (const auto &value : providers) {
             const auto provider = value.toObject();
             const QString label = provider.value("label").toString();
-            const QString summary = provider.value("summary").toString();
+            const QString summary = provider.value("summary").toObject().value("text").toString();
             if (!label.isEmpty() && !summary.isEmpty())
                 lines.append(label + ": " + summary);
         }

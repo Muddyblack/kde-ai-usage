@@ -1,100 +1,60 @@
 #!/usr/bin/env bash
 set -u
 
-API_KEY="${WIDGET_GITHUB_TOKEN:-}"
-[ -z "$API_KEY" ] && [ -n "${GITHUB_TOKEN:-}" ] && API_KEY="$GITHUB_TOKEN"
-[ -z "$API_KEY" ] && [ -n "${HOME:-}" ] && [ -f "$HOME/.config/github-copilot/token" ] && API_KEY=$(tr -d '\n\r ' < "$HOME/.config/github-copilot/token" 2>/dev/null)
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/http.sh"
+require_jq
 
-QUOTA="${WIDGET_COPILOT_QUOTA:-}"
-[ -z "$QUOTA" ] && [ -n "${COPILOT_QUOTA:-}" ] && QUOTA="$COPILOT_QUOTA"
-case "$QUOTA" in
-    ''|*[!0-9]*) QUOTA=300 ;;
-esac
-
+API_KEY="$(resolve_key WIDGET_GITHUB_TOKEN GITHUB_TOKEN "$HOME/.config/github-copilot/token")"
 if [ -z "$API_KEY" ]; then
     echo "{}"
     exit 0
 fi
 
-if ! command -v jq >/dev/null 2>&1; then
-    printf '%s\n' '{"githubToken":"","keyValid":false,"error":"jq is required"}'
-    exit 0
-fi
+QUOTA="${WIDGET_COPILOT_QUOTA:-${COPILOT_QUOTA:-}}"
+case "$QUOTA" in
+    '' | *[!0-9]*) QUOTA=300 ;;
+esac
 
 github_get() {
-    local kind="$1"
-    local url="$2"
-
-    if [ "$kind" = "user" ] && [ -n "${COPILOT_USER_RESPONSE_FILE:-}" ] && [ -f "$COPILOT_USER_RESPONSE_FILE" ]; then
-        printf '%s\n200' "$(< "$COPILOT_USER_RESPONSE_FILE")"
-        return
-    fi
-
-    if [ "$kind" = "usage" ] && [ -n "${COPILOT_USAGE_RESPONSE_FILE:-}" ] && [ -f "$COPILOT_USAGE_RESPONSE_FILE" ]; then
-        printf '%s\n200' "$(< "$COPILOT_USAGE_RESPONSE_FILE")"
-        return
-    fi
-
-    curl -s -w "\n%{http_code}" \
+    http_json "$1" "$2" \
         -H "Authorization: Bearer $API_KEY" \
         -H "Accept: application/vnd.github+json" \
         -H "X-GitHub-Api-Version: 2022-11-28" \
-        -H "User-Agent: kde-ai-usage/copilot" \
-        --max-time 10 \
-        "$url" 2>/dev/null
+        -H "User-Agent: kde-ai-usage/copilot"
 }
 
-USER_RESPONSE=$(github_get "user" "https://api.github.com/user")
-USER_HTTP="${USER_RESPONSE##*$'\n'}"
-USER_BODY="${USER_RESPONSE%$'\n'*}"
-
-if [ "$USER_HTTP" != "200" ]; then
-    case "$USER_HTTP" in
-        401|403) jq -n '{githubToken: "", keyValid: false, error: "Invalid GitHub token"}' ;;
-        000) jq -n '{githubToken: "", keyValid: false, error: "GitHub network error"}' ;;
-        *) jq -n --arg code "$USER_HTTP" '{githubToken: "", keyValid: false, error: ("GitHub HTTP " + $code)}' ;;
-    esac
+github_get COPILOT_USER_RESPONSE_FILE "https://api.github.com/user"
+USER_BODY="$HTTP_BODY"
+if [ "$HTTP_STATUS" != "200" ]; then
+    http_error_json "GitHub" "$HTTP_STATUS" "Invalid GitHub token"
     exit 0
 fi
 
-if ! USER_JSON=$(echo "$USER_BODY" | jq -c '.' 2>/dev/null); then
-    jq -n '{githubToken: "", keyValid: false, error: "GitHub user invalid JSON"}'
-    exit 0
-fi
-
-USERNAME=$(echo "$USER_JSON" | jq -r 'if ((.login | type) == "string" and (.login | length) > 0) then .login else empty end')
+USERNAME="$(printf '%s' "$USER_BODY" | jq -r 'if ((.login | type) == "string" and (.login | length) > 0) then .login else empty end' 2>/dev/null)"
 if [ -z "$USERNAME" ]; then
-    jq -n '{githubToken: "", keyValid: false, error: "GitHub username missing"}'
+    error_json "GitHub username missing"
     exit 0
 fi
 
-USAGE_RESPONSE=$(github_get "usage" "https://api.github.com/users/$USERNAME/settings/billing/premium_request/usage")
-USAGE_HTTP="${USAGE_RESPONSE##*$'\n'}"
-USAGE_BODY="${USAGE_RESPONSE%$'\n'*}"
+github_get COPILOT_USAGE_RESPONSE_FILE \
+    "https://api.github.com/users/$USERNAME/settings/billing/premium_request/usage"
+USAGE_BODY="$HTTP_BODY"
+if [ "$HTTP_STATUS" != "200" ]; then
+    http_error_json "GitHub Copilot" "$HTTP_STATUS" \
+        "GitHub token cannot read Copilot premium request usage"
+    exit 0
+fi
 
-case "$USAGE_HTTP" in
-    200)
-        if ! echo "$USAGE_BODY" | jq --arg key "$API_KEY" --arg username "$USERNAME" --argjson quota "$QUOTA" '
-            (if type == "array" then . else (.usageItems // []) end) as $items |
-            ($items | map((.grossQuantity // 0) | if type == "number" then . else (tonumber? // 0) end) | add // 0) as $used |
-            {
-                githubToken: $key,
-                keyValid: true,
-                username: $username,
-                used: $used,
-                quota: $quota,
-                pct: (if $quota > 0 then ([100, (($used / $quota) * 100)] | min) else 0 end)
-            }' 2>/dev/null; then
-            jq -n '{githubToken: "", keyValid: false, error: "GitHub Copilot invalid JSON"}'
-        fi
-        ;;
-    401|403|404)
-        jq -n '{githubToken: "", keyValid: false, error: "GitHub token cannot read Copilot premium request usage"}'
-        ;;
-    000)
-        jq -n '{githubToken: "", keyValid: false, error: "GitHub Copilot network error"}'
-        ;;
-    *)
-        jq -n --arg code "$USAGE_HTTP" '{githubToken: "", keyValid: false, error: ("GitHub Copilot HTTP " + $code)}'
-        ;;
-esac
+if ! printf '%s' "$USAGE_BODY" | jq --arg username "$USERNAME" --argjson quota "$QUOTA" '
+    (if type == "array" then . else (.usageItems // []) end) as $items |
+    ($items | map((.grossQuantity // 0) | if type == "number" then . else (tonumber? // 0) end) | add // 0) as $used |
+    {
+        hasKey: true,
+        keyValid: true,
+        username: $username,
+        used: $used,
+        quota: $quota,
+        pct: (if $quota > 0 then ([100, (($used / $quota) * 100)] | min) else 0 end)
+    }' 2>/dev/null; then
+    error_json "GitHub Copilot invalid JSON"
+fi

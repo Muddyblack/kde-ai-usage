@@ -20,3 +20,14 @@ jobs:
 
       - name: qmlformat check
         run: nix develop --command bash -c 'find package/contents -name "*.qml" | xargs qmlformat --dry-run 2>&1 | grep -q "would reformat" && echo "Files need formatting, run qmlformat -i" && exit 1 || true'
+
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: provider contract tests
+        run: ./tests/get-ai-usage.test.sh
+
+      - name: shared frontend code tests
+        run: node --test tests/*.test.js

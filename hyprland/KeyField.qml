@@ -76,7 +76,7 @@ RowLayout {
         }
     }
 
-    // Debounce so we don't spawn a snapshot on every keystroke.
+    // Debounce so we don't spawn a backend refresh on every keystroke.
     Timer {
         id: refreshDebounce
         interval: 1200

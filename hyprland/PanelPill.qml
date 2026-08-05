@@ -9,7 +9,7 @@ Rectangle {
     id: pill
 
     property string iconSource: ""
-    // [{pct, color, text?, tooltip?}] from the snapshot's provider.slots
+    // [{pct, color, text?, tooltip?}] from the backend's provider.slots
     property var slots: []
     property bool stale: false
     property bool hasError: false

@@ -6,7 +6,8 @@ import org.kde.kirigami as Kirigami
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.plasma5support as Plasma5Support
 import org.kde.plasma.plasmoid
-import "../code/UsageWindows.js" as UsageWindows
+import "../code/Format.js" as Format
+import "../code/UsageHistory.js" as UsageHistory
 
 PlasmoidItem {
     // GPT-4o family
@@ -105,12 +106,6 @@ PlasmoidItem {
             "incidents": [],
             "latestUpdate": ""
         })
-    // Legacy aliases kept so ClaudeTab still compiles during the transition
-    readonly property string claudeApiStatusIndicator: claudeStatus.indicator
-    readonly property string claudeApiStatusDescription: claudeStatus.description
-    readonly property var claudeApiStatusComponents: claudeStatus.components
-    readonly property var claudeApiStatusIncidents: claudeStatus.incidents
-    readonly property string claudeApiStatusLatestUpdate: claudeStatus.latestUpdate
     // ── Claude data ───────────────────────────────────────────────────────────
     property bool sessionAvailable: false
     property real sessionPct: 0
@@ -137,8 +132,9 @@ PlasmoidItem {
     property real claudeExtraUsageUsed: 0
     property real claudeExtraUsagePct: 0
     property string claudeExtraUsageCurrency: "USD"
-    property string _claudeToken: ""
-    property string _claudeAdminToken: ""
+    // Credential *presence* only — the backend never hands tokens to the UI.
+    property bool claudeHasOAuth: false
+    property bool claudeHasAdminKey: false
     property var claudeModels: ({})
     property real claudeTotalCostUSD: 0
     property real claudeTotalInputTokens: 0
@@ -200,13 +196,10 @@ PlasmoidItem {
     property string antigravityPlanType: ""
     property real antigravityPromptCreditsMonthly: 0
     property real antigravityPromptCreditsAvailable: 0
-    property string _antigravityToken: ""
-    property string _antigravityProjectId: ""
     property var antigravityModels: ({})
     property var antigravityGroups: []
     // ── OpenAI data ───────────────────────────────────────────────────────────
-    property string _openaiApiKey: ""
-    property string _openaiAccessToken: "" // Codex OAuth token (no org key needed)
+    property bool openaiHasApiKey: false
     property string openaiEmail: ""
     property string openaiPlanType: ""
     property string openaiOrgId: ""
@@ -257,10 +250,8 @@ PlasmoidItem {
     // Per-model additional rate limits (additional_rate_limits[] from the endpoint)
     // Each entry: { name, primary_pct, primary_reset, primary_countdown, secondary_pct, secondary_reset, secondary_countdown }
     property var codexAdditionalLimits: []
-    // ── Google AI / Gemini API data ───────────────────────────────────────────
-    property string _googleApiKey: ""
     // ── Mistral data ──────────────────────────────────────────────────────────
-    property string _mistralApiKey: ""
+    property bool mistralHasKey: false
     property bool mistralKeyValid: false
     property var mistralAvailableModels: []
     property string mistralError: ""
@@ -275,7 +266,7 @@ PlasmoidItem {
     property string mistralVibeActiveModel: ""
     property var mistralVibeRecent: []
     // ── OpenRouter data ───────────────────────────────────────────────────────
-    property string _openrouterApiKey: ""
+    property bool openrouterHasKey: false
     property bool openrouterKeyValid: false
     property string openrouterLabel: ""
     property real openrouterUsageUSD: 0
@@ -285,7 +276,7 @@ PlasmoidItem {
     property var openrouterRateLimit: ({})
     property string openrouterError: ""
     // ── Grok CLI / xAI data ──────────────────────────────────────────────────
-    property string _grokApiKey: ""
+    property bool grokHasKey: false
     property bool grokLoggedIn: false
     property real grokPct: 0
     property real grokUsed: 0
@@ -303,7 +294,7 @@ PlasmoidItem {
     property string grokQuotaWindow: ""
     property bool grokQuotaExhausted: false
     // ── Z.AI data ─────────────────────────────────────────────────────────────
-    property string _zaiToken: ""
+    property bool zaiHasKey: false
     property bool zaiKeyValid: false
     property string zaiLevel: ""
     property real zaiTokenPct: 0
@@ -318,7 +309,7 @@ PlasmoidItem {
     property var zaiModels: []
     property string zaiError: ""
     // ── GitHub Copilot data ───────────────────────────────────────────────────
-    property string _githubToken: ""
+    property bool copilotHasKey: false
     property bool copilotKeyValid: false
     property string copilotUsername: ""
     property real copilotUsed: 0
@@ -328,7 +319,7 @@ PlasmoidItem {
     property string copilotCountdown: ""
     property string copilotError: ""
     // ── DeepSeek data ────────────────────────────────────────────────────────
-    property string _deepseekApiKey: ""
+    property bool deepseekHasKey: false
     property bool deepseekKeyValid: false
     property bool deepseekIsAvailable: false
     property var deepseekBalances: []
@@ -343,7 +334,6 @@ PlasmoidItem {
     property string lastUpdate: ""
     property int backoffMs: 0
     property bool showSettings: false
-    property bool _offline: false
     property bool showUsageChart: Plasmoid.configuration.showUsageChart
     // Unified usage history: array of {t, s, w, cp, cw}.
     // s=Claude session%, w=Claude weekly%, cp=Codex 5h%, cw=Codex weekly%.
@@ -355,22 +345,20 @@ PlasmoidItem {
     // services keeps the same time range. Tabs with a single fixed window
     // (antigravity/openrouter/mistral) ignore it but don't clobber it, so you
     // return to your previous range when you go back to a multi-window tab.
-    property string chartGranularity: {
-        // Prefer a saved granularity; otherwise derive it from the saved window
-        // (so existing users keep whatever range their last chartWindow implied).
-        var saved = Plasmoid.configuration.chartGranularity || "";
-        if (saved !== "")
-            return saved;
-
-        var fromWin = root._windowGranularity(Plasmoid.configuration.chartWindow || "");
-        return fromWin !== "" ? fromWin : "7d";
-    }
+    property string chartGranularity: Plasmoid.configuration.chartGranularity || "7d"
+    // Chart ranges per provider, straight from the backend: which history series
+    // exist, what each one is called and how wide it is. Keyed by provider id.
+    property var providerChartWindows: ({})
     // {t, v} view of the currently-selected chart window
     readonly property var weeklyUsageHistory: {
-        var key = root._historyKey();
+        var win = root.currentChartWindow();
+        if (!win)
+            return [];
+
+        var key = win.key;
         var out = [];
         var now_ms = new Date().getTime();
-        var winSize = root.getChartWindowSize();
+        var winSize = win.size;
         var maxT = now_ms - root.chartTimeOffset;
         var minT = maxT - winSize;
         for (var i = 0; i < root.usageHistory.length; i++) {
@@ -385,9 +373,14 @@ PlasmoidItem {
                     "v": v
                 });
         }
+        // Redraw quota resets where they actually happened, not where the next
+        // poll noticed them (see UsageHistory.withResets).
+        if (win.resets)
+            out = UsageHistory.withResets(out, win.resetAt * 1000, win.periodMs, minT, maxT);
+
         // Raw money series store absolute amounts; auto-scale to their own max so the
         // spend curve fills the chart (the canvas expects a 0-100 value).
-        if ((key === "mv" || key === "ds") && out.length > 0) {
+        if (win.raw && out.length > 0) {
             var maxV = 0;
             for (var j = 0; j < out.length; j++)
                 if (out[j].v > maxV) {
@@ -473,127 +466,6 @@ PlasmoidItem {
 
         return sum;
     }
-    // ── Pricing (USD per million tokens) ─────────────────────────────────────
-    readonly property var claudePricing: ({
-            "claude-opus-4": {
-                "input": 15,
-                "output": 75
-            },
-            "claude-sonnet-4": {
-                "input": 3,
-                "output": 15
-            },
-            "claude-sonnet-3-5": {
-                "input": 3,
-                "output": 15
-            },
-            "claude-haiku-4": {
-                "input": 0.8,
-                "output": 4
-            },
-            "claude-haiku-3-5": {
-                "input": 0.8,
-                "output": 4
-            },
-            "claude-3-5-sonnet-20241022": {
-                "input": 3,
-                "output": 15
-            },
-            "claude-3-5-sonnet-20240620": {
-                "input": 3,
-                "output": 15
-            },
-            "claude-3-5-haiku-20241022": {
-                "input": 0.8,
-                "output": 4
-            },
-            "claude-3-opus-20240229": {
-                "input": 15,
-                "output": 75
-            }
-        })
-    readonly property var openaiPricing: ({
-            "gpt-4o": {
-                "input": 2.5,
-                "output": 10
-            },
-            "gpt-4o-2024-11-20": {
-                "input": 2.5,
-                "output": 10
-            },
-            "gpt-4o-2024-08-06": {
-                "input": 2.5,
-                "output": 10
-            },
-            "gpt-4o-mini": {
-                "input": 0.15,
-                "output": 0.6
-            },
-            "gpt-4o-mini-2024-07-18": {
-                "input": 0.15,
-                "output": 0.6
-            },
-            "o1": {
-                "input": 15,
-                "output": 60
-            },
-            "o1-2024-12-17": {
-                "input": 15,
-                "output": 60
-            },
-            "o1-mini": {
-                "input": 1.1,
-                "output": 4.4
-            },
-            "o1-mini-2024-09-12": {
-                "input": 1.1,
-                "output": 4.4
-            },
-            "o3": {
-                "input": 10,
-                "output": 40
-            },
-            "o3-mini": {
-                "input": 1.1,
-                "output": 4.4
-            },
-            "o4-mini": {
-                "input": 1.1,
-                "output": 4.4
-            },
-            "gpt-4-turbo": {
-                "input": 10,
-                "output": 30
-            },
-            "gpt-4-turbo-2024-04-09": {
-                "input": 10,
-                "output": 30
-            },
-            "gpt-4": {
-                "input": 30,
-                "output": 60
-            },
-            "gpt-4-32k": {
-                "input": 60,
-                "output": 120
-            },
-            "gpt-3.5-turbo": {
-                "input": 0.5,
-                "output": 1.5
-            },
-            "gpt-3.5-turbo-0125": {
-                "input": 0.5,
-                "output": 1.5
-            },
-            "text-embedding-3-small": {
-                "input": 0.02,
-                "output": 0
-            },
-            "text-embedding-3-large": {
-                "input": 0.13,
-                "output": 0
-            }
-        })
     // ── Timers ────────────────────────────────────────────────────────────────
     // Poll interval is user-configurable (seconds); default 300s. Clamp to a sane floor.
     property int pollIntervalSec: Plasmoid.configuration.pollIntervalSec || 300
@@ -606,131 +478,69 @@ PlasmoidItem {
         return root.shellQuote([root.scriptDir, name].join(""));
     }
 
-    // Granularity of a given window ID ("" for single-window tabs).
-    function _windowGranularity(win) {
-        if (win === "session" || win === "codex_primary")
-            return "5h";
-
-        if (win === "day" || win === "codex_day")
-            return "24h";
-
-        if (win === "weekly" || win === "codex_weekly")
-            return "7d";
-
-        return "";
+    // Chart ranges the backend reported for a provider, newest snapshot wins.
+    function chartWindowsFor(tab) {
+        return root.providerChartWindows[tab] || [];
     }
 
-    // Window ID for a tab at the current granularity. Single-window tabs return
-    // their only ID; multi-window tabs fall back to 7d if the granularity is unset.
+    // The range currently selected on the active tab, or null when the provider
+    // has no chartable series (or has not been fetched yet).
+    function currentChartWindow() {
+        var windows = root.chartWindowsFor(root.enabledTabs[root.activeTab] || "");
+        for (var i = 0; i < windows.length; i++) {
+            if (windows[i].id === root.chartWindow)
+                return windows[i];
+        }
+        return windows.length > 0 ? windows[windows.length - 1] : null;
+    }
+
+    // Window ID for a tab at the remembered granularity, so the selected time
+    // range carries across services. Providers with a single fixed range return
+    // that one; an unknown tab keeps the current selection.
     function _windowForTab(tab, gran) {
-        if (tab === "claude")
-            return gran === "5h" ? "session" : gran === "24h" ? "day" : "weekly";
+        var windows = root.chartWindowsFor(tab);
+        if (windows.length === 0)
+            return root.chartWindow;
 
-        if (tab === "openai")
-            return gran === "5h" ? "codex_primary" : gran === "24h" ? "codex_day" : "codex_weekly";
-
-        if (tab === "kiro")
-            return "kiro";
-
-        if (tab === "antigravity")
-            return "antigravity";
-
-        if (tab === "openrouter")
-            return "openrouter";
-
-        if (tab === "mistral")
-            return "mistral";
-
-        if (tab === "grok")
-            return "grok";
-
-        if (tab === "zai")
-            return "zai";
-
-        if (tab === "copilot")
-            return "copilot";
-
-        if (tab === "deepseek")
-            return "deepseek";
-
-        return "weekly";
+        for (var i = 0; i < windows.length; i++) {
+            if (windows[i].granularity === gran)
+                return windows[i].id;
+        }
+        return windows[windows.length - 1].id;
     }
 
-    function ensureAvailableChartWindow(provider, sessionIsAvailable, weeklyIsAvailable) {
+    // Called after a provider refresh: if the selected range vanished (a plan
+    // window the provider stopped reporting), fall back to a range it still has.
+    function ensureAvailableChartWindow(provider) {
         if (root.enabledTabs[root.activeTab] !== provider)
             return;
 
-        var choices = UsageWindows.chartChoices(provider, sessionIsAvailable, weeklyIsAvailable);
-        if (choices.length === 0)
+        var windows = root.chartWindowsFor(provider);
+        if (windows.length === 0)
             return;
 
-        for (var i = 0; i < choices.length; i++) {
-            if (choices[i].id === root.chartWindow)
+        for (var i = 0; i < windows.length; i++) {
+            if (windows[i].id === root.chartWindow)
                 return;
         }
 
-        var fallback = weeklyIsAvailable ? choices[choices.length - 1] : choices[0];
+        var fallback = windows[windows.length - 1];
         root.chartWindow = fallback.id;
-        root.chartGranularity = root._windowGranularity(fallback.id);
         Plasmoid.configuration.chartWindow = root.chartWindow;
-        Plasmoid.configuration.chartGranularity = root.chartGranularity;
+        if (fallback.granularity !== "") {
+            root.chartGranularity = fallback.granularity;
+            Plasmoid.configuration.chartGranularity = root.chartGranularity;
+        }
     }
 
     function _historyKey() {
-        if (root.chartWindow === "session" || root.chartWindow === "day")
-            return "s";
-
-        if (root.chartWindow === "weekly")
-            return "w";
-
-        if (root.chartWindow === "codex_primary" || root.chartWindow === "codex_day")
-            return "cp";
-
-        if (root.chartWindow === "codex_weekly")
-            return "cw";
-
-        if (root.chartWindow === "kiro")
-            return "kr";
-
-        if (root.chartWindow === "antigravity")
-            return "ag";
-
-        if (root.chartWindow === "openrouter")
-            return "or";
-
-        if (root.chartWindow === "mistral")
-            return "mv";
-
-        if (root.chartWindow === "grok")
-            return "gr";
-
-        if (root.chartWindow === "zai")
-            return "za";
-
-        if (root.chartWindow === "copilot")
-            return "gh";
-
-        if (root.chartWindow === "deepseek")
-            return "ds";
-
-        return "w";
+        var win = root.currentChartWindow();
+        return win ? win.key : "";
     }
 
     function getChartWindowSize() {
-        var win = root.chartWindow;
-        if (win === "session" || win === "codex_primary")
-            return 5 * 3.6e+06; // 5 hours in ms
-
-        if (win === "day" || win === "codex_day")
-            return 24 * 3.6e+06; // 24 hours in ms
-
-        if (win === "weekly" || win === "codex_weekly")
-            return 7 * 24 * 3.6e+06; // 7 days in ms
-
-        if (win === "kiro" || win === "antigravity" || win === "openrouter" || win === "mistral" || win === "grok" || win === "zai" || win === "copilot" || win === "deepseek")
-            return 30 * 24 * 3.6e+06; // 30 days in ms
-
-        return 7 * 24 * 3.6e+06;
+        var win = root.currentChartWindow();
+        return win ? win.size : 7 * 24 * 3.6e+06;
     }
 
     function getChartRangeText() {
@@ -741,7 +551,7 @@ PlasmoidItem {
         var minT = maxT - winSize;
         var minDate = new Date(minT);
         var maxDate = new Date(maxT);
-        var isHourly = (root.chartWindow === "session" || root.chartWindow === "codex_primary" || root.chartWindow === "day" || root.chartWindow === "codex_day");
+        var isHourly = winSize <= 24 * 3.6e+06;
         if (isHourly) {
             if (minDate.toDateString() === maxDate.toDateString())
                 return Qt.formatDateTime(minDate, "hh:mm") + " - " + Qt.formatDateTime(maxDate, "hh:mm") + " (" + Qt.formatDateTime(maxDate, "MMM d") + ")";
@@ -766,13 +576,7 @@ PlasmoidItem {
         var legacy = Plasmoid.configuration.weeklyUsageHistory || "";
         if (legacy) {
             try {
-                var old = JSON.parse(legacy);
-                var migrated = [];
-                for (var i = 0; i < old.length; i++)
-                    migrated.push({
-                        "t": old[i].t,
-                        "w": old[i].v
-                    });
+                var migrated = UsageHistory.normalize(JSON.parse(legacy), root.historyLimit);
                 root.usageHistory = migrated;
                 Plasmoid.configuration.usageHistory = JSON.stringify(migrated);
                 return;
@@ -785,32 +589,13 @@ PlasmoidItem {
         root.autoloadHistory();
     }
 
-    function recordUsage(sessionPct, weeklyPct, sessionIsAvailable, weeklyIsAvailable) {
-        var history = root.usageHistory.slice();
-        var now = new Date().getTime();
-        if (history.length > 0 && now - history[history.length - 1].t < 60000) {
-            var last = history[history.length - 1];
-            if (sessionIsAvailable)
-                last.s = sessionPct;
-
-            if (weeklyIsAvailable)
-                last.w = weeklyPct;
-
-            history[history.length - 1] = last;
-        } else {
-            var point = {
-                "t": now
-            };
-            if (sessionIsAvailable)
-                point.s = sessionPct;
-
-            if (weeklyIsAvailable)
-                point.w = weeklyPct;
-
-            history.push(point);
-        }
-        if (history.length > root.historyLimit)
-            history = history.slice(history.length - root.historyLimit);
+    // Merge one provider's history values into the shared series. The backend
+    // decides which keys a provider contributes (see historyValues in the
+    // contract), so the frontend never has to know a provider's chart series.
+    function recordHistoryValues(values) {
+        var history = UsageHistory.merge(root.usageHistory, values, new Date().getTime(), root.historyLimit);
+        if (history === root.usageHistory)
+            return;
 
         root.usageHistory = history;
         var json = JSON.stringify(history);
@@ -819,235 +604,9 @@ PlasmoidItem {
         root.autosaveHistory(json);
     }
 
-    function recordAntigravityUsage(pct) {
-        var history = root.usageHistory.slice();
-        var now = new Date().getTime();
-        if (history.length > 0 && now - history[history.length - 1].t < 120000) {
-            var last = history[history.length - 1];
-            last.ag = pct;
-            history[history.length - 1] = last;
-        } else {
-            history.push({
-                "t": now,
-                "ag": pct
-            });
-        }
-        if (history.length > root.historyLimit)
-            history = history.slice(history.length - root.historyLimit);
-
-        root.usageHistory = history;
-        var json = JSON.stringify(history);
-        Plasmoid.configuration.usageHistory = json;
-        root.autosaveHistory(json);
-    }
-
-    function recordOpenRouterUsage(pct) {
-        if (pct <= 0)
-            return;
-
-        var history = root.usageHistory.slice();
-        var now = new Date().getTime();
-        if (history.length > 0 && now - history[history.length - 1].t < 120000) {
-            var last = history[history.length - 1];
-            last.or = pct;
-            history[history.length - 1] = last;
-        } else {
-            history.push({
-                "t": now,
-                "or": pct
-            });
-        }
-        if (history.length > root.historyLimit)
-            history = history.slice(history.length - root.historyLimit);
-
-        root.usageHistory = history;
-        var json = JSON.stringify(history);
-        Plasmoid.configuration.usageHistory = json;
-        root.autosaveHistory(json);
-    }
-
-    function recordKiroUsage(pct) {
-        var history = root.usageHistory.slice();
-        var now = new Date().getTime();
-        if (history.length > 0 && now - history[history.length - 1].t < 120000) {
-            var last = history[history.length - 1];
-            last.kr = pct;
-            history[history.length - 1] = last;
-        } else {
-            history.push({
-                "t": now,
-                "kr": pct
-            });
-        }
-        if (history.length > root.historyLimit)
-            history = history.slice(history.length - root.historyLimit);
-
-        root.usageHistory = history;
-        var json = JSON.stringify(history);
-        Plasmoid.configuration.usageHistory = json;
-        root.autosaveHistory(json);
-    }
-
-    function recordGrokUsage(pct) {
-        pct = Math.max(0, Math.min(100, pct || 0));
-        var history = root.usageHistory.slice();
-        var now = new Date().getTime();
-        if (history.length > 0 && now - history[history.length - 1].t < 120000) {
-            var last = history[history.length - 1];
-            last.gr = pct;
-            history[history.length - 1] = last;
-        } else {
-            history.push({
-                "t": now,
-                "gr": pct
-            });
-        }
-        if (history.length > root.historyLimit)
-            history = history.slice(history.length - root.historyLimit);
-
-        root.usageHistory = history;
-        var json = JSON.stringify(history);
-        Plasmoid.configuration.usageHistory = json;
-        root.autosaveHistory(json);
-    }
-
-    function recordZaiUsage(pct) {
-        pct = Math.max(0, Math.min(100, pct || 0));
-        var history = root.usageHistory.slice();
-        var now = new Date().getTime();
-        if (history.length > 0 && now - history[history.length - 1].t < 120000) {
-            var last = history[history.length - 1];
-            last.za = pct;
-            history[history.length - 1] = last;
-        } else {
-            history.push({
-                "t": now,
-                "za": pct
-            });
-        }
-        if (history.length > root.historyLimit)
-            history = history.slice(history.length - root.historyLimit);
-
-        root.usageHistory = history;
-        var json = JSON.stringify(history);
-        Plasmoid.configuration.usageHistory = json;
-        root.autosaveHistory(json);
-    }
-
-    function recordCopilotUsage(pct) {
-        pct = Math.max(0, Math.min(100, pct || 0));
-        var history = root.usageHistory.slice();
-        var now = new Date().getTime();
-        if (history.length > 0 && now - history[history.length - 1].t < 120000) {
-            var last = history[history.length - 1];
-            last.gh = pct;
-            history[history.length - 1] = last;
-        } else {
-            history.push({
-                "t": now,
-                "gh": pct
-            });
-        }
-        if (history.length > root.historyLimit)
-            history = history.slice(history.length - root.historyLimit);
-
-        root.usageHistory = history;
-        var json = JSON.stringify(history);
-        Plasmoid.configuration.usageHistory = json;
-        root.autosaveHistory(json);
-    }
-
-    function recordDeepSeekBalance(amount) {
-        amount = Math.max(0, amount || 0);
-        var history = root.usageHistory.slice();
-        var now = new Date().getTime();
-        if (history.length > 0 && now - history[history.length - 1].t < 120000) {
-            var last = history[history.length - 1];
-            last.ds = amount;
-            history[history.length - 1] = last;
-        } else {
-            history.push({
-                "t": now,
-                "ds": amount
-            });
-        }
-        if (history.length > root.historyLimit)
-            history = history.slice(history.length - root.historyLimit);
-
-        root.usageHistory = history;
-        var json = JSON.stringify(history);
-        Plasmoid.configuration.usageHistory = json;
-        root.autosaveHistory(json);
-    }
-
-    // Record vibe CLI cumulative cost as a history point. We store the raw USD
-    // value in `mv`; the chart view auto-scales it to the window's own max so the
-    // spend-growth curve is always visible (no meaningful fixed quota to scale to).
-    function recordMistralVibeUsage(costUSD) {
-        if (costUSD <= 0)
-            return;
-
-        var history = root.usageHistory.slice();
-        var now = new Date().getTime();
-        if (history.length > 0 && now - history[history.length - 1].t < 120000) {
-            var last = history[history.length - 1];
-            last.mv = costUSD;
-            history[history.length - 1] = last;
-        } else {
-            history.push({
-                "t": now,
-                "mv": costUSD
-            });
-        }
-        if (history.length > root.historyLimit)
-            history = history.slice(history.length - root.historyLimit);
-
-        root.usageHistory = history;
-        var json = JSON.stringify(history);
-        Plasmoid.configuration.usageHistory = json;
-        root.autosaveHistory(json);
-    }
-
-    // Merge Codex windows into the most recent history point (or create one).
-    // Called after fetchCodexUsage() succeeds, separate from recordUsage() since
-    // Claude and Codex refresh on different tabs at different times.
-    function recordCodexUsage(sessionPct, weeklyPct, sessionIsAvailable, weeklyIsAvailable) {
-        var history = root.usageHistory.slice();
-        var now = new Date().getTime();
-        // If the last point is recent (<2 min), just patch it in-place.
-        if (history.length > 0 && now - history[history.length - 1].t < 120000) {
-            var last = history[history.length - 1];
-            if (sessionIsAvailable)
-                last.cp = sessionPct;
-
-            if (weeklyIsAvailable)
-                last.cw = weeklyPct;
-
-            history[history.length - 1] = last;
-        } else {
-            var point = {
-                "t": now
-            };
-            if (sessionIsAvailable)
-                point.cp = sessionPct;
-
-            if (weeklyIsAvailable)
-                point.cw = weeklyPct;
-
-            history.push(point);
-        }
-        if (history.length > root.historyLimit)
-            history = history.slice(history.length - root.historyLimit);
-
-        root.usageHistory = history;
-        var json = JSON.stringify(history);
-        Plasmoid.configuration.usageHistory = json;
-        root.autosaveHistory(json);
-    }
-
     // Silently mirror history JSON to ~/.local/share/ai-usage-widget/usage-history-latest.json
     function autosaveHistory(json) {
-        var cmd = "WIDGET_HISTORY_JSON=\"$(printf %s '" + Qt.btoa(json) + "' | base64 -d)\" " + root.scriptPath("history-io") + " autosave";
+        var cmd = "WIDGET_HISTORY_JSON=\"$(printf %s '" + root.base64(json) + "' | base64 -d)\" " + root.scriptPath("history-io") + " autosave";
         historyIOSource.disconnectSource(cmd);
         historyIOSource.connectSource(cmd);
     }
@@ -1114,7 +673,7 @@ PlasmoidItem {
         var json = JSON.stringify(root.usageHistory);
         // Pass the payload base64-encoded and decode it inside the shell, so the JSON
         // (quotes, brackets) never has to survive command-line quoting.
-        var cmd = "WIDGET_HISTORY_JSON=\"$(printf %s '" + Qt.btoa(json) + "' | base64 -d)\" " + root.scriptPath("history-io") + " export";
+        var cmd = "WIDGET_HISTORY_JSON=\"$(printf %s '" + root.base64(json) + "' | base64 -d)\" " + root.scriptPath("history-io") + " export";
         historyIOSource.disconnectSource(cmd);
         historyIOSource.connectSource(cmd);
     }
@@ -1420,39 +979,7 @@ PlasmoidItem {
     }
 
     function formatCountdown(targetDate) {
-        if (!targetDate)
-            return "";
-
-        var now = new Date();
-        var diffMs = targetDate.getTime() - now.getTime();
-        if (diffMs <= 0)
-            return "resetting...";
-
-        var totalMins = Math.floor(diffMs / 60000);
-        var d = Math.floor(totalMins / 1440);
-        var h = Math.floor((totalMins % 1440) / 60);
-        var m = totalMins % 60;
-        var parts = [];
-        if (d > 0)
-            parts.push(d + "d");
-
-        if (h > 0 || d > 0)
-            parts.push(h + "h");
-
-        parts.push(m + "m");
-        return parts.join(" ");
-    }
-
-    function msFromNowToDate(ms) {
-        if (ms === null || ms === undefined || ms <= 0)
-            return null;
-
-        return new Date(Date.now() + ms);
-    }
-
-    function nextMonthResetDate() {
-        var now = new Date();
-        return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0));
+        return Format.countdown(targetDate ? targetDate.getTime() : 0, new Date().getTime());
     }
 
     function updateCountdowns() {
@@ -1465,195 +992,6 @@ PlasmoidItem {
         root.zaiTokenCountdown = root.formatCountdown(root.zaiTokenResetDate);
         root.zaiToolsCountdown = root.formatCountdown(root.zaiToolsResetDate);
         root.copilotCountdown = root.formatCountdown(root.copilotResetDate);
-    }
-
-    // ── Shared stats helpers (Claude + Codex use the same derivations) ───────
-    // `dates` must be sorted ascending YYYY-MM-DD strings.
-    function _activityStreaks(dates) {
-        var longest = 0, run = 0, previous = null;
-        for (var d = 0; d < dates.length; d++) {
-            var current = new Date(dates[d] + "T00:00:00");
-            run = previous !== null && Math.round((current.getTime() - previous.getTime()) / 86400000) === 1 ? run + 1 : 1;
-            longest = Math.max(longest, run);
-            previous = current;
-        }
-        var currentStreak = 0;
-        if (dates.length) {
-            var last = new Date(dates[dates.length - 1] + "T00:00:00"), today = new Date();
-            today.setHours(0, 0, 0, 0);
-            if (Math.round((today.getTime() - last.getTime()) / 86400000) <= 1)
-                currentStreak = run;
-        }
-        return {
-            longest: longest,
-            current: currentStreak
-        };
-    }
-
-    function _spanDaysSince(firstDate) {
-        if (!firstDate)
-            return 0;
-
-        var first = new Date(firstDate);
-        return isNaN(first.getTime()) ? 0 : Math.max(1, Math.round((Date.now() - first.getTime()) / 86400000) + 1);
-    }
-
-    function _peakHour(hourCounts) {
-        var peak = -1, peakCount = -1;
-        for (var hour in hourCounts) {
-            if (hourCounts[hour] > peakCount) {
-                peakCount = hourCounts[hour];
-                peak = parseInt(hour, 10);
-            }
-        }
-        return peak;
-    }
-
-    // Lifetime Codex usage aggregated from ~/.codex/sessions by get-codex-stats.
-    function parseCodexStats(raw) {
-        root.codexStatsAvailable = false;
-        if (!raw)
-            return;
-
-        try {
-            var s = JSON.parse(raw);
-            if (!s || !s.totalSessions)
-                return;
-
-            root.codexStatsTotalSessions = s.totalSessions || 0;
-            root.codexStatsTotalMessages = s.totalMessages || 0;
-            root.codexStatsTotalTokens = s.totalTokens || 0;
-            root.codexStatsTotalToolCalls = s.totalToolCalls || 0;
-            root.codexStatsFirstDate = s.firstSessionDate || "";
-            root.codexStatsComputedDate = s.lastComputedDate || "";
-            root.codexStatsLongestSessionMs = (s.longestSession && s.longestSession.duration) || 0;
-            root.codexStatsLongestSessionMessages = (s.longestSession && s.longestSession.messageCount) || 0;
-            root.codexModel = s.model || "";
-            root.codexEffortLevel = s.effortLevel || "";
-            var models = {}, favorite = "", favoriteTotal = -1;
-            var usage = s.modelUsage || {};
-            for (var id in usage) {
-                var m = usage[id] || {};
-                models[id] = {
-                    input: m.inputTokens || 0,
-                    output: m.outputTokens || 0,
-                    cacheRead: m.cachedInput || 0,
-                    reasoning: m.reasoningTokens || 0,
-                    total: m.totalTokens || 0,
-                    sessions: m.sessions || 0,
-                    contextWindow: m.contextWindow || 0
-                };
-                if (models[id].total > favoriteTotal) {
-                    favoriteTotal = models[id].total;
-                    favorite = id;
-                }
-            }
-            root.codexStatsModels = models;
-            root.codexStatsFavoriteModel = favorite;
-            var daily = [], dates = [], dailySource = s.dailyModelTokens || [], activity = s.dailyActivity || [];
-            for (var i = 0; i < dailySource.length; i++)
-                daily.push({
-                    date: (dailySource[i] || {}).date || "",
-                    total: (dailySource[i] || {}).total || 0
-                });
-
-            daily.sort(function (a, b) {
-                return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0);
-            });
-            root.codexStatsDailyTokens = daily;
-            for (var j = 0; j < activity.length; j++)
-                if (activity[j] && activity[j].date)
-                    dates.push(activity[j].date);
-
-            dates.sort();
-            root.codexStatsActiveDays = dates.length;
-            root.codexStatsSpanDays = root._spanDaysSince(root.codexStatsFirstDate);
-            var streaks = root._activityStreaks(dates);
-            root.codexStatsLongestStreak = streaks.longest;
-            root.codexStatsCurrentStreak = streaks.current;
-            root.codexStatsPeakHour = root._peakHour(s.hourCounts || {});
-            root.codexStatsAvailable = true;
-        } catch (e) {
-            console.log("Codex stats parse error: " + e);
-        }
-    }
-
-    function parseClaudeStats(raw) {
-        root.claudeStatsAvailable = false;
-        if (!raw)
-            return;
-        try {
-            var s = JSON.parse(raw);
-            root.claudeStatsVersion = s.version || 0;
-            root.claudeStatsTotalMessages = s.totalMessages || 0;
-            root.claudeStatsTotalSessions = s.totalSessions || 0;
-            root.claudeStatsFirstDate = s.firstSessionDate || "";
-            root.claudeStatsComputedDate = s.lastComputedDate || "";
-            root.claudeStatsLongestSessionMs = (s.longestSession && s.longestSession.duration) || 0;
-            root.claudeStatsLongestSessionMessages = (s.longestSession && s.longestSession.messageCount) || 0;
-            var models = {}, total = 0, favorite = "", favoriteTotal = -1, cost = 0, searches = 0;
-            var usage = s.modelUsage || {};
-            for (var id in usage) {
-                var m = usage[id] || {}, input = m.inputTokens || 0, output = m.outputTokens || 0;
-                var modelTotal = input + output;
-                var modelCost = m.costUSD || 0, modelSearches = m.webSearchRequests || 0;
-                models[id] = {
-                    input: input,
-                    output: output,
-                    cacheRead: m.cacheReadInputTokens || 0,
-                    cacheCreation: m.cacheCreationInputTokens || 0,
-                    total: modelTotal,
-                    cost: modelCost,
-                    webSearches: modelSearches,
-                    contextWindow: m.contextWindow || 0
-                };
-                total += modelTotal;
-                cost += modelCost;
-                searches += modelSearches;
-                if (modelTotal > favoriteTotal) {
-                    favoriteTotal = modelTotal;
-                    favorite = id;
-                }
-            }
-            root.claudeStatsModels = models;
-            root.claudeStatsTotalTokens = total;
-            root.claudeStatsTotalCostUSD = cost;
-            root.claudeStatsTotalWebSearches = searches;
-            root.claudeStatsFavoriteModel = favorite;
-            var daily = [], dailySource = s.dailyModelTokens || [];
-            for (var i = 0; i < dailySource.length; i++) {
-                var day = dailySource[i] || {}, byModel = day.tokensByModel || {}, dayTotal = 0;
-                for (var key in byModel)
-                    dayTotal += byModel[key] || 0;
-                daily.push({
-                    date: day.date || "",
-                    total: dayTotal
-                });
-            }
-            daily.sort(function (a, b) {
-                return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0);
-            });
-            root.claudeStatsDailyTokens = daily;
-            var dates = [], activity = s.dailyActivity || [], toolCalls = 0;
-            for (var j = 0; j < activity.length; j++) {
-                if (!activity[j])
-                    continue;
-                if (activity[j].date)
-                    dates.push(activity[j].date);
-                toolCalls += activity[j].toolCallCount || 0;
-            }
-            root.claudeStatsTotalToolCalls = toolCalls;
-            dates.sort();
-            root.claudeStatsActiveDays = dates.length;
-            root.claudeStatsSpanDays = root._spanDaysSince(root.claudeStatsFirstDate);
-            var streaks = root._activityStreaks(dates);
-            root.claudeStatsLongestStreak = streaks.longest;
-            root.claudeStatsCurrentStreak = streaks.current;
-            root.claudeStatsPeakHour = root._peakHour(s.hourCounts || {});
-            root.claudeStatsAvailable = true;
-        } catch (e) {
-            console.log("Claude stats parse error: " + e);
-        }
     }
 
     function usageColor(pct) {
@@ -1670,527 +1008,453 @@ PlasmoidItem {
         return name.replace(/gpt-4o-mini/g, "4o-mini").replace(/gpt-4o/g, "4o").replace(/gpt-4-turbo/g, "4-turbo").replace(/gpt-4-32k/g, "4-32k").replace(/gpt-4/g, "4").replace(/gpt-3\.5-turbo/g, "3.5-turbo").replace(/o1-mini/g, "o1-mini").replace(/o3-mini/g, "o3-mini").replace(/o4-mini/g, "o4-mini").replace(/claude-3-5-/g, "3.5-").replace(/claude-3-/g, "3-").replace(/claude-/g, "").replace(/-\d{8}$/, "").replace(/-20\d{2}-\d{2}-\d{2}$/, "");
     }
 
-    function loadCreds(tabOverride) {
-        var tab = tabOverride || root.enabledTabs[root.activeTab];
-        if (tab === "claude") {
-            var cfgKey = Plasmoid.configuration.claudeAdminApiKey || "";
-            // base64-encode the key so shell metacharacters in it can't break out
-            // of the command string (decoded back in the env assignment).
-            var envPrefix = cfgKey ? "WIDGET_CLAUDE_ADMIN_KEY=\"$(printf %s '" + Qt.btoa(cfgKey) + "' | base64 -d)\" " : "";
-            var cmd = envPrefix + root.scriptPath("get-claude-credentials");
-            credSource.disconnectSource(cmd);
-            credSource.connectSource(cmd);
-            // Read effort level + dream mode from ~/.claude/settings.json
-            var settingsCmd = "cat \"$HOME/.claude/settings.json\" 2>/dev/null || echo '{}'";
-            claudeSettingsSource.disconnectSource(settingsCmd);
-            claudeSettingsSource.connectSource(settingsCmd);
-            var statsCmd = "cat \"$HOME/.claude/stats-cache.json\" 2>/dev/null || echo ''";
-            claudeStatsSource.disconnectSource(statsCmd);
-            claudeStatsSource.connectSource(statsCmd);
-        } else if (tab === "antigravity") {
-            var cmd = root.scriptPath("get-antigravity-usage");
-            antigravityUsageSource.disconnectSource(cmd);
-            antigravityUsageSource.connectSource(cmd);
-        } else if (tab === "openai") {
-            var cfgKey = Plasmoid.configuration.openaiApiKey || "";
-            var envPrefix = cfgKey ? "WIDGET_OPENAI_API_KEY=\"$(printf %s '" + Qt.btoa(cfgKey) + "' | base64 -d)\" " : "";
-            var cmd = envPrefix + root.scriptPath("get-openai-usage");
-            openaiCredSource.disconnectSource(cmd);
-            openaiCredSource.connectSource(cmd);
-            var codexStatsCmd = root.scriptPath("get-codex-stats");
-            codexStatsSource.disconnectSource(codexStatsCmd);
-            codexStatsSource.connectSource(codexStatsCmd);
-        } else if (tab === "kiro") {
-            var cmd = root.scriptPath("get-kiro-usage");
-            kiroUsageSource.disconnectSource(cmd);
-            kiroUsageSource.connectSource(cmd);
-        } else if (tab === "mistral") {
-            var cfgKey = Plasmoid.configuration.mistralApiKey || "";
-            var envPrefix = cfgKey ? "WIDGET_MISTRAL_API_KEY=\"$(printf %s '" + Qt.btoa(cfgKey) + "' | base64 -d)\" " : "";
-            var cmd = envPrefix + root.scriptPath("get-mistral-usage");
-            mistralCredSource.disconnectSource(cmd);
-            mistralCredSource.connectSource(cmd);
-        } else if (tab === "openrouter") {
-            var cfgKey = Plasmoid.configuration.openrouterApiKey || "";
-            var envPrefix = cfgKey ? "WIDGET_OPENROUTER_API_KEY=\"$(printf %s '" + Qt.btoa(cfgKey) + "' | base64 -d)\" " : "";
-            var cmd = envPrefix + root.scriptPath("get-openrouter-usage");
-            openrouterCredSource.disconnectSource(cmd);
-            openrouterCredSource.connectSource(cmd);
-        } else if (tab === "grok") {
-            var cfgKey = Plasmoid.configuration.grokApiKey || "";
-            var envPrefix = cfgKey ? "WIDGET_GROK_API_KEY=\"$(printf %s '" + Qt.btoa(cfgKey) + "' | base64 -d)\" " : "";
-            var cmd = envPrefix + root.scriptPath("get-grok-usage");
-            grokUsageSource.disconnectSource(cmd);
-            grokUsageSource.connectSource(cmd);
-        } else if (tab === "zai") {
-            var cfgKey = Plasmoid.configuration.zaiToken || "";
-            var envPrefix = cfgKey ? "WIDGET_ZAI_TOKEN=\"$(printf %s '" + Qt.btoa(cfgKey) + "' | base64 -d)\" " : "";
-            var cmd = envPrefix + root.scriptPath("get-zai-usage");
-            zaiUsageSource.disconnectSource(cmd);
-            zaiUsageSource.connectSource(cmd);
-        } else if (tab === "copilot") {
-            var cfgKey = Plasmoid.configuration.githubToken || "";
-            var quota = parseInt(Plasmoid.configuration.copilotQuota || 300);
-            if (isNaN(quota) || quota <= 0)
-                quota = 300;
+    // ── Shared provider backend ───────────────────────────────────────────────
+    // Everything below only maps the backend's frontend-neutral JSON onto the
+    // properties the tabs bind to. No provider API call, response parsing or
+    // quota arithmetic lives in this widget any more — see
+    // tools/sh/get-ai-usage and docs/provider-contract.md.
 
-            var envPrefix = cfgKey ? "WIDGET_GITHUB_TOKEN=\"$(printf %s '" + Qt.btoa(cfgKey) + "' | base64 -d)\" " : "";
-            var cmd = envPrefix + "WIDGET_COPILOT_QUOTA=\"" + quota + "\" " + root.scriptPath("get-copilot-usage");
-            copilotUsageSource.disconnectSource(cmd);
-            copilotUsageSource.connectSource(cmd);
-        } else if (tab === "deepseek") {
-            var cfgKey = Plasmoid.configuration.deepseekApiKey || "";
-            var envPrefix = cfgKey ? "WIDGET_DEEPSEEK_API_KEY=\"$(printf %s '" + Qt.btoa(cfgKey) + "' | base64 -d)\" " : "";
-            var cmd = envPrefix + root.scriptPath("get-deepseek-balance");
-            deepseekBalanceSource.disconnectSource(cmd);
-            deepseekBalanceSource.connectSource(cmd);
-        }
-    }
-
-    // ── Claude usage ─────────────────────────────────────────────────────────
-    function fetchClaudeUsage() {
-        if (root.backoffMs > 0)
-            return;
-
-        var reqTab = root.activeTab;
-        var xhr = new XMLHttpRequest();
-        xhr.open("GET", "https://api.anthropic.com/api/oauth/usage");
-        xhr.setRequestHeader("Authorization", "Bearer " + root._claudeToken);
-        xhr.setRequestHeader("anthropic-beta", "oauth-2025-04-20");
-        xhr.setRequestHeader("User-Agent", "claude-code/2.1.0");
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState !== XMLHttpRequest.DONE)
-                return;
-
-            if (root.activeTab !== reqTab)
-                return;
-
-            if (xhr.status === 200) {
-                try {
-                    var d = JSON.parse(xhr.responseText);
-                    var normalized = UsageWindows.normalizeClaude(d);
-                    var f = d.five_hour || {};
-                    var s = d.seven_day || {};
-                    root.sessionAvailable = normalized.session.available;
-                    root.sessionPct = normalized.session.pct;
-                    root.sessionTokensUsed = f.tokens_used || 0;
-                    root.sessionTokenLimit = f.token_limit || 0;
-                    root.weeklyAvailable = normalized.weekly.available;
-                    root.weeklyPct = normalized.weekly.pct;
-                    root.weeklyTokensUsed = s.tokens_used || 0;
-                    root.weeklyTokenLimit = s.token_limit || 0;
-                    var extra = d.extra || d.extra_budget || {};
-                    root.claudeExtraTokens = extra.tokens_remaining !== undefined ? extra.tokens_remaining : (extra.token_limit || 0);
-                    var extraUsage = d.extra_usage || {};
-                    root.claudeExtraUsageEnabled = !!extraUsage.is_enabled;
-                    root.claudeExtraUsageLimit = extraUsage.monthly_limit || 0;
-                    root.claudeExtraUsageUsed = extraUsage.used_credits || 0;
-                    root.claudeExtraUsagePct = extraUsage.utilization || 0;
-                    root.claudeExtraUsageCurrency = extraUsage.currency || "USD";
-                    root.sessionResetDate = root.normalizedResetDate(normalized.session.resetAt);
-                    root.sessionResetTime = root.sessionResetDate ? Qt.formatTime(root.sessionResetDate, "hh:mm") : "";
-                    root.weeklyResetDate = root.normalizedResetDate(normalized.weekly.resetAt);
-                    root.weeklyResetTime = root.weeklyResetDate ? Qt.formatDateTime(root.weeklyResetDate, "MMM d, hh:mm") : "";
-                    root.ensureAvailableChartWindow("claude", root.sessionAvailable, root.weeklyAvailable);
-                    root.updateCountdowns();
-                    root.errorMsg = "";
-                    root.stale = false;
-                    root.lastUpdate = Qt.formatTime(new Date(), "hh:mm");
-                    root._offline = false;
-                    offlineRetryTimer.stop();
-                    if (root.sessionAvailable || root.weeklyAvailable)
-                        root.recordUsage(root.sessionPct, root.weeklyPct, root.sessionAvailable, root.weeklyAvailable);
-                } catch (_) {
-                    root.errorMsg = "parse error";
-                    root.stale = root.lastUpdate !== "";
-                }
-            } else if (xhr.status === 429) {
-                var retry = parseInt(xhr.getResponseHeader("retry-after") || "0");
-                root.backoffMs = retry > 0 ? retry * 1000 : 300000;
-                backoffTimer.interval = root.backoffMs;
-                backoffTimer.restart();
-                root.errorMsg = "rate limited";
-                root.stale = root.lastUpdate !== "";
-            } else if (xhr.status === 401) {
-                root.errorMsg = "token expired";
-                root.stale = root.lastUpdate !== "";
-            } else if (xhr.status === 0) {
-                root.errorMsg = "offline";
-                root.stale = root.lastUpdate !== "";
-                root._offline = true;
-                offlineRetryTimer.restart();
-            } else {
-                root.errorMsg = "err " + xhr.status;
-                root.stale = root.lastUpdate !== "";
-            }
-        };
-        xhr.send();
-    }
-
-    function fetchClaudeApiUsage() {
-        if (root.backoffMs > 0 || !root._claudeAdminToken)
-            return;
-
-        var reqTab = root.activeTab;
-        var endDate = new Date();
-        var startDate = new Date();
-        startDate.setDate(startDate.getDate() - 30);
-        var xhr = new XMLHttpRequest();
-        xhr.open("GET", "https://api.anthropic.com/v1/organization/usage?" + "start_date=" + startDate.toISOString().split('T')[0] + "&end_date=" + endDate.toISOString().split('T')[0]);
-        xhr.setRequestHeader("x-api-key", root._claudeAdminToken);
-        xhr.setRequestHeader("anthropic-version", "2023-06-01");
-        xhr.setRequestHeader("Content-Type", "application/json");
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState !== XMLHttpRequest.DONE)
-                return;
-
-            if (root.activeTab !== reqTab)
-                return;
-
-            if (xhr.status !== 200)
-                return;
-
-            try {
-                var d = JSON.parse(xhr.responseText);
-                var models = {};
-                var totalIn = 0, totalOut = 0, totalCost = 0;
-                var usageData = d.data || [];
-                for (var i = 0; i < usageData.length; i++) {
-                    var entry = usageData[i];
-                    var modelName = entry.model || "unknown";
-                    var inTok = parseInt(entry.input_tokens || 0);
-                    var outTok = parseInt(entry.output_tokens || 0);
-                    if (!models[modelName])
-                        models[modelName] = {
-                            "input_tokens": 0,
-                            "output_tokens": 0,
-                            "cost_usd": 0,
-                            "priced": false
-                        };
-
-                    models[modelName].input_tokens += inTok;
-                    models[modelName].output_tokens += outTok;
-                    var pricing = root.claudePricing[modelName];
-                    if (pricing) {
-                        models[modelName].cost_usd += (inTok / 1e+06) * pricing.input + (outTok / 1e+06) * pricing.output;
-                        models[modelName].priced = true;
-                    }
-                    totalIn += inTok;
-                    totalOut += outTok;
-                }
-                for (var m in models)
-                    totalCost += models[m].cost_usd;
-                root.claudeModels = models;
-                root.claudeTotalInputTokens = totalIn;
-                root.claudeTotalOutputTokens = totalOut;
-                root.claudeTotalCostUSD = totalCost;
-            } catch (e) {
-                console.log("Claude API usage parse error: " + e);
-            }
-        };
-        xhr.send();
-    }
-
-    // ── OpenAI usage ──────────────────────────────────────────────────────────
-    function fetchOpenAIUsage() {
-        if (!root._openaiApiKey)
-            return;
-
-        var reqTab = root.activeTab;
-        var endDate = new Date();
-        var startDate = new Date();
-        startDate.setDate(startDate.getDate() - 30);
-        var xhr = new XMLHttpRequest();
-        xhr.open("GET", "https://api.openai.com/v1/organization/usage/completions?" + "start_time=" + Math.floor(startDate.getTime() / 1000) + "&end_time=" + Math.floor(endDate.getTime() / 1000) + "&group_by=model&limit=100");
-        xhr.setRequestHeader("Authorization", "Bearer " + root._openaiApiKey);
-        xhr.setRequestHeader("Content-Type", "application/json");
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState !== XMLHttpRequest.DONE)
-                return;
-
-            if (root.activeTab !== reqTab)
-                return;
-
-            if (xhr.status === 0) {
-                root.errorMsg = "offline";
-                root.stale = root.lastUpdate !== "";
-                root._offline = true;
-                offlineRetryTimer.restart();
-                return;
-            }
-            if (xhr.status === 401) {
-                root.errorMsg = "OpenAI API key invalid";
-                root.stale = root.lastUpdate !== "";
-                return;
-            }
-            if (xhr.status === 403) {
-                root.errorMsg = "OpenAI usage access denied";
-                root.stale = root.lastUpdate !== "";
-                return;
-            }
-            if (xhr.status !== 200) {
-                root.errorMsg = "OpenAI err " + xhr.status;
-                root.stale = root.lastUpdate !== "";
-                return;
-            }
-            try {
-                var d = JSON.parse(xhr.responseText);
-                var models = {};
-                var totalIn = 0, totalOut = 0, totalCost = 0;
-                var buckets = d.data || [];
-                for (var i = 0; i < buckets.length; i++) {
-                    var bucket = buckets[i];
-                    var results = bucket.results || [];
-                    for (var j = 0; j < results.length; j++) {
-                        var entry = results[j];
-                        var modelName = entry.model || "unknown";
-                        var inTok = parseInt(entry.input_tokens || 0);
-                        var outTok = parseInt(entry.output_tokens || 0);
-                        if (!models[modelName])
-                            models[modelName] = {
-                                "input_tokens": 0,
-                                "output_tokens": 0,
-                                "cost_usd": 0,
-                                "priced": false
-                            };
-
-                        models[modelName].input_tokens += inTok;
-                        models[modelName].output_tokens += outTok;
-                        var pricing = root.openaiPricing[modelName];
-                        if (pricing) {
-                            models[modelName].cost_usd += (inTok / 1e+06) * pricing.input + (outTok / 1e+06) * pricing.output;
-                            models[modelName].priced = true;
-                        }
-                        totalIn += inTok;
-                        totalOut += outTok;
-                    }
-                }
-                for (var m in models)
-                    totalCost += models[m].cost_usd;
-                root.openaiModels = models;
-                root.openaiTotalInputTokens = totalIn;
-                root.openaiTotalOutputTokens = totalOut;
-                root.openaiTotalCostUSD = totalCost;
-                root.errorMsg = "";
-                root.stale = false;
-                root.lastUpdate = Qt.formatTime(new Date(), "hh:mm");
-                root._offline = false;
-                offlineRetryTimer.stop();
-            } catch (e) {
-                console.log("OpenAI usage parse error: " + e);
-                root.errorMsg = "parse error";
-                root.stale = root.lastUpdate !== "";
-            }
-        };
-        xhr.send();
-    }
-
-    // ── Codex / ChatGPT-plan usage ────────────────────────────────────────────
-    // Uses the local Codex app-server first, with the authenticated web endpoint
-    // retained as a fallback. This is separate from OpenAI API org billing.
-    function normalizedResetDate(resetAt) {
-        if (resetAt === null || resetAt === undefined || resetAt === "")
+    function dateFromEpoch(seconds) {
+        if (seconds === null || seconds === undefined || seconds <= 0)
             return null;
 
-        var date = new Date(resetAt);
+        var date = new Date(seconds * 1000);
         return isNaN(date.getTime()) ? null : date;
     }
 
-    function applyCodexUsage(payload) {
-        var normalized = UsageWindows.normalizeCodex(payload);
-        root.codexSessionAvailable = normalized.session.available;
-        root.codexSessionPct = normalized.session.pct;
-        root.codexSessionResetDate = root.normalizedResetDate(normalized.session.resetAt);
-        root.codexWeeklyAvailable = normalized.weekly.available;
-        root.codexWeeklyPct = normalized.weekly.pct;
-        root.codexWeeklyResetDate = root.normalizedResetDate(normalized.weekly.resetAt);
-        root.codexUsageAvailable = root.codexSessionAvailable || root.codexWeeklyAvailable;
-        root.ensureAvailableChartWindow("openai", root.codexSessionAvailable, root.codexWeeklyAvailable);
+    function emptyStatus() {
+        return {
+            "indicator": "",
+            "description": "",
+            "components": [],
+            "incidents": [],
+            "latestUpdate": ""
+        };
+    }
 
-        var main = payload.rateLimits || payload.rate_limit || {};
-        if (main.planType)
-            root.openaiPlanType = main.planType;
-        else if (payload.plan_type)
-            root.openaiPlanType = payload.plan_type;
-
-        root.codexLimitReached = main.limit_reached === true || (main.rateLimitReachedType !== null && main.rateLimitReachedType !== undefined);
-        var parsedAdditional = [];
-        for (var i = 0; i < normalized.additional.length; i++) {
-            var entry = normalized.additional[i];
-            parsedAdditional.push({
-                "name": entry.name,
-                "session": {
-                    "available": entry.session.available,
-                    "pct": entry.session.pct,
-                    "reset": root.normalizedResetDate(entry.session.resetAt)
-                },
-                "weekly": {
-                    "available": entry.weekly.available,
-                    "pct": entry.weekly.pct,
-                    "reset": root.normalizedResetDate(entry.weekly.resetAt)
-                },
-                "limit_reached": entry.limitReached
-            });
+    // Qt.btoa(string) is deprecated and encodes latin1, which mangles non-ASCII;
+    // encode UTF-8 bytes ourselves and use the array-like overload.
+    function base64(text) {
+        var s = String(text);
+        var bytes = [];
+        for (var i = 0; i < s.length; ++i) {
+            var c = s.charCodeAt(i);
+            if (c < 0x80) {
+                bytes.push(c);
+            } else if (c < 0x800) {
+                bytes.push(0xC0 | (c >> 6), 0x80 | (c & 0x3F));
+            } else if (c >= 0xD800 && c <= 0xDBFF && i + 1 < s.length) {
+                var cp = 0x10000 + ((c & 0x3FF) << 10) + (s.charCodeAt(++i) & 0x3FF);
+                bytes.push(0xF0 | (cp >> 18), 0x80 | ((cp >> 12) & 0x3F), 0x80 | ((cp >> 6) & 0x3F), 0x80 | (cp & 0x3F));
+            } else {
+                bytes.push(0xE0 | (c >> 12), 0x80 | ((c >> 6) & 0x3F), 0x80 | (c & 0x3F));
+            }
         }
-        root.codexAdditionalLimits = parsedAdditional;
-        root.updateCountdowns();
+        return Qt.btoa(new Uint8Array(bytes));
+    }
 
-        if (root.codexUsageAvailable) {
-            root.recordCodexUsage(root.codexSessionPct, root.codexWeeklyPct, root.codexSessionAvailable, root.codexWeeklyAvailable);
-            root.errorMsg = "";
+    // base64-encode secrets so shell metacharacters in them can't break out of
+    // the command string (decoded back in the env assignment).
+    function envAssign(name, value) {
+        if (!value)
+            return "";
+
+        return name + "=\"$(printf %s '" + root.base64(value) + "' | base64 -d)\" ";
+    }
+
+    function backendCommand(ids) {
+        var env = "";
+        env += root.envAssign("WIDGET_CLAUDE_ADMIN_KEY", Plasmoid.configuration.claudeAdminApiKey);
+        env += root.envAssign("WIDGET_OPENAI_API_KEY", Plasmoid.configuration.openaiApiKey);
+        env += root.envAssign("WIDGET_MISTRAL_API_KEY", Plasmoid.configuration.mistralApiKey);
+        env += root.envAssign("WIDGET_OPENROUTER_API_KEY", Plasmoid.configuration.openrouterApiKey);
+        env += root.envAssign("WIDGET_GROK_API_KEY", Plasmoid.configuration.grokApiKey);
+        env += root.envAssign("WIDGET_ZAI_TOKEN", Plasmoid.configuration.zaiToken);
+        env += root.envAssign("WIDGET_GITHUB_TOKEN", Plasmoid.configuration.githubToken);
+        env += root.envAssign("WIDGET_DEEPSEEK_API_KEY", Plasmoid.configuration.deepseekApiKey);
+        var quota = parseInt(Plasmoid.configuration.copilotQuota || 300);
+        if (isNaN(quota) || quota <= 0)
+            quota = 300;
+
+        env += "WIDGET_COPILOT_QUOTA=" + root.shellQuote(quota) + " ";
+        return env + root.scriptPath("get-ai-usage") + " --provider " + root.shellQuote(ids.join(","));
+    }
+
+    function applySnapshot(text) {
+        var snapshot;
+        try {
+            snapshot = JSON.parse(text);
+        } catch (_) {
+            root.errorMsg = "usage backend unavailable";
+            root.stale = root.lastUpdate !== "";
+            return;
+        }
+        var providers = snapshot.providers || [];
+        var active = root.enabledTabs[root.activeTab] || "";
+        var activeSeen = false;
+        var activeError = "";
+        // Assign the map once: QML `property var` only emits a change signal on
+        // assignment, never when a key is set in place.
+        var windows = {};
+        for (var key in root.providerChartWindows)
+            windows[key] = root.providerChartWindows[key];
+
+        for (var i = 0; i < providers.length; i++) {
+            var provider = providers[i] || {};
+            windows[provider.id] = provider.chartWindows || [];
+            if (provider.id === active) {
+                activeSeen = true;
+                activeError = provider.error || "";
+            }
+        }
+        root.providerChartWindows = windows;
+        for (var j = 0; j < providers.length; j++)
+            root.applyProvider(providers[j] || {});
+        root.recordHistoryValues(UsageHistory.collect(providers));
+        root.updateCountdowns();
+        if (!activeSeen)
+            return;
+
+        root.errorMsg = activeError;
+        if (activeError === "") {
             root.stale = false;
             root.lastUpdate = Qt.formatTime(new Date(), "hh:mm");
+            offlineRetryTimer.stop();
+            return;
         }
-
-        return root.codexUsageAvailable;
+        root.stale = root.lastUpdate !== "";
+        if (activeError === "offline") {
+            offlineRetryTimer.restart();
+        } else if (activeError === "rate limited") {
+            root.backoffMs = 300000;
+            backoffTimer.interval = root.backoffMs;
+            backoffTimer.restart();
+        }
     }
 
-    function fetchCodexUsage() {
-        if (!root.openaiCodexLoggedIn)
-            return;
-
-        var cmd = root.scriptPath("get-codex-rate-limits");
-        codexUsageSource.disconnectSource(cmd);
-        codexUsageSource.connectSource(cmd);
+    function applyProvider(provider) {
+        var details = provider.details || {};
+        if (provider.id === "claude")
+            root.applyClaude(details);
+        else if (provider.id === "openai")
+            root.applyOpenAi(details);
+        else if (provider.id === "antigravity")
+            root.applyAntigravity(details);
+        else if (provider.id === "kiro")
+            root.applyKiro(details);
+        else if (provider.id === "mistral")
+            root.applyMistral(details, provider.error || "");
+        else if (provider.id === "openrouter")
+            root.applyOpenRouter(details, provider.error || "");
+        else if (provider.id === "grok")
+            root.applyGrok(details, provider.error || "");
+        else if (provider.id === "zai")
+            root.applyZai(details, provider.error || "");
+        else if (provider.id === "copilot")
+            root.applyCopilot(details, provider.error || "");
+        else if (provider.id === "deepseek")
+            root.applyDeepSeek(details, provider.error || "");
     }
 
-    function fetchCodexUsageFromWeb() {
-        if (!root._openaiAccessToken)
-            return;
-
-        var reqTab = root.activeTab;
-        var xhr = new XMLHttpRequest();
-        xhr.open("GET", "https://chatgpt.com/backend-api/codex/usage");
-        xhr.setRequestHeader("Authorization", "Bearer " + root._openaiAccessToken);
-        if (root.openaiAccountId)
-            xhr.setRequestHeader("chatgpt-account-id", root.openaiAccountId);
-
-        xhr.setRequestHeader("User-Agent", "codex-cli");
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState !== XMLHttpRequest.DONE)
-                return;
-
-            if (root.activeTab !== reqTab)
-                return;
-
-            if (xhr.status !== 200) {
-                // Don't surface as a hard error — account status still shows.
-                root.codexUsageAvailable = false;
-                root.codexSessionAvailable = false;
-                root.codexWeeklyAvailable = false;
-                return;
-            }
-            try {
-                var d = JSON.parse(xhr.responseText);
-                root.applyCodexUsage(d);
-            } catch (e) {
-                root.codexUsageAvailable = false;
-                root.codexSessionAvailable = false;
-                root.codexWeeklyAvailable = false;
-            }
-        };
-        xhr.send();
+    function applyClaude(d) {
+        root.claudeHasOAuth = d.hasOAuth === true;
+        root.claudeHasAdminKey = d.hasAdminKey === true;
+        root.claudeSubscriptionType = d.subscriptionType || "";
+        root.claudeRateLimitTier = d.rateLimitTier || "";
+        root.claudeOrganizationUuid = d.organizationUuid || "";
+        root.claudeEffortLevel = d.effortLevel || "";
+        root.claudeAutoDream = d.autoDream === true;
+        var session = d.session || {};
+        var weekly = d.weekly || {};
+        root.sessionAvailable = session.available === true;
+        root.sessionPct = session.pct || 0;
+        root.sessionTokensUsed = session.tokensUsed || 0;
+        root.sessionTokenLimit = session.tokenLimit || 0;
+        root.sessionResetDate = root.dateFromEpoch(session.resetAt);
+        root.sessionResetTime = root.sessionResetDate ? Qt.formatTime(root.sessionResetDate, "hh:mm") : "";
+        root.weeklyAvailable = weekly.available === true;
+        root.weeklyPct = weekly.pct || 0;
+        root.weeklyTokensUsed = weekly.tokensUsed || 0;
+        root.weeklyTokenLimit = weekly.tokenLimit || 0;
+        root.weeklyResetDate = root.dateFromEpoch(weekly.resetAt);
+        root.weeklyResetTime = root.weeklyResetDate ? Qt.formatDateTime(root.weeklyResetDate, "MMM d, hh:mm") : "";
+        root.claudeExtraTokens = d.extraTokens || 0;
+        var extra = d.extraUsage || {};
+        root.claudeExtraUsageEnabled = extra.enabled === true;
+        root.claudeExtraUsageLimit = extra.limit || 0;
+        root.claudeExtraUsageUsed = extra.used || 0;
+        root.claudeExtraUsagePct = extra.pct || 0;
+        root.claudeExtraUsageCurrency = extra.currency || "USD";
+        var org = d.organizationUsage || {};
+        root.claudeModels = org.models || ({});
+        root.claudeTotalInputTokens = org.totalInputTokens || 0;
+        root.claudeTotalOutputTokens = org.totalOutputTokens || 0;
+        root.claudeTotalCostUSD = org.totalCostUSD || 0;
+        root.claudeStatus = d.status || root.emptyStatus();
+        var stats = d.stats || {};
+        root.claudeStatsAvailable = stats.available === true;
+        root.claudeStatsVersion = stats.version || 0;
+        root.claudeStatsTotalMessages = stats.totalMessages || 0;
+        root.claudeStatsTotalSessions = stats.totalSessions || 0;
+        root.claudeStatsTotalTokens = stats.totalTokens || 0;
+        root.claudeStatsTotalCostUSD = stats.totalCostUSD || 0;
+        root.claudeStatsTotalToolCalls = stats.totalToolCalls || 0;
+        root.claudeStatsTotalWebSearches = stats.totalWebSearches || 0;
+        root.claudeStatsFavoriteModel = stats.favoriteModel || "";
+        root.claudeStatsFirstDate = stats.firstDate || "";
+        root.claudeStatsComputedDate = stats.computedDate || "";
+        root.claudeStatsActiveDays = stats.activeDays || 0;
+        root.claudeStatsSpanDays = stats.spanDays || 0;
+        root.claudeStatsCurrentStreak = stats.currentStreak || 0;
+        root.claudeStatsLongestStreak = stats.longestStreak || 0;
+        root.claudeStatsLongestSessionMs = stats.longestSessionMs || 0;
+        root.claudeStatsLongestSessionMessages = stats.longestSessionMessages || 0;
+        root.claudeStatsPeakHour = stats.peakHour === undefined ? -1 : stats.peakHour;
+        root.claudeStatsModels = stats.models || ({});
+        root.claudeStatsDailyTokens = stats.dailyTokens || [];
+        root.ensureAvailableChartWindow("claude");
     }
 
-    // ── Service status (Statuspage JSON API) ─────────────────────────────────
-    // Parses a Statuspage /api/v2/summary.json response and calls setter(obj).
-    function _fetchStatusPage(url, setter) {
-        var xhr = new XMLHttpRequest();
-        xhr.open("GET", url);
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState !== XMLHttpRequest.DONE)
-                return;
-
-            if (xhr.status !== 200)
-                return;
-
-            try {
-                var d = JSON.parse(xhr.responseText);
-                var indicator = (d.status || {}).indicator || "none";
-                var description = (d.status || {}).description || "";
-                // Non-operational components (skip group parent rows)
-                var comps = d.components || [];
-                var affectedComps = [];
-                for (var c = 0; c < comps.length; c++) {
-                    var comp = comps[c];
-                    if (comp.status && comp.status !== "operational" && !comp.group)
-                        affectedComps.push((comp.name || "") + " (" + comp.status.replace(/_/g, " ") + ")");
-                }
-                // Active incidents + most recent update body
-                var inc = d.incidents || [];
-                var activeNames = [];
-                var latestBody = "";
-                for (var i = 0; i < inc.length; i++) {
-                    var incident = inc[i];
-                    if (incident.status === "resolved")
-                        continue;
-
-                    activeNames.push(incident.name || "");
-                    if (!latestBody) {
-                        var updates = incident.incident_updates || [];
-                        if (updates.length > 0) {
-                            var body = (updates[0].body || "").trim();
-                            latestBody = body.length > 200 ? body.substring(0, 197) + "…" : body;
-                        }
-                    }
-                }
-                setter({
-                    "indicator": indicator,
-                    "description": description,
-                    "components": affectedComps,
-                    "incidents": activeNames,
-                    "latestUpdate": latestBody
-                });
-            } catch (_) {}
-        };
-        xhr.send();
+    function applyOpenAi(d) {
+        root.openaiHasApiKey = d.hasApiKey === true;
+        root.openaiCodexLoggedIn = d.codexLoggedIn === true;
+        root.openaiEmail = d.email || "";
+        root.openaiPlanType = d.planType || "";
+        root.openaiOrgId = d.orgId || "";
+        root.openaiAccountId = d.accountId || "";
+        root.openaiAuthMode = d.authMode || "";
+        var codex = d.codex || {};
+        var session = codex.session || {};
+        var weekly = codex.weekly || {};
+        root.codexSessionAvailable = session.available === true;
+        root.codexSessionPct = session.pct || 0;
+        root.codexSessionResetDate = root.dateFromEpoch(session.resetAt);
+        root.codexWeeklyAvailable = weekly.available === true;
+        root.codexWeeklyPct = weekly.pct || 0;
+        root.codexWeeklyResetDate = root.dateFromEpoch(weekly.resetAt);
+        root.codexUsageAvailable = codex.available === true;
+        root.codexLimitReached = codex.limitReached === true;
+        var additional = codex.additional || [];
+        var limits = [];
+        for (var i = 0; i < additional.length; i++) {
+            var entry = additional[i] || {};
+            var entrySession = entry.session || {};
+            var entryWeekly = entry.weekly || {};
+            limits.push({
+                "name": entry.name || "",
+                "session": {
+                    "available": entrySession.available === true,
+                    "pct": entrySession.pct || 0,
+                    "reset": root.dateFromEpoch(entrySession.resetAt)
+                },
+                "weekly": {
+                    "available": entryWeekly.available === true,
+                    "pct": entryWeekly.pct || 0,
+                    "reset": root.dateFromEpoch(entryWeekly.resetAt)
+                },
+                "limit_reached": entry.limitReached === true
+            });
+        }
+        root.codexAdditionalLimits = limits;
+        var org = d.organizationUsage || {};
+        root.openaiModels = org.models || ({});
+        root.openaiTotalInputTokens = org.totalInputTokens || 0;
+        root.openaiTotalOutputTokens = org.totalOutputTokens || 0;
+        root.openaiTotalCostUSD = org.totalCostUSD || 0;
+        root.openaiStatus = d.status || root.emptyStatus();
+        var stats = d.stats || {};
+        root.codexStatsAvailable = stats.available === true;
+        root.codexStatsTotalSessions = stats.totalSessions || 0;
+        root.codexStatsTotalMessages = stats.totalMessages || 0;
+        root.codexStatsTotalTokens = stats.totalTokens || 0;
+        root.codexStatsTotalToolCalls = stats.totalToolCalls || 0;
+        root.codexStatsFirstDate = stats.firstDate || "";
+        root.codexStatsComputedDate = stats.computedDate || "";
+        root.codexStatsActiveDays = stats.activeDays || 0;
+        root.codexStatsSpanDays = stats.spanDays || 0;
+        root.codexStatsCurrentStreak = stats.currentStreak || 0;
+        root.codexStatsLongestStreak = stats.longestStreak || 0;
+        root.codexStatsLongestSessionMs = stats.longestSessionMs || 0;
+        root.codexStatsLongestSessionMessages = stats.longestSessionMessages || 0;
+        root.codexStatsPeakHour = stats.peakHour === undefined ? -1 : stats.peakHour;
+        root.codexStatsFavoriteModel = stats.favoriteModel || "";
+        root.codexStatsModels = stats.models || ({});
+        root.codexStatsDailyTokens = stats.dailyTokens || [];
+        root.codexModel = stats.model || "";
+        root.codexEffortLevel = stats.effortLevel || "";
+        root.ensureAvailableChartWindow("openai");
     }
 
-    function fetchClaudeStatus() {
-        root._fetchStatusPage("https://status.claude.com/api/v2/summary.json", function (s) {
-            root.claudeStatus = s;
-        });
+    function applyAntigravity(d) {
+        root.antigravityEmail = d.email || "";
+        root.antigravityPlanType = d.planType || "";
+        root.antigravityPromptCreditsMonthly = d.promptCreditsMonthly || 0;
+        root.antigravityPromptCreditsAvailable = d.promptCreditsAvailable || 0;
+        root.antigravityPct = d.pct || 0;
+        root.antigravityGooglePct = d.googlePct || 0;
+        root.antigravityExternalPct = d.externalPct || 0;
+        root.antigravityModels = d.models || ({});
+        root.antigravityResetDate = root.dateFromEpoch(d.resetAt);
+        root.antigravityResetTime = root.antigravityResetDate ? Qt.formatDateTime(root.antigravityResetDate, "MMM d, hh:mm") : "";
+        // Build locally and assign once: QML `property var` only emits a change
+        // signal on assignment, never on in-place push().
+        var groups = d.groups || [];
+        var out = [];
+        for (var i = 0; i < groups.length; i++) {
+            var group = groups[i] || {};
+            var resetDate = root.dateFromEpoch(group.resetAt);
+            out.push({
+                "key": group.key || "",
+                "label": group.label || "",
+                "usedPct": group.usedPct || 0,
+                "resetDate": resetDate,
+                "resetTime": resetDate ? Qt.formatDateTime(resetDate, "MMM d, hh:mm") : "",
+                "isExhausted": group.isExhausted === true,
+                "models": group.models || []
+            });
+        }
+        root.antigravityGroups = out;
     }
 
-    function fetchMistralStatus() {
-        root._fetchStatusPage("https://status.mistral.ai/api/v2/summary.json", function (s) {
-            root.mistralStatus = s;
-        });
+    function applyKiro(d) {
+        root.kiroUsageAvailable = d.available === true;
+        root.kiroPlanType = d.planType || "";
+        root.kiroDisplayName = d.displayName || "Credit";
+        root.kiroDisplayNamePlural = d.displayNamePlural || "Credits";
+        root.kiroCurrentUsage = d.currentUsage || 0;
+        root.kiroUsageLimit = d.usageLimit || 0;
+        root.kiroPct = d.pct || 0;
+        root.kiroRemaining = d.remaining || 0;
+        root.kiroCurrentOverages = d.currentOverages || 0;
+        root.kiroOverageCap = d.overageCap || 0;
+        root.kiroOverageCharges = d.overageCharges || 0;
+        root.kiroOverageRate = d.overageRate || 0;
+        root.kiroCurrencyCode = d.currencyCode || "USD";
+        root.kiroCurrencySymbol = d.currencySymbol || "$";
+        root.kiroResetDate = root.dateFromEpoch(d.resetAt);
+        root.kiroResetTime = root.kiroResetDate ? Qt.formatDateTime(root.kiroResetDate, "MMM d, hh:mm") : "";
     }
 
-    function fetchOpenAIStatus() {
-        root._fetchStatusPage("https://status.openai.com/api/v2/summary.json", function (s) {
-            root.openaiStatus = s;
-        });
+    function applyMistral(d, error) {
+        root.mistralHasKey = d.hasKey === true;
+        root.mistralKeyValid = d.keyValid === true;
+        root.mistralAvailableModels = d.availableModels || [];
+        root.mistralError = error;
+        root.mistralStatus = d.status || root.emptyStatus();
+        var vibe = d.vibe || {};
+        root.mistralVibeSessionCount = vibe.sessionCount || 0;
+        root.mistralVibeTotalCost = vibe.totalCost || 0;
+        root.mistralVibeTotalTokens = vibe.totalTokens || 0;
+        root.mistralVibePromptTokens = vibe.promptTokens || 0;
+        root.mistralVibeCompletionTokens = vibe.completionTokens || 0;
+        root.mistralVibeTotalSteps = vibe.totalSteps || 0;
+        root.mistralVibeToolOk = vibe.toolOk || 0;
+        root.mistralVibeToolFail = vibe.toolFail || 0;
+        root.mistralVibeActiveModel = vibe.activeModel || "";
+        root.mistralVibeRecent = vibe.recent || [];
     }
 
-    function fetchOpenRouterStatus() {
-        root._fetchStatusPage("https://status.openrouter.ai/api/v2/summary.json", function (s) {
-            root.openrouterStatus = s;
-        });
+    function applyOpenRouter(d, error) {
+        root.openrouterHasKey = d.hasKey === true;
+        root.openrouterKeyValid = d.keyValid === true;
+        root.openrouterLabel = d.label || "";
+        root.openrouterUsageUSD = d.usageUSD || 0;
+        root.openrouterLimitUSD = d.limitUSD === undefined ? null : d.limitUSD;
+        root.openrouterLimitRemainingUSD = d.limitRemainingUSD === undefined ? null : d.limitRemainingUSD;
+        root.openrouterIsFreeTier = d.isFreeTier === true;
+        root.openrouterRateLimit = d.rateLimit || ({});
+        root.openrouterError = error;
+        root.openrouterStatus = d.status || root.emptyStatus();
     }
 
-    function fetchAllStatuses() {
-        root.fetchClaudeStatus();
-        root.fetchMistralStatus();
-        root.fetchOpenAIStatus();
-        root.fetchOpenRouterStatus();
+    function applyGrok(d, error) {
+        root.grokHasKey = d.hasKey === true;
+        root.grokLoggedIn = d.loggedIn === true;
+        root.grokPct = d.pct || 0;
+        root.grokUsed = d.used || 0;
+        root.grokMonthlyLimit = d.monthlyLimit || 0;
+        root.grokEmail = d.email || "";
+        root.grokTeamName = d.teamName || "";
+        root.grokTierId = d.tierId || "";
+        root.grokBillingPeriodEnd = d.billingPeriodEnd || "";
+        root.grokSessionCount = d.sessionCount || 0;
+        root.grokTotalTokens = d.totalTokens || 0;
+        root.grokTotalToolCalls = d.totalToolCalls || 0;
+        root.grokHasBilling = d.hasBilling === true;
+        root.grokQuotaKind = d.quotaKind || "";
+        root.grokQuotaWindow = d.quotaWindow || "";
+        root.grokQuotaExhausted = d.quotaExhausted === true;
+        root.grokError = d.billingError || error;
+    }
+
+    function applyZai(d, error) {
+        root.zaiHasKey = d.hasKey === true;
+        root.zaiKeyValid = d.keyValid === true;
+        root.zaiLevel = d.level || "";
+        var token = d.token || {};
+        var tools = d.tools || {};
+        root.zaiTokenPct = token.pct || 0;
+        root.zaiTokenUsed = token.used === undefined ? null : token.used;
+        root.zaiTokenLimit = token.limit === undefined ? null : token.limit;
+        root.zaiTokenResetDate = root.dateFromEpoch(token.resetAt);
+        root.zaiToolsPct = tools.pct || 0;
+        root.zaiToolsRemaining = tools.remaining === undefined ? null : tools.remaining;
+        root.zaiToolsResetDate = root.dateFromEpoch(tools.resetAt);
+        root.zaiModels = d.models || [];
+        root.zaiError = error;
+    }
+
+    function applyCopilot(d, error) {
+        root.copilotHasKey = d.hasKey === true;
+        root.copilotKeyValid = d.keyValid === true;
+        root.copilotUsername = d.username || "";
+        root.copilotUsed = d.used || 0;
+        root.copilotQuota = d.quota === undefined ? (Plasmoid.configuration.copilotQuota || 300) : d.quota;
+        root.copilotPct = d.pct || 0;
+        root.copilotResetDate = root.dateFromEpoch(d.resetAt);
+        root.copilotError = error;
+    }
+
+    function applyDeepSeek(d, error) {
+        root.deepseekHasKey = d.hasKey === true;
+        root.deepseekKeyValid = d.keyValid === true;
+        root.deepseekIsAvailable = d.isAvailable === true;
+        root.deepseekBalances = d.balances || [];
+        root.deepseekPrimaryCurrency = d.primaryCurrency || "";
+        root.deepseekPrimaryTotal = d.primaryTotal || 0;
+        root.deepseekPrimaryGranted = d.primaryGranted || 0;
+        root.deepseekPrimaryToppedUp = d.primaryToppedUp || 0;
+        root.deepseekError = error;
     }
 
     function refresh() {
         if (root.enabledTabs.length === 0)
             return;
 
+        if (root.backoffMs > 0)
+            return;
+
         if (root.activeTab >= root.enabledTabs.length)
             root.activeTab = 0;
 
-        loadCreds();
+        // The active tab plus every pinned service: those are the only providers
+        // whose data is on screen, so those are the only ones worth fetching.
+        var ids = [];
         var active = root.enabledTabs[root.activeTab] || "";
+        if (active !== "")
+            ids.push(active);
+
         var pins = root.pinnedTabs;
         for (var i = 0; i < pins.length; i++) {
-            if (pins[i] !== active)
-                loadCreds(pins[i]);
+            if (ids.indexOf(pins[i]) < 0)
+                ids.push(pins[i]);
         }
+        if (ids.length === 0)
+            return;
+
+        var cmd = root.backendCommand(ids);
+        usageSource.disconnectSource(cmd);
+        usageSource.connectSource(cmd);
     }
 
     Plasmoid.backgroundHints: root.backgroundHints
@@ -2228,7 +1492,7 @@ PlasmoidItem {
             if (root.antigravityResetTime)
                 lines.push("Resets: " + root.antigravityResetTime);
         } else if (tab === "openai") {
-            if (root._openaiApiKey)
+            if (root.openaiHasApiKey)
                 lines.push("API usage: configured");
 
             if (root.openaiTotalCostUSD > 0)
@@ -2245,7 +1509,7 @@ PlasmoidItem {
             if (root.openaiPlanType)
                 lines.push("Plan: " + root.openaiPlanType);
 
-            if (root.openaiCodexLoggedIn && !root._openaiApiKey)
+            if (root.openaiCodexLoggedIn && !root.openaiHasApiKey)
                 lines.push("API usage needs an OpenAI API key");
         } else if (tab === "kiro") {
             if (root.kiroPlanType)
@@ -2346,6 +1610,10 @@ PlasmoidItem {
             Plasmoid.configuration.chartWindow = win;
         }
         root.chartTimeOffset = 0;
+        // A rate limit belongs to the provider that hit it; don't let it keep
+        // the tab you just switched to empty.
+        root.backoffMs = 0;
+        backoffTimer.stop();
     }
     // With one pin, open the popup on that service. With multiple pins, leave the
     // current popup tab alone so the pin list only controls the panel contents.
@@ -2408,24 +1676,7 @@ PlasmoidItem {
                 }
                 if (res.data) {
                     // array of {t,s,w} (or legacy {t,v}); normalize + persist
-                    var arr = res.data;
-                    var norm = [];
-                    for (var i = 0; i < arr.length; i++) {
-                        var p = arr[i];
-                        if (p.t === undefined)
-                            continue;
-
-                        if (p.w === undefined && p.v !== undefined)
-                            norm.push({
-                                "t": p.t,
-                                "w": p.v
-                            });
-                        else
-                            norm.push(p);
-                    }
-                    if (norm.length > root.historyLimit)
-                        norm = norm.slice(norm.length - root.historyLimit);
-
+                    var norm = UsageHistory.normalize(res.data, root.historyLimit);
                     // Merge autoload data with any points already recorded since startup
                     // (poll timer fires immediately and may beat the async shell).
                     if (op === "autoload" && root.usageHistory.length > 0) {
@@ -2476,676 +1727,17 @@ PlasmoidItem {
         }
     }
 
-    // ── Credentials ──────────────────────────────────────────────────────────
+    // ── Provider data ────────────────────────────────────────────────────────
+    // One source for every provider: the shared backend already returns the
+    // active tab's and every pinned service's data in a single document.
     Plasma5Support.DataSource {
-        id: credSource
+        id: usageSource
 
         engine: "executable"
         connectedSources: []
         onNewData: function (src, data) {
             disconnectSource(src);
-            if (root.enabledTabs[root.activeTab] !== "claude" && !root.panelShows("claude"))
-                return;
-
-            try {
-                var creds = JSON.parse((data["stdout"] || "").trim());
-                root._claudeToken = (creds.claudeAiOauth || {}).accessToken || "";
-                root._claudeAdminToken = creds.claudeAdminApiKey || "";
-                root.claudeSubscriptionType = (creds.claudeAiOauth || {}).subscriptionType || "";
-                root.claudeRateLimitTier = (creds.claudeAiOauth || {}).rateLimitTier || "";
-                root.claudeOrganizationUuid = creds.organizationUuid || "";
-            } catch (_) {
-                root._claudeToken = "";
-                root._claudeAdminToken = "";
-                root.claudeSubscriptionType = "";
-                root.claudeRateLimitTier = "";
-                root.claudeOrganizationUuid = "";
-            }
-            if (root._claudeToken) {
-                fetchClaudeUsage();
-                if (root._claudeAdminToken)
-                    fetchClaudeApiUsage();
-            } else if (root._claudeAdminToken) {
-                root.sessionAvailable = false;
-                root.weeklyAvailable = false;
-                root.sessionPct = 0;
-                root.weeklyPct = 0;
-                root.sessionTokenLimit = 0;
-                root.weeklyTokenLimit = 0;
-                fetchClaudeApiUsage();
-                root.errorMsg = "OAuth missing — API stats only";
-            } else {
-                root.sessionAvailable = false;
-                root.weeklyAvailable = false;
-                root.errorMsg = "Claude not logged in";
-            }
-        }
-    }
-
-    Plasma5Support.DataSource {
-        id: claudeSettingsSource
-
-        engine: "executable"
-        connectedSources: []
-        onNewData: function (src, data) {
-            disconnectSource(src);
-            try {
-                var s = JSON.parse((data["stdout"] || "").trim());
-                root.claudeEffortLevel = s.effortLevel || "";
-                root.claudeAutoDream = s.autoDreamEnabled === true;
-            } catch (_) {
-                root.claudeEffortLevel = "";
-                root.claudeAutoDream = false;
-            }
-        }
-    }
-
-    Plasma5Support.DataSource {
-        id: claudeStatsSource
-
-        engine: "executable"
-        connectedSources: []
-        onNewData: function (src, data) {
-            disconnectSource(src);
-            root.parseClaudeStats((data["stdout"] || "").trim());
-        }
-    }
-
-    Plasma5Support.DataSource {
-        id: codexStatsSource
-
-        engine: "executable"
-        connectedSources: []
-        onNewData: function (src, data) {
-            disconnectSource(src);
-            root.parseCodexStats((data["stdout"] || "").trim());
-        }
-    }
-
-    Plasma5Support.DataSource {
-        id: antigravityUsageSource
-
-        engine: "executable"
-        connectedSources: []
-        onNewData: function (src, data) {
-            disconnectSource(src);
-            if (root.enabledTabs[root.activeTab] !== "antigravity" && !root.panelShows("antigravity"))
-                return;
-
-            var output = (data["stdout"] || "").trim();
-            if (!output) {
-                root.errorMsg = "Antigravity not configured";
-                root.stale = root.lastUpdate !== "";
-                return;
-            }
-            try {
-                var res = JSON.parse(output);
-                if (res.error) {
-                    var cleanErr = res.error.split("\n")[0] || res.error;
-                    if (cleanErr.indexOf("Antigravity is not running") !== -1)
-                        cleanErr = "Antigravity is not running in IDE";
-
-                    root.errorMsg = cleanErr;
-                    root.stale = true;
-                    return;
-                }
-                root.antigravityEmail = res.email || "";
-                var credits = res.promptCredits || {};
-                root.antigravityPromptCreditsMonthly = credits.monthly || 0;
-                root.antigravityPromptCreditsAvailable = credits.available || 0;
-                root.antigravityPlanType = res.planType || (res.method === "local" ? "LOCAL" : "CLOUD");
-                var modelsList = res.models || [];
-                var newModels = {};
-                var totalUsed = 0;
-                var modelCount = 0;
-                var googleUsed = 0;
-                var googleCount = 0;
-                var externalUsed = 0;
-                var externalCount = 0;
-                var earliestReset = null;
-                var groupAcc = {
-                    gemini: {
-                        key: "gemini",
-                        label: "Gemini Models",
-                        used: 0,
-                        count: 0,
-                        resetDate: null,
-                        isExhausted: false,
-                        models: []
-                    },
-                    external: {
-                        key: "external",
-                        label: "Claude & GPT Models",
-                        used: 0,
-                        count: 0,
-                        resetDate: null,
-                        isExhausted: false,
-                        models: []
-                    }
-                };
-                for (var i = 0; i < modelsList.length; i++) {
-                    var m = modelsList[i];
-                    var remaining = m.remainingPercentage !== undefined ? m.remainingPercentage : -1;
-                    var usedPct = remaining !== -1 ? Math.max(0, Math.min(100, (1 - remaining) * 100)) : 0;
-                    newModels[m.modelId] = {
-                        "displayName": m.label || m.modelId,
-                        "usedPct": usedPct,
-                        "resetTime": m.resetTime || "",
-                        "isExhausted": !!m.isExhausted,
-                        "hasQuota": remaining !== -1
-                    };
-                    if (remaining !== -1) {
-                        totalUsed += usedPct;
-                        modelCount++;
-                        var name = (m.label || m.modelId).toLowerCase();
-                        if (name.indexOf("gemini") !== -1 || name.indexOf("google") !== -1) {
-                            googleUsed += usedPct;
-                            googleCount++;
-                        } else {
-                            externalUsed += usedPct;
-                            externalCount++;
-                        }
-                        var family = (name.indexOf("gemini") !== -1 || name.indexOf("google") !== -1) ? "gemini" : "external";
-                        groupAcc[family].used += usedPct;
-                        groupAcc[family].count++;
-                    } else {
-                        var family = ((m.label || m.modelId).toLowerCase().indexOf("gemini") !== -1 || (m.label || m.modelId).toLowerCase().indexOf("google") !== -1) ? "gemini" : "external";
-                    }
-                    groupAcc[family].models.push(m.modelId);
-                    if (m.isExhausted)
-                        groupAcc[family].isExhausted = true;
-                    if (m.resetTime) {
-                        var rd = new Date(m.resetTime);
-                        if (!isNaN(rd.getTime())) {
-                            if (earliestReset === null || rd < earliestReset)
-                                earliestReset = rd;
-                            if (groupAcc[family].resetDate === null || rd < groupAcc[family].resetDate)
-                                groupAcc[family].resetDate = rd;
-                        }
-                    }
-                }
-                root.antigravityModels = newModels;
-                root.antigravityPct = modelCount > 0 ? totalUsed / modelCount : 0;
-                root.antigravityGooglePct = googleCount > 0 ? googleUsed / googleCount : 0;
-                root.antigravityExternalPct = externalCount > 0 ? externalUsed / externalCount : 0;
-                // Build locally and assign once: QML `property var` only emits a
-                // change signal on assignment, never on in-place push().
-                var groupsOut = [];
-                ["gemini", "external"].forEach(function (key) {
-                    var group = groupAcc[key];
-                    if (group.models.length > 0)
-                        groupsOut.push({
-                            key: key,
-                            label: group.label,
-                            usedPct: group.count > 0 ? group.used / group.count : 0,
-                            resetDate: group.resetDate,
-                            resetTime: group.resetDate ? Qt.formatDateTime(group.resetDate, "MMM d, hh:mm") : "",
-                            isExhausted: group.isExhausted,
-                            models: group.models.sort()
-                        });
-                });
-                root.antigravityGroups = groupsOut;
-                root.recordAntigravityUsage(root.antigravityPct);
-                if (earliestReset) {
-                    root.antigravityResetDate = earliestReset;
-                    root.antigravityResetTime = Qt.formatDateTime(earliestReset, "MMM d, hh:mm");
-                } else {
-                    root.antigravityResetDate = null;
-                    root.antigravityResetTime = "";
-                }
-                root.updateCountdowns();
-                root.errorMsg = "";
-                root.stale = false;
-                root.lastUpdate = Qt.formatTime(new Date(), "hh:mm");
-                root._offline = false;
-                offlineRetryTimer.stop();
-            } catch (e) {
-                console.log("Antigravity parse error: " + e);
-                root.errorMsg = "parse error";
-                root.stale = root.lastUpdate !== "";
-            }
-        }
-    }
-
-    Plasma5Support.DataSource {
-        id: openaiCredSource
-
-        engine: "executable"
-        connectedSources: []
-        onNewData: function (src, data) {
-            disconnectSource(src);
-            if (root.enabledTabs[root.activeTab] !== "openai" && !root.panelShows("openai"))
-                return;
-
-            try {
-                var creds = JSON.parse((data["stdout"] || "").trim());
-                root._openaiApiKey = creds.openaiApiKey || "";
-                root._openaiAccessToken = creds.codexAccessToken || "";
-                root.openaiEmail = creds.email || "";
-                root.openaiPlanType = creds.planType || "";
-                root.openaiOrgId = creds.orgId || "";
-                root.openaiAccountId = creds.accountId || "";
-                root.openaiAuthMode = creds.authMode || "";
-                root.openaiCodexLoggedIn = creds.codexLoggedIn === true || root._openaiAccessToken !== "";
-            } catch (_) {
-                root._openaiApiKey = "";
-                root._openaiAccessToken = "";
-                root.openaiEmail = "";
-                root.openaiPlanType = "";
-                root.openaiOrgId = "";
-                root.openaiAccountId = "";
-                root.openaiAuthMode = "";
-                root.openaiCodexLoggedIn = false;
-            }
-            // Codex plan usage is independent of the org API key — fetch it whenever signed in.
-            if (root.openaiCodexLoggedIn)
-                fetchCodexUsage();
-
-            if (root._openaiApiKey) {
-                fetchOpenAIUsage();
-            } else if (root.openaiCodexLoggedIn) {
-                root.openaiModels = ({});
-                root.openaiTotalCostUSD = 0;
-                root.openaiTotalInputTokens = 0;
-                root.openaiTotalOutputTokens = 0;
-                root.errorMsg = "";
-                root.stale = false;
-                root.lastUpdate = Qt.formatTime(new Date(), "hh:mm");
-            } else {
-                root.openaiModels = ({});
-                root.openaiTotalCostUSD = 0;
-                root.openaiTotalInputTokens = 0;
-                root.openaiTotalOutputTokens = 0;
-                root.errorMsg = "OpenAI: no API key or Codex login";
-                root.stale = root.lastUpdate !== "";
-            }
-        }
-    }
-
-    Plasma5Support.DataSource {
-        id: codexUsageSource
-
-        engine: "executable"
-        connectedSources: []
-        onNewData: function (src, data) {
-            disconnectSource(src);
-            if (root.enabledTabs[root.activeTab] !== "openai" && !root.panelShows("openai"))
-                return;
-
-            try {
-                var payload = JSON.parse((data["stdout"] || "").trim() || "{}");
-                if (!root.applyCodexUsage(payload))
-                    root.fetchCodexUsageFromWeb();
-            } catch (_) {
-                root.fetchCodexUsageFromWeb();
-            }
-        }
-    }
-
-    Plasma5Support.DataSource {
-        id: kiroUsageSource
-
-        engine: "executable"
-        connectedSources: []
-        onNewData: function (src, data) {
-            disconnectSource(src);
-            if (root.enabledTabs[root.activeTab] !== "kiro" && !root.panelShows("kiro"))
-                return;
-
-            var output = (data["stdout"] || "").trim();
-            if (!output || output === "{}") {
-                root.kiroUsageAvailable = false;
-                root.errorMsg = "Kiro: no local usage data found";
-                root.stale = root.lastUpdate !== "";
-                return;
-            }
-            try {
-                var res = JSON.parse(output);
-                if (res.error) {
-                    root.kiroUsageAvailable = false;
-                    root.errorMsg = "Kiro: " + res.error;
-                    root.stale = root.lastUpdate !== "";
-                    return;
-                }
-                root.kiroPlanType = res.planType || "";
-                root.kiroDisplayName = res.displayName || "Credit";
-                root.kiroDisplayNamePlural = res.displayNamePlural || "Credits";
-                root.kiroCurrentUsage = res.currentUsage || 0;
-                root.kiroUsageLimit = res.usageLimit || 0;
-                root.kiroPct = Math.max(0, Math.min(100, res.percentageUsed || 0));
-                root.kiroRemaining = res.remaining || 0;
-                root.kiroCurrentOverages = res.currentOverages || 0;
-                root.kiroOverageCap = res.overageCap || 0;
-                root.kiroOverageCharges = res.overageCharges || 0;
-                root.kiroOverageRate = res.overageRate || 0;
-                root.kiroCurrencyCode = res.currencyCode || "USD";
-                root.kiroCurrencySymbol = res.currencySymbol || "$";
-                root.kiroResetDate = res.resetDate ? new Date(res.resetDate) : null;
-                root.kiroResetTime = root.kiroResetDate ? Qt.formatDateTime(root.kiroResetDate, "MMM d, hh:mm") : "";
-                root.kiroUsageAvailable = root.kiroUsageLimit > 0 || root.kiroCurrentUsage > 0;
-                root.updateCountdowns();
-                root.errorMsg = root.kiroUsageAvailable ? "" : "Kiro: usage snapshot is empty";
-                root.stale = false;
-                root.lastUpdate = Qt.formatTime(new Date(), "hh:mm");
-                root._offline = false;
-                offlineRetryTimer.stop();
-                if (root.kiroUsageAvailable)
-                    root.recordKiroUsage(root.kiroPct);
-            } catch (e) {
-                root.kiroUsageAvailable = false;
-                root.errorMsg = "Kiro: parse error";
-                root.stale = root.lastUpdate !== "";
-            }
-        }
-    }
-
-    Plasma5Support.DataSource {
-        id: mistralCredSource
-
-        engine: "executable"
-        connectedSources: []
-        onNewData: function (src, data) {
-            disconnectSource(src);
-            if (root.enabledTabs[root.activeTab] !== "mistral" && !root.panelShows("mistral"))
-                return;
-
-            var output = (data["stdout"] || "").trim();
-            if (!output || output === "{}") {
-                root.errorMsg = "Mistral: no API key configured";
-                root.stale = root.lastUpdate !== "";
-                return;
-            }
-            try {
-                var res = JSON.parse(output);
-                // always harvest vibe stats regardless of key validity
-                root.mistralVibeSessionCount = res.vibeSessionCount || 0;
-                root.mistralVibeTotalCost = res.vibeTotalCost || 0;
-                root.mistralVibeTotalTokens = res.vibeTotalTokens || 0;
-                root.mistralVibePromptTokens = res.vibePromptTokens || 0;
-                root.mistralVibeCompletionTokens = res.vibeCompletionTokens || 0;
-                root.mistralVibeTotalSteps = res.vibeTotalSteps || 0;
-                root.mistralVibeToolOk = res.vibeToolOk || 0;
-                root.mistralVibeToolFail = res.vibeToolFail || 0;
-                root.mistralVibeActiveModel = res.vibeActiveModel || "";
-                root.mistralVibeRecent = res.vibeRecent || [];
-                if (res.error) {
-                    root.mistralError = res.error;
-                    root.errorMsg = res.error;
-                    root.stale = root.lastUpdate !== "";
-                    return;
-                }
-                root._mistralApiKey = res.mistralApiKey || "";
-                root.mistralKeyValid = res.keyValid === true;
-                root.mistralAvailableModels = res.availableModels || [];
-                root.mistralError = "";
-                root.errorMsg = "";
-                root.stale = false;
-                root.lastUpdate = Qt.formatTime(new Date(), "hh:mm");
-                root._offline = false;
-                offlineRetryTimer.stop();
-                root.recordMistralVibeUsage(root.mistralVibeTotalCost);
-            } catch (e) {
-                root.errorMsg = "Mistral: parse error";
-                root.stale = root.lastUpdate !== "";
-            }
-        }
-    }
-
-    Plasma5Support.DataSource {
-        id: openrouterCredSource
-
-        engine: "executable"
-        connectedSources: []
-        onNewData: function (src, data) {
-            disconnectSource(src);
-            if (root.enabledTabs[root.activeTab] !== "openrouter" && !root.panelShows("openrouter"))
-                return;
-
-            var output = (data["stdout"] || "").trim();
-            if (!output || output === "{}") {
-                root.errorMsg = "OpenRouter: no API key configured";
-                root.stale = root.lastUpdate !== "";
-                return;
-            }
-            try {
-                var res = JSON.parse(output);
-                if (res.error && !res.openrouterApiKey) {
-                    root.openrouterError = res.error;
-                    root.errorMsg = res.error;
-                    root.stale = root.lastUpdate !== "";
-                    return;
-                }
-                root._openrouterApiKey = res.openrouterApiKey || "";
-                root.openrouterKeyValid = res.keyValid === true;
-                root.openrouterLabel = res.label || "";
-                root.openrouterUsageUSD = res.usageUSD || 0;
-                root.openrouterLimitUSD = (res.limitUSD !== undefined && res.limitUSD !== null) ? res.limitUSD : null;
-                root.openrouterLimitRemainingUSD = (res.limitRemainingUSD !== undefined && res.limitRemainingUSD !== null) ? res.limitRemainingUSD : null;
-                root.openrouterIsFreeTier = res.isFreeTier === true;
-                root.openrouterRateLimit = res.rateLimit || {};
-                root.openrouterError = "";
-                root.errorMsg = "";
-                root.stale = false;
-                root.lastUpdate = Qt.formatTime(new Date(), "hh:mm");
-                root._offline = false;
-                offlineRetryTimer.stop();
-                if (root.openrouterLimitUSD !== null && root.openrouterLimitUSD > 0)
-                    root.recordOpenRouterUsage(Math.min(100, (root.openrouterUsageUSD / root.openrouterLimitUSD) * 100));
-            } catch (e) {
-                root.errorMsg = "OpenRouter: parse error";
-                root.stale = root.lastUpdate !== "";
-            }
-        }
-    }
-
-    Plasma5Support.DataSource {
-        id: grokUsageSource
-
-        engine: "executable"
-        connectedSources: []
-        onNewData: function (src, data) {
-            disconnectSource(src);
-            if (root.enabledTabs[root.activeTab] !== "grok" && !root.panelShows("grok"))
-                return;
-
-            var output = (data["stdout"] || "").trim();
-            if (!output || output === "{}") {
-                root.grokLoggedIn = false;
-                root.errorMsg = "Grok: run grok --oauth or configure an xAI key";
-                root.stale = root.lastUpdate !== "";
-                return;
-            }
-            try {
-                var res = JSON.parse(output);
-                root._grokApiKey = res.xaiApiKey || "";
-                root.grokLoggedIn = res.loggedIn === true;
-                root.grokPct = Math.max(0, Math.min(100, res.creditUsagePercent || 0));
-                root.grokUsed = res.used || res.onDemandUsed || 0;
-                root.grokMonthlyLimit = res.monthlyLimit || res.onDemandCap || 0;
-                root.grokEmail = res.email || "";
-                root.grokTeamName = res.teamName || "";
-                root.grokTierId = res.tierId || "";
-                root.grokBillingPeriodEnd = res.billingPeriodEnd || "";
-                root.grokSessionCount = res.sessionCount || 0;
-                root.grokTotalTokens = res.totalTokens || 0;
-                root.grokTotalToolCalls = res.totalToolCalls || 0;
-                root.grokError = res.billingError || "";
-                root.grokHasBilling = res.hasBilling === true;
-                root.grokQuotaKind = res.quotaKind || "";
-                root.grokQuotaWindow = res.quotaWindow || "";
-                root.grokQuotaExhausted = res.quotaExhausted === true;
-                root.errorMsg = root.grokError;
-                root.stale = false;
-                root.lastUpdate = Qt.formatTime(new Date(), "hh:mm");
-                root._offline = false;
-                offlineRetryTimer.stop();
-                if (root.grokHasBilling)
-                    root.recordGrokUsage(root.grokPct);
-            } catch (e) {
-                root.grokError = "Grok: parse error";
-                root.errorMsg = "Grok: parse error";
-                root.stale = root.lastUpdate !== "";
-            }
-        }
-    }
-
-    Plasma5Support.DataSource {
-        id: zaiUsageSource
-
-        engine: "executable"
-        connectedSources: []
-        onNewData: function (src, data) {
-            disconnectSource(src);
-            if (root.enabledTabs[root.activeTab] !== "zai" && !root.panelShows("zai"))
-                return;
-
-            var output = (data["stdout"] || "").trim();
-            if (!output || output === "{}") {
-                root._zaiToken = "";
-                root.zaiKeyValid = false;
-                root.zaiError = "";
-                root.errorMsg = "Z.AI: no token configured";
-                root.stale = root.lastUpdate !== "";
-                return;
-            }
-            try {
-                var res = JSON.parse(output);
-                if (res.error) {
-                    root._zaiToken = res.zaiToken || "";
-                    root.zaiKeyValid = res.keyValid === true;
-                    root.zaiError = res.error;
-                    root.errorMsg = "Z.AI: " + res.error;
-                    root.stale = root.lastUpdate !== "";
-                    return;
-                }
-                root._zaiToken = res.zaiToken || "";
-                root.zaiKeyValid = res.keyValid === true;
-                root.zaiLevel = res.level || "";
-                root.zaiTokenPct = Math.max(0, Math.min(100, res.tokenPct || 0));
-                root.zaiTokenUsed = res.tokenUsed !== undefined && res.tokenUsed !== null ? res.tokenUsed : null;
-                root.zaiTokenLimit = res.tokenLimit !== undefined && res.tokenLimit !== null ? res.tokenLimit : null;
-                root.zaiTokenResetDate = root.msFromNowToDate(res.tokenResetMs);
-                root.zaiToolsPct = Math.max(0, Math.min(100, res.toolsPct || 0));
-                root.zaiToolsRemaining = res.toolsRemaining !== undefined && res.toolsRemaining !== null ? res.toolsRemaining : null;
-                root.zaiToolsResetDate = root.msFromNowToDate(res.toolsResetMs);
-                root.zaiModels = res.models || [];
-                root.zaiError = "";
-                root.updateCountdowns();
-                root.errorMsg = "";
-                root.stale = false;
-                root.lastUpdate = Qt.formatTime(new Date(), "hh:mm");
-                root._offline = false;
-                offlineRetryTimer.stop();
-                root.recordZaiUsage(root.zaiTokenPct);
-            } catch (e) {
-                root.zaiError = "Z.AI: parse error";
-                root.errorMsg = "Z.AI: parse error";
-                root.stale = root.lastUpdate !== "";
-            }
-        }
-    }
-
-    Plasma5Support.DataSource {
-        id: copilotUsageSource
-
-        engine: "executable"
-        connectedSources: []
-        onNewData: function (src, data) {
-            disconnectSource(src);
-            if (root.enabledTabs[root.activeTab] !== "copilot" && !root.panelShows("copilot"))
-                return;
-
-            var output = (data["stdout"] || "").trim();
-            if (!output || output === "{}") {
-                root._githubToken = "";
-                root.copilotKeyValid = false;
-                root.copilotError = "";
-                root.errorMsg = "Copilot: no token configured";
-                root.stale = root.lastUpdate !== "";
-                return;
-            }
-            try {
-                var res = JSON.parse(output);
-                if (res.error) {
-                    root._githubToken = res.githubToken || "";
-                    root.copilotKeyValid = res.keyValid === true;
-                    root.copilotError = res.error;
-                    root.errorMsg = "Copilot: " + res.error;
-                    root.stale = root.lastUpdate !== "";
-                    return;
-                }
-                root._githubToken = res.githubToken || "";
-                root.copilotKeyValid = res.keyValid === true;
-                root.copilotUsername = res.username || "";
-                root.copilotUsed = res.used || 0;
-                root.copilotQuota = res.quota !== undefined && res.quota !== null ? res.quota : (Plasmoid.configuration.copilotQuota || 300);
-                root.copilotPct = Math.max(0, Math.min(100, res.pct || 0));
-                root.copilotResetDate = root.nextMonthResetDate();
-                root.copilotError = "";
-                root.updateCountdowns();
-                root.errorMsg = "";
-                root.stale = false;
-                root.lastUpdate = Qt.formatTime(new Date(), "hh:mm");
-                root._offline = false;
-                offlineRetryTimer.stop();
-                root.recordCopilotUsage(root.copilotPct);
-            } catch (e) {
-                root.copilotError = "Copilot: parse error";
-                root.errorMsg = "Copilot: parse error";
-                root.stale = root.lastUpdate !== "";
-            }
-        }
-    }
-
-    Plasma5Support.DataSource {
-        id: deepseekBalanceSource
-
-        engine: "executable"
-        connectedSources: []
-        onNewData: function (src, data) {
-            disconnectSource(src);
-            if (root.enabledTabs[root.activeTab] !== "deepseek" && !root.panelShows("deepseek"))
-                return;
-
-            var output = (data["stdout"] || "").trim();
-            if (!output || output === "{}") {
-                root._deepseekApiKey = "";
-                root.deepseekKeyValid = false;
-                root.deepseekError = "";
-                root.errorMsg = "DeepSeek: no API key configured";
-                root.stale = root.lastUpdate !== "";
-                return;
-            }
-            try {
-                var res = JSON.parse(output);
-                if (res.error) {
-                    root._deepseekApiKey = res.deepseekApiKey || "";
-                    root.deepseekKeyValid = res.keyValid === true;
-                    root.deepseekError = res.error;
-                    root.errorMsg = "DeepSeek: " + res.error;
-                    root.stale = root.lastUpdate !== "";
-                    return;
-                }
-                root._deepseekApiKey = res.deepseekApiKey || "";
-                root.deepseekKeyValid = res.keyValid === true;
-                root.deepseekIsAvailable = res.isAvailable === true;
-                root.deepseekBalances = res.balances || [];
-                root.deepseekPrimaryCurrency = res.primaryCurrency || "";
-                root.deepseekPrimaryTotal = res.primaryTotal || 0;
-                root.deepseekPrimaryGranted = res.primaryGranted || 0;
-                root.deepseekPrimaryToppedUp = res.primaryToppedUp || 0;
-                root.deepseekError = "";
-                root.errorMsg = "";
-                root.stale = false;
-                root.lastUpdate = Qt.formatTime(new Date(), "hh:mm");
-                root._offline = false;
-                offlineRetryTimer.stop();
-                root.recordDeepSeekBalance(root.deepseekPrimaryTotal);
-            } catch (e) {
-                root.deepseekError = "DeepSeek: parse error";
-                root.errorMsg = "DeepSeek: parse error";
-                root.stale = root.lastUpdate !== "";
-            }
+            root.applySnapshot((data["stdout"] || "").trim());
         }
     }
 
@@ -3185,14 +1777,6 @@ PlasmoidItem {
         running: false
         repeat: true
         onTriggered: root.refresh()
-    }
-
-    Timer {
-        interval: 300000 // 5 minutes
-        running: true
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: root.fetchAllStatuses()
     }
 
     // ── Compact (panel) ───────────────────────────────────────────────────────
@@ -3326,8 +1910,8 @@ PlasmoidItem {
                 stale: root.stale && root.panelShows("openai")
                 visible: root.panelShows("openai") && (root.codexSessionAvailable || !root.codexUsageAvailable)
                 showCost: !root.codexUsageAvailable
-                costText: root.openaiTotalCostUSD > 0 ? "$" + root.openaiTotalCostUSD.toFixed(2) : (root._openaiApiKey ? "API" : (root.openaiCodexLoggedIn ? "Codex" : "—"))
-                tooltipText: "OpenAI" + (root.codexSessionAvailable ? "\nCodex 5h: " + Math.round(100 - root.codexSessionPct) + "% left" : "") + (root.codexWeeklyAvailable ? "\nCodex weekly: " + Math.round(100 - root.codexWeeklyPct) + "% left" : "") + (root._openaiApiKey ? "\nAPI usage configured\nCost (30d): $" + root.openaiTotalCostUSD.toFixed(2) + "\nIn: " + root.formatTokens(root.openaiTotalInputTokens) + "  Out: " + root.formatTokens(root.openaiTotalOutputTokens) : "\nAPI usage needs an OpenAI API key") + (root.openaiCodexLoggedIn ? "\nCodex signed in" + (root.openaiEmail ? ": " + root.openaiEmail : "") : "")
+                costText: root.openaiTotalCostUSD > 0 ? "$" + root.openaiTotalCostUSD.toFixed(2) : (root.openaiHasApiKey ? "API" : (root.openaiCodexLoggedIn ? "Codex" : "—"))
+                tooltipText: "OpenAI" + (root.codexSessionAvailable ? "\nCodex 5h: " + Math.round(100 - root.codexSessionPct) + "% left" : "") + (root.codexWeeklyAvailable ? "\nCodex weekly: " + Math.round(100 - root.codexWeeklyPct) + "% left" : "") + (root.openaiHasApiKey ? "\nAPI usage configured\nCost (30d): $" + root.openaiTotalCostUSD.toFixed(2) + "\nIn: " + root.formatTokens(root.openaiTotalInputTokens) + "  Out: " + root.formatTokens(root.openaiTotalOutputTokens) : "\nAPI usage needs an OpenAI API key") + (root.openaiCodexLoggedIn ? "\nCodex signed in" + (root.openaiEmail ? ": " + root.openaiEmail : "") : "")
             }
 
             Rectangle {

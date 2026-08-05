@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import "../package/contents/code/UsageHistory.js" as UsageHistory
 
 // Usage-history chart, ported from the Plasma UsageChart. Self-contained:
 // feed it the unified history array plus the window list for the active tab.
@@ -8,7 +9,8 @@ Rectangle {
 
     // Full unified history: [{t, s?, w?, cp?, cw?, kr?, ag?, or?, mv?, gr?, za?, gh?, ds?}]
     property var usageHistory: []
-    // Windows available on the active tab: [{id, key, label, size}] (size in ms)
+    // Chart ranges for the active tab, straight from the provider contract:
+    // [{id, key, label, size, granularity, raw, resets}] (size in ms)
     property var windows: []
     property string chartWindow: ""
     property color accent: "#7dd3fc"
@@ -30,10 +32,10 @@ Rectangle {
     }
     readonly property string historyKey: currentWindow ? currentWindow.key : "w"
     readonly property real windowSize: currentWindow ? currentWindow.size : 7 * 24 * 3600000
-    // Mistral spend and DeepSeek balance are raw money values; auto-scale them.
-    readonly property bool isCost: historyKey === "mv" || historyKey === "ds"
-    // Only rolling-window series (Claude / Codex) drop to ~0 at a reset.
-    readonly property bool windowHasResets: ["session", "day", "weekly", "codex_primary", "codex_day", "codex_weekly"].indexOf(chartWindow) >= 0
+    // Money series (Mistral spend, DeepSeek balance) are absolute amounts the
+    // chart auto-scales; rolling plan windows are the ones that drop at a reset.
+    readonly property bool isCost: currentWindow ? currentWindow.raw === true : false
+    readonly property bool windowHasResets: currentWindow ? currentWindow.resets === true : false
 
     // {t, v[, raw]} view of the selected series inside the visible window
     readonly property var series: {
@@ -52,6 +54,8 @@ Rectangle {
                     v: v
                 });
         }
+        if (chart.windowHasResets && chart.currentWindow)
+            out = UsageHistory.withResets(out, chart.currentWindow.resetAt * 1000, chart.currentWindow.periodMs, minT, maxT);
         if (chart.isCost && out.length > 0) {
             var maxV = 0;
             for (var j = 0; j < out.length; j++)

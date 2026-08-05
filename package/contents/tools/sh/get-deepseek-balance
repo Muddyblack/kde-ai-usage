@@ -1,67 +1,41 @@
 #!/usr/bin/env bash
 set -u
 
-API_KEY="${WIDGET_DEEPSEEK_API_KEY:-}"
-[ -z "$API_KEY" ] && [ -n "${DEEPSEEK_API_KEY:-}" ] && API_KEY="$DEEPSEEK_API_KEY"
-[ -z "$API_KEY" ] && [ -n "${HOME:-}" ] && [ -f "$HOME/.config/deepseek/api-key" ] && API_KEY=$(tr -d '\n\r ' < "$HOME/.config/deepseek/api-key" 2>/dev/null)
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/http.sh"
+require_jq
 
+API_KEY="$(resolve_key WIDGET_DEEPSEEK_API_KEY DEEPSEEK_API_KEY "$HOME/.config/deepseek/api-key")"
 if [ -z "$API_KEY" ]; then
     echo "{}"
     exit 0
 fi
 
-if ! command -v jq >/dev/null 2>&1; then
-    printf '%s\n' '{"deepseekApiKey":"","keyValid":false,"error":"jq is required"}'
+http_json DEEPSEEK_BALANCE_RESPONSE_FILE "https://api.deepseek.com/user/balance" \
+    -H "Authorization: Bearer $API_KEY" \
+    -H "Accept: application/json" \
+    -H "User-Agent: kde-ai-usage/deepseek"
+
+if [ "$HTTP_STATUS" != "200" ]; then
+    http_error_json "DeepSeek" "$HTTP_STATUS" "Invalid DeepSeek API key"
     exit 0
 fi
 
-if [ -n "${DEEPSEEK_BALANCE_RESPONSE_FILE:-}" ] && [ -f "$DEEPSEEK_BALANCE_RESPONSE_FILE" ]; then
-    BODY=$(< "$DEEPSEEK_BALANCE_RESPONSE_FILE")
-    HTTP_CODE=200
-else
-    RESPONSE=$(curl -s -w "\n%{http_code}" \
-        -H "Authorization: Bearer $API_KEY" \
-        -H "Accept: application/json" \
-        -H "User-Agent: kde-ai-usage/deepseek" \
-        --max-time 10 \
-        "https://api.deepseek.com/user/balance" 2>/dev/null)
-    HTTP_CODE="${RESPONSE##*$'\n'}"
-    BODY="${RESPONSE%$'\n'*}"
+if ! printf '%s' "$HTTP_BODY" | jq '
+    if ((.balance_infos | type) == "array") then
+        (.balance_infos // []) as $balances |
+        (($balances | map(select(.currency == "USD"))[0]) // ($balances[0] // {})) as $primary |
+        {
+            hasKey: true,
+            keyValid: true,
+            isAvailable: (.is_available == true),
+            balances: $balances,
+            primaryCurrency: ($primary.currency // ""),
+            primaryTotal: (($primary.total_balance // "0") | tonumber? // 0),
+            primaryGranted: (($primary.granted_balance // "0") | tonumber? // 0),
+            primaryToppedUp: (($primary.topped_up_balance // "0") | tonumber? // 0)
+        }
+    else
+        { hasKey: true, keyValid: false, error: "DeepSeek unexpected response" }
+    end' 2>/dev/null; then
+    error_json "DeepSeek invalid JSON"
 fi
-
-case "$HTTP_CODE" in
-    200)
-        if ! echo "$BODY" | jq --arg key "$API_KEY" '
-            if ((.balance_infos | type) == "array") then
-                (.balance_infos // []) as $balances |
-                (($balances | map(select(.currency == "USD"))[0]) // ($balances[0] // {})) as $primary |
-                {
-                    deepseekApiKey: $key,
-                    keyValid: true,
-                    isAvailable: (.is_available == true),
-                    balances: $balances,
-                    primaryCurrency: ($primary.currency // ""),
-                    primaryTotal: (($primary.total_balance // "0") | tonumber? // 0),
-                    primaryGranted: (($primary.granted_balance // "0") | tonumber? // 0),
-                    primaryToppedUp: (($primary.topped_up_balance // "0") | tonumber? // 0)
-                }
-            else
-                {
-                    deepseekApiKey: "",
-                    keyValid: false,
-                    error: "DeepSeek unexpected response"
-                }
-            end' 2>/dev/null; then
-            jq -n '{deepseekApiKey: "", keyValid: false, error: "DeepSeek invalid JSON"}'
-        fi
-        ;;
-    401|403)
-        jq -n '{deepseekApiKey: "", keyValid: false, error: "Invalid DeepSeek API key"}'
-        ;;
-    000)
-        jq -n '{deepseekApiKey: "", keyValid: false, error: "DeepSeek network error"}'
-        ;;
-    *)
-        jq -n --arg code "$HTTP_CODE" '{deepseekApiKey: "", keyValid: false, error: ("DeepSeek HTTP " + $code)}'
-        ;;
-esac

@@ -535,11 +535,6 @@ ColumnLayout {
             configKey: "openaiApiKey"
         }
         KeyRow {
-            label: "Google AI"
-            placeholder: "AIza…"
-            configKey: "googleApiKey"
-        }
-        KeyRow {
             label: "Mistral"
             placeholder: "or $MISTRAL_API_KEY"
             configKey: "mistralApiKey"

@@ -70,7 +70,7 @@ ColumnLayout {
             PlasmaComponents.Label {
                 id: mistralBadgeLabel
                 anchors.centerIn: parent
-                text: rootItem.mistralKeyValid ? "CONNECTED" : (rootItem._mistralApiKey ? "INVALID KEY" : "NO KEY")
+                text: rootItem.mistralKeyValid ? "CONNECTED" : (rootItem.mistralHasKey ? "INVALID KEY" : "NO KEY")
                 font.pixelSize: 9
                 font.bold: true
                 color: rootItem.mistralKeyValid ? rootItem.mistralOrange : Kirigami.Theme.textColor
@@ -89,7 +89,7 @@ ColumnLayout {
 
     // ── No data at all ────────────────────────────────────────────────────────
     ColumnLayout {
-        visible: !mistralTabRoot.hasVibe && !rootItem.mistralKeyValid && rootItem._mistralApiKey === ""
+        visible: !mistralTabRoot.hasVibe && !rootItem.mistralKeyValid && !rootItem.mistralHasKey
         Layout.fillWidth: true
         spacing: 6
         PlasmaComponents.Label {

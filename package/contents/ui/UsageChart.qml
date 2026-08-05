@@ -4,13 +4,14 @@ import QtQuick.Controls as QQC2
 import org.kde.plasma.plasmoid
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
-import "../code/UsageWindows.js" as UsageWindows
 
 Rectangle {
     id: usageChartContainer
     property Item rootItem
 
-    visible: !rootItem.showSettings && rootItem.showUsageChart && rootItem.weeklyUsageHistory.length >= 1 && (rootItem.enabledTabs[rootItem.activeTab] === "claude" || (rootItem.enabledTabs[rootItem.activeTab] === "openai" && rootItem.codexUsageAvailable) || rootItem.enabledTabs[rootItem.activeTab] === "kiro" || rootItem.enabledTabs[rootItem.activeTab] === "antigravity" || rootItem.enabledTabs[rootItem.activeTab] === "openrouter" || rootItem.enabledTabs[rootItem.activeTab] === "mistral" || rootItem.enabledTabs[rootItem.activeTab] === "grok" || rootItem.enabledTabs[rootItem.activeTab] === "zai" || rootItem.enabledTabs[rootItem.activeTab] === "copilot" || rootItem.enabledTabs[rootItem.activeTab] === "deepseek")
+    // The backend decides which providers have a chartable series, so the chart
+    // simply shows whenever the active one reported a range and has data.
+    visible: !rootItem.showSettings && rootItem.showUsageChart && rootItem.weeklyUsageHistory.length >= 1 && rootItem.chartWindowsFor(rootItem.enabledTabs[rootItem.activeTab] || "").length > 0
     Layout.fillWidth: true
     Layout.preferredHeight: implicitHeight
     implicitHeight: 184
@@ -122,14 +123,7 @@ Rectangle {
     // ── Window toggle — Claude: 5H/7D, Codex: 5H/7D (single-series tabs: hidden) ──
     RowLayout {
         id: chartWindowToggle
-        readonly property var choices: {
-            var tab = rootItem.enabledTabs[rootItem.activeTab];
-            if (tab === "openai")
-                return UsageWindows.chartChoices("openai", rootItem.codexSessionAvailable, rootItem.codexWeeklyAvailable);
-            if (tab === "claude")
-                return UsageWindows.chartChoices("claude", rootItem.sessionAvailable, rootItem.weeklyAvailable);
-            return [];
-        }
+        readonly property var choices: rootItem.chartWindowsFor(rootItem.enabledTabs[rootItem.activeTab] || "")
         anchors.top: parent.top
         anchors.right: parent.right
         anchors.topMargin: 7
@@ -165,7 +159,7 @@ Rectangle {
                         rootItem.chartWindow = modelData.id;
                         Plasmoid.configuration.chartWindow = modelData.id;
                         // Remember the granularity so it carries to other tabs
-                        var gran = rootItem._windowGranularity(modelData.id);
+                        var gran = modelData.granularity;
                         if (gran !== "") {
                             rootItem.chartGranularity = gran;
                             Plasmoid.configuration.chartGranularity = gran;

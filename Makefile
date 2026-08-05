@@ -1,4 +1,4 @@
-.PHONY: help view view-h install pack tag
+.PHONY: help view view-h install pack tag test
 .DEFAULT_GOAL := help
 
 help: ## list targets
@@ -20,6 +20,11 @@ view-h: ## preview widget (horizontal)
 
 install: ## install test copy to local Plasma session
 	@./test_install.sh
+
+test: ## run the provider backend contract tests
+	@./tests/get-ai-usage.test.sh
+	@if command -v node >/dev/null 2>&1; then node --test tests/*.test.js; \
+	  else echo "skipping tests/shared-code.test.js (node not found)"; fi
 
 pack: ## build .plasmoid archive
 	@if command -v nix >/dev/null 2>&1 && [ -f flake.nix ]; then \

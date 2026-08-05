@@ -99,7 +99,8 @@ usage before its limit is exhausted. See
 | Dependency | Notes |
 |---|---|
 | KDE Plasma 6.0+ | `X-Plasma-API-Minimum-Version: 6.0` |
-| `plasma5support` | Provides the `executable` DataEngine for reading credentials |
+| `plasma5support` | Provides the `executable` DataEngine for running the backend |
+| `jq` and `curl` | Required by the shared provider backend and every fetch helper |
 
 Enable only the services you use. Each one has its own setup requirement:
 
@@ -108,7 +109,7 @@ Enable only the services you use. Each one has its own setup requirement:
 | Claude | Claude Code, signed in locally |
 | Antigravity | Node.js 18+, the `antigravity-usage` CLI, and a Google account with access |
 | OpenAI | An OpenAI API key for organization API usage; a Codex CLI login provides Codex/ChatGPT plan limits and account status |
-| Grok | Grok CLI authenticated with `grok --oauth`; an xAI API key is optional. The helper also needs `jq` and `curl` |
+| Grok | Grok CLI authenticated with `grok --oauth`; an xAI API key is optional |
 | Kiro | Kiro IDE, signed in at least once |
 | Mistral AI | A Mistral API key; vibe CLI is optional and adds local session statistics |
 | OpenRouter | An OpenRouter API key entered in widget settings |
@@ -215,6 +216,31 @@ settings are stored locally in
 
 ## How it works
 
+### Shared provider backend
+
+Both frontends — the Plasma widget and the Hyprland/Quickshell shell — get every
+provider value from one executable, `package/contents/tools/sh/get-ai-usage`.
+It owns credential discovery, provider API requests, response parsing, quota
+maths, reset timestamps and error/stale state, and returns a versioned,
+frontend-neutral JSON model:
+
+```bash
+get-ai-usage --provider claude        # one provider (Plasma: active tab + pins)
+get-ai-usage --all                    # every enabled provider (Hyprland panel)
+```
+
+Normalization lives in `package/contents/tools/jq/providers.jq` and is pure, so
+`get-ai-usage --normalize` can replay a recorded provider response offline.
+Credential lookup, HTTP calls and status-code handling are shared by every
+helper via `package/contents/tools/sh/lib/http.sh`.
+
+The QML on both sides is presentation only: no provider URLs, no response
+parsing, no percentage or window arithmetic, and not even the table of which
+chart ranges a provider has — that arrives with the data. What genuinely is
+shared between the two UIs (countdown formatting, usage-history merging) lives
+in `package/contents/code/`. The schema is documented in
+[`docs/provider-contract.md`](docs/provider-contract.md).
+
 ### Claude
 On each refresh cycle the widget reads `~/.claude/.credentials.json` to get the OAuth access token, then calls Anthropic's subscription usage endpoint. It prefers the current semantic `limits[]` entries and falls back to the legacy `five_hour` and `seven_day` objects. Only windows with usable data are displayed; legacy five-hour support remains available if Anthropic returns it.
 
@@ -246,9 +272,24 @@ The GitHub Copilot tab reads monthly premium request usage from GitHub's user bi
 The DeepSeek tab calls `GET https://api.deepseek.com/user/balance` with the configured API key. It shows whether the account has sufficient balance for API calls, the primary total balance, and the granted / topped-up split. The key is resolved from widget settings → `$DEEPSEEK_API_KEY` → `~/.config/deepseek/api-key`.
 
 ### Usage history
-Each refresh appends the usage values that a provider actually reports to a rolling history (the last 500 samples) used by the chart, spark-lines, burn-rate ETA, and period comparison. Most series are percentages; Mistral stores its raw vibe CLI spend and DeepSeek stores its raw balance so their charts retain meaningful units. Existing session and weekly history fields are retained even while a window is unavailable, so five-hour charts can return without migration if providers restore that limit. History is stored in the widget's Plasma config **and** mirrored to `~/.local/share/ai-usage-widget/usage-history-latest.json`, so it survives a full uninstall/reinstall — on first launch with no config history, the widget restores from that file automatically. You can also manually **Export** (writes a timestamped JSON copy) and **Import** from the settings panel. If a saved file is unreadable or in an unrecognized format, it's discarded and history starts fresh rather than erroring out.
+Each refresh appends the usage values that a provider actually reports to a rolling history (the last 500 samples) used by the chart, spark-lines, burn-rate ETA, and period comparison. Rolling plan windows (Claude, Codex) empty at a known instant, so when the machine was asleep across one the chart replays the drop where it actually happened instead of sloping from the last pre-sleep sample to the first one after wake-up. Most series are percentages; Mistral stores its raw vibe CLI spend and DeepSeek stores its raw balance so their charts retain meaningful units. Existing session and weekly history fields are retained even while a window is unavailable, so five-hour charts can return without migration if providers restore that limit. History is stored in the widget's Plasma config **and** mirrored to `~/.local/share/ai-usage-widget/usage-history-latest.json`, so it survives a full uninstall/reinstall — on first launch with no config history, the widget restores from that file automatically. You can also manually **Export** (writes a timestamped JSON copy) and **Import** from the settings panel. If a saved file is unreadable or in an unrecognized format, it's discarded and history starts fresh rather than erroring out.
 
-**Privacy:** Credentials entered in widget settings are stored locally in the desktop's widget/config file and are sent only to the corresponding provider endpoints. Automatically discovered credentials remain in their original local files. Usage history (timestamps plus the values described above) is written locally to `~/.local/share/ai-usage-widget/`.
+**Privacy:** Credentials entered in widget settings are stored locally in the desktop's widget/config file and are sent only to the corresponding provider endpoints. Automatically discovered credentials remain in their original local files. Tokens never leave the backend: the JSON model handed to either frontend carries presence flags (`hasApiKey`, `keyValid`, …) but no credential, and a contract test enforces that. Usage history (timestamps plus the values described above) is written locally to `~/.local/share/ai-usage-widget/`.
+
+---
+
+## Tests
+
+```bash
+make test
+```
+
+`tests/get-ai-usage.test.sh` replays the fixtures in `tests/fixtures/` through
+the backend's `--normalize` mode — success, missing credentials, malformed
+responses, offline and rate-limited states for every provider — and then runs
+the real backend end to end against the fetch tools' fixture hooks. No network
+access is needed. `tests/shared-code.test.js` covers the JavaScript both
+frontends share.
 
 ---
 

@@ -4,30 +4,31 @@
 #   1. Resolve the key (widget config > env var > vibe .env > known config files)
 #   2. Call GET /v1/models to verify validity and get the model list
 #   3. Read ~/.vibe session logs for local cost / token / session stats
+set -u
 
-API_KEY="${WIDGET_MISTRAL_API_KEY:-}"
-[ -z "$API_KEY" ] && [ -n "$MISTRAL_API_KEY" ]                        && API_KEY="$MISTRAL_API_KEY"
-# vibe CLI stores its key in ~/.vibe/.env
-[ -z "$API_KEY" ] && [ -f "$HOME/.vibe/.env" ] && \
-    API_KEY=$(grep -oP "(?<=MISTRAL_API_KEY=')[^']+" "$HOME/.vibe/.env" 2>/dev/null | head -1)
-[ -z "$API_KEY" ] && [ -f "$HOME/.vibe/.env" ] && \
-    API_KEY=$(grep -oP '(?<=MISTRAL_API_KEY=")[^"]+' "$HOME/.vibe/.env" 2>/dev/null | head -1)
-[ -z "$API_KEY" ] && [ -f "$HOME/.vibe/.env" ] && \
-    API_KEY=$(grep -m1 '^MISTRAL_API_KEY=' "$HOME/.vibe/.env" 2>/dev/null | cut -d= -f2- | tr -d "'\" \n\r")
-[ -z "$API_KEY" ] && [ -f "$HOME/.config/mistral/api-key" ]           && API_KEY=$(cat "$HOME/.config/mistral/api-key"  2>/dev/null | tr -d '\n\r ')
-[ -z "$API_KEY" ] && [ -f "$HOME/.mistral/api-key" ]                  && API_KEY=$(cat "$HOME/.mistral/api-key"         2>/dev/null | tr -d '\n\r ')
-[ -z "$API_KEY" ] && [ -f "$HOME/.config/mistral.key" ]               && API_KEY=$(cat "$HOME/.config/mistral.key"      2>/dev/null | tr -d '\n\r ')
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/http.sh"
+require_jq
+
+VIBE_ENV="$HOME/.vibe/.env"
+API_KEY="$(resolve_key WIDGET_MISTRAL_API_KEY MISTRAL_API_KEY \
+    "$HOME/.config/mistral/api-key" "$HOME/.mistral/api-key" "$HOME/.config/mistral.key")"
+
+# vibe CLI stores its key inside an .env assignment rather than on its own line,
+# so it needs parsing the shared file fallback cannot do.
+if [ -z "$API_KEY" ] && [ -f "$VIBE_ENV" ]; then
+    API_KEY=$(grep -m1 '^MISTRAL_API_KEY=' "$VIBE_ENV" 2>/dev/null | cut -d= -f2- | tr -d "'\" \n\r")
+fi
 
 # ── Vibe CLI session stats ────────────────────────────────────────────────────
 VIBE_SESSION_DIR="$HOME/.vibe/logs/session"
 VIBE_CONFIG="$HOME/.vibe/config.toml"
 
 VIBE_STATS='{}'
-if [ -d "$VIBE_SESSION_DIR" ] && command -v jq >/dev/null 2>&1; then
+if [ -d "$VIBE_SESSION_DIR" ]; then
     VIBE_STATS=$(
-        find "$VIBE_SESSION_DIR" -name "meta.json" -type f 2>/dev/null \
-        | sort -u \
-        | xargs jq -s '
+        find "$VIBE_SESSION_DIR" -name "meta.json" -type f 2>/dev/null |
+            sort -u |
+            xargs jq -s '
             map(select(.stats != null))
             | (sort_by(.start_time) | reverse) as $byNewest
             | {
@@ -58,39 +59,38 @@ if [ -f "$VIBE_CONFIG" ]; then
     VIBE_MODEL=$(grep -m1 '^active_model' "$VIBE_CONFIG" 2>/dev/null | sed 's/.*= *"\?\([^"]*\)"\?.*/\1/' | tr -d '"')
 fi
 
+# Local vibe statistics are worth showing even when the key is missing or
+# rejected, so every exit path below merges them in.
+emit() {
+    printf '%s' "$VIBE_STATS" | jq --arg m "$VIBE_MODEL" ". + {vibeActiveModel: \$m} + $1"
+}
+
 if [ -z "$API_KEY" ]; then
-    echo "$VIBE_STATS" | jq --arg m "$VIBE_MODEL" '. + {vibeActiveModel: $m}'
+    emit '{hasKey: false, keyValid: false}'
     exit 0
 fi
 
-RESPONSE=$(curl -s -w "\n%{http_code}" \
+HTTP_TIMEOUT=8 http_json MISTRAL_RESPONSE_FILE "https://api.mistral.ai/v1/models" \
     -H "Authorization: Bearer $API_KEY" \
-    -H "Content-Type: application/json" \
-    --max-time 8 \
-    "https://api.mistral.ai/v1/models" 2>/dev/null)
+    -H "Content-Type: application/json"
 
-HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-BODY=$(echo "$RESPONSE" | head -n -1)
-
-case "$HTTP_CODE" in
+case "$HTTP_STATUS" in
     200)
-        echo "$BODY" | jq --arg key "$API_KEY" --arg m "$VIBE_MODEL" --argjson vibe "$VIBE_STATS" \
-            '$vibe + {mistralApiKey: $key, keyValid: true, vibeActiveModel: $m,
-                      availableModels: [.data[]?.id // empty]}'
+        printf '%s' "$HTTP_BODY" | jq --arg m "$VIBE_MODEL" --argjson vibe "$VIBE_STATS" \
+            '$vibe + {hasKey: true, keyValid: true, vibeActiveModel: $m,
+                      availableModels: [.data[]?.id // empty]}' ||
+            emit '{hasKey: true, keyValid: false, error: "Mistral invalid JSON"}'
         ;;
-    401)
-        echo "$VIBE_STATS" | jq --arg m "$VIBE_MODEL" \
-            '. + {mistralApiKey: "", keyValid: false, vibeActiveModel: $m,
-                  error: "Invalid API key (401)"}'
+    401 | 403)
+        emit '{hasKey: true, keyValid: false, error: "Invalid API key (401)"}'
         ;;
     429)
-        echo "$VIBE_STATS" | jq --arg key "$API_KEY" --arg m "$VIBE_MODEL" \
-            '. + {mistralApiKey: $key, keyValid: true, vibeActiveModel: $m,
-                  error: "Rate limited (429)"}'
+        emit '{hasKey: true, keyValid: true, error: "Rate limited (429)"}'
+        ;;
+    000 | '')
+        emit '{hasKey: true, keyValid: false, error: "Mistral network error"}'
         ;;
     *)
-        echo "$VIBE_STATS" | jq --arg code "$HTTP_CODE" --arg m "$VIBE_MODEL" \
-            '. + {mistralApiKey: "", keyValid: false, vibeActiveModel: $m,
-                  error: ("HTTP " + $code)}'
+        emit "{hasKey: true, keyValid: false, error: \"HTTP $HTTP_STATUS\"}"
         ;;
 esac

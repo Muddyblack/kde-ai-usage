@@ -224,7 +224,7 @@ ColumnLayout {
     // Pricing: sonnet-4 ($3/$15 per M), opus-4 ($15/$75 per M).
     Rectangle {
         id: apiCostEstimate
-        visible: claudeTabRoot.subTab === "usage" && rootItem.weeklyTokensUsed > 0 && rootItem._claudeAdminToken === ""
+        visible: claudeTabRoot.subTab === "usage" && rootItem.weeklyTokensUsed > 0 && !rootItem.claudeHasAdminKey
         Layout.fillWidth: true
         height: costEstCol.implicitHeight + 16
         radius: 6
@@ -445,18 +445,18 @@ ColumnLayout {
             ColumnLayout {
                 Layout.fillWidth: true
                 spacing: 3
-                MouseArea {
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    propagateComposedEvents: true
-                    QQC2.ToolTip.visible: containsMouse
-                    QQC2.ToolTip.delay: 400
-                    QQC2.ToolTip.text: {
-                        var m = rootItem.claudeModels[modelData];
-                        if (!m)
-                            return modelData;
-                        return modelData + "\nInput:  " + rootItem.formatTokens(m.input_tokens) + " tokens\nOutput: " + rootItem.formatTokens(m.output_tokens) + " tokens\nCost:   " + (m.priced ? "$" + m.cost_usd.toFixed(4) : "unpriced");
-                    }
+                // HoverHandler rather than a MouseArea: a MouseArea here would be a
+                // layout child, and anchoring it to fill the layout is undefined behavior.
+                HoverHandler {
+                    id: costHover
+                }
+                QQC2.ToolTip.visible: costHover.hovered
+                QQC2.ToolTip.delay: 400
+                QQC2.ToolTip.text: {
+                    var m = rootItem.claudeModels[modelData];
+                    if (!m)
+                        return modelData;
+                    return modelData + "\nInput:  " + rootItem.formatTokens(m.input_tokens) + " tokens\nOutput: " + rootItem.formatTokens(m.output_tokens) + " tokens\nCost:   " + (m.priced ? "$" + m.cost_usd.toFixed(4) : "unpriced");
                 }
                 RowLayout {
                     Layout.fillWidth: true
@@ -700,18 +700,18 @@ ColumnLayout {
             ColumnLayout {
                 Layout.fillWidth: true
                 spacing: 3
-                MouseArea {
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    propagateComposedEvents: true
-                    QQC2.ToolTip.visible: containsMouse
-                    QQC2.ToolTip.delay: 400
-                    QQC2.ToolTip.text: {
-                        var m = rootItem.claudeStatsModels[modelData];
-                        if (!m)
-                            return modelData;
-                        return modelData + "\nInput:  " + rootItem.formatTokens(m.input) + "\nOutput: " + rootItem.formatTokens(m.output) + "\nCache read: " + rootItem.formatTokens(m.cacheRead) + "\nCache write: " + rootItem.formatTokens(m.cacheCreation) + (m.cost > 0 ? "\nCost: $" + m.cost.toFixed(2) : "") + (m.webSearches > 0 ? "\nWeb searches: " + m.webSearches : "");
-                    }
+                // HoverHandler rather than a MouseArea: a MouseArea here would be a
+                // layout child, and anchoring it to fill the layout is undefined behavior.
+                HoverHandler {
+                    id: statsHover
+                }
+                QQC2.ToolTip.visible: statsHover.hovered
+                QQC2.ToolTip.delay: 400
+                QQC2.ToolTip.text: {
+                    var m = rootItem.claudeStatsModels[modelData];
+                    if (!m)
+                        return modelData;
+                    return modelData + "\nInput:  " + rootItem.formatTokens(m.input) + "\nOutput: " + rootItem.formatTokens(m.output) + "\nCache read: " + rootItem.formatTokens(m.cacheRead) + "\nCache write: " + rootItem.formatTokens(m.cacheCreation) + (m.cost > 0 ? "\nCost: $" + m.cost.toFixed(2) : "") + (m.webSearches > 0 ? "\nWeb searches: " + m.webSearches : "");
                 }
                 RowLayout {
                     Layout.fillWidth: true
