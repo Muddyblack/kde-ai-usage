@@ -29,5 +29,10 @@ jobs:
       - name: provider contract tests
         run: ./tests/get-ai-usage.test.sh
 
+      - name: codex helper tests
+        run: |
+          ./tests/get-codex-stats.test.sh
+          ./tests/get-codex-rate-limits.test.sh
+
       - name: shared frontend code tests
         run: node --test tests/*.test.js

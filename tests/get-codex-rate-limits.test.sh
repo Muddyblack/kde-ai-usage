@@ -30,3 +30,5 @@ EOF
 chmod +x "$tmp/codex"
 
 test "$(PATH="$tmp:$PATH" "$repo/package/contents/tools/sh/get-codex-rate-limits")" = '{}'
+
+echo "get-codex-rate-limits: all assertions passed"
