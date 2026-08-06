@@ -5,11 +5,12 @@ Hyprland/Quickshell shell (`hyprland/`) — get all of their provider data from 
 single backend:
 
 ```
-credential + local-data helpers   package/contents/tools/sh/get-*
-                 │                (shared plumbing: tools/sh/lib/http.sh)
-                 ▼
-  shared provider backend         package/contents/tools/sh/get-ai-usage
-                 │                (normalization: package/contents/tools/jq/providers.jq)
+shared provider backend (Python, stdlib only)   package/contents/tools/aiusage
+  - credential discovery, HTTP, local-data reads   aiusage/providers/, aiusage/http.py
+  - normalization                                  aiusage/normalize/
+                 │
+                 ▼  thin bash launcher, execs into the package above
+  package/contents/tools/sh/get-ai-usage
                  │
           stable JSON model
            ┌─────┴─────┐
@@ -79,7 +80,7 @@ when its remembered one disappears.
 | --- | --- |
 | `ok` | the provider produced usable data |
 | `stale` | data is missing or older than this refresh |
-| `error` | human-readable failure, `""` when healthy. Well-known values: `offline`, `rate limited`, `token expired`, `access denied`, `err <http status>` |
+| `error` | human-readable failure, `""` when healthy. Well-known values: `offline`, `rate limited`, `token expired`, `access denied`, `err <http status>`, `python3 missing` (unlike the others, not retried — see the bash launcher in `tools/sh/get-ai-usage`) |
 | `updatedAt` | epoch seconds when the data was collected |
 | `summary.pct` | headline percentage (0–100) |
 | `summary.text` | headline string, already formatted (`"23%"`, `"$12.5"`, `"CLI"`) |
@@ -230,9 +231,9 @@ and Quickshell writes the mirror file. Both write the same format to the same
 `tests/get-ai-usage.test.sh` replays `tests/fixtures/*.json` — raw envelopes for
 success, missing credentials, malformed responses, offline and rate-limited
 states — through `--normalize`, so the whole provider matrix is covered without
-network access. It also runs the real backend end to end against the fetch
-tools' own fixture hooks (`*_RESPONSE_FILE`, honoured by `http_json` in
-`tools/sh/lib/http.sh`) to check settings toggles, key plumbing and the outer
+network access. It also runs the real backend end to end against the providers'
+own fixture hooks (`*_RESPONSE_FILE`, honoured by `fetch_json` in
+`aiusage/http.py`) to check settings toggles, key plumbing and the outer
 envelope.
 
 `tests/shared-code.test.js` covers the shared frontend modules. Run both with
@@ -241,5 +242,5 @@ envelope.
 ## Changing the contract
 
 Adding a field is backwards compatible. Removing or repurposing one is not:
-bump `schema_version` in `package/contents/tools/jq/providers.jq`, update this
-document, and update both frontends in the same change.
+bump `SCHEMA_VERSION` in `package/contents/tools/aiusage/contract.py`, update
+this document, and update both frontends in the same change.

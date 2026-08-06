@@ -2,415 +2,82 @@
 #
 # get-ai-usage — the shared provider backend for every frontend of this widget.
 #
-# This tool owns credential discovery, provider API requests, response parsing,
-# quota/percentage maths, reset timestamps and error/stale state. The KDE Plasma
-# widget and the Hyprland/Quickshell shell both consume its output and do
-# presentation only; see docs/provider-contract.md for the schema.
+# This is a thin launcher. All logic — credential discovery, provider API
+# requests, response parsing, quota/percentage maths, reset timestamps and
+# error/stale state — lives in ../aiusage, a Python package using only the
+# standard library. See docs/provider-contract.md for the schema and
+# ../aiusage/__main__.py for the CLI.
 #
 #   get-ai-usage --provider claude          one provider (KDE's active tab)
 #   get-ai-usage --provider claude,openai   several providers (active + pinned)
 #   get-ai-usage --all                      every enabled provider (Hyprland)
 #   get-ai-usage --normalize < envelope     replay a raw envelope offline (tests)
+#   get-ai-usage --list                     known provider ids
 #
-# All IO lives here. Normalization lives in ../jq/providers.jq and is pure, so
-# --normalize can reproduce any provider state from a fixture without network
-# access.
+# Three consumers hardcode this path (package/contents/ui/main.qml,
+# hyprland/shell.qml, hyprland/tray/main.cpp), so it has to keep working even
+# when python3 is missing — hence the fallback envelope below instead of a
+# bare shebang failure.
 
 set -u
 
-TOOLS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-JQ_DIR="$(cd "$TOOLS/../jq" && pwd)"
-NOW="$(date +%s)"
-
-. "$TOOLS/lib/http.sh"
-require_jq
-
+# Keep in sync with aiusage/config.py:ALL_PROVIDERS — duplicated here so
+# --list and the missing-python3 fallback work without importing Python.
 ALL_PROVIDERS="claude antigravity openai kiro mistral openrouter grok zai copilot deepseek"
-# Providers that stay off until explicitly enabled (they need a token the user
-# has to paste, so defaulting them on would only produce error rows).
-OPT_IN_PROVIDERS=" zai copilot deepseek "
 
-STATUS_TTL="${AI_USAGE_STATUS_TTL:-300}"
-CACHE_DIR="${AI_USAGE_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/ai-usage-widget}"
+PY="${PYTHON3:-python3}"
 
-usage() {
-    cat <<'EOF'
-usage: get-ai-usage [--all | --provider <id>[,<id>...] | --normalize]
-
-  --all                 fetch every provider enabled in the shared settings file
-  --provider <ids>      fetch the named providers regardless of the toggles
-  --normalize           read one raw envelope on stdin, print the provider object
-  --list                print the known provider ids, one per line
-  -h, --help            show this help
-
-providers: claude antigravity openai kiro mistral openrouter grok zai copilot deepseek
-EOF
-}
-
-# ── Shared settings (provider toggles + API keys) ───────────────────────────
-# The Hyprland shell writes this file; the Plasma widget passes the same values
-# through WIDGET_* environment variables. Environment always wins.
-
-CONFIG="${AI_USAGE_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/ai-usage-widget/hyprland-settings.json}"
-cfg='{}'
-if [ -f "$CONFIG" ]; then
-    raw_cfg="$(cat "$CONFIG" 2>/dev/null)"
-    if printf '%s' "$raw_cfg" | jq empty >/dev/null 2>&1; then
-        cfg="$raw_cfg"
-    fi
-fi
-
-cfg_key() {
-    printf '%s' "$cfg" | jq -r --arg k "$1" '.keys[$k] // empty' 2>/dev/null
-}
-
-# Export a WIDGET_* variable from the settings file only when the caller has not
-# already provided one.
-export_key() {
-    local var="$1" value
-    value="$(cfg_key "$2")"
-    [ -z "$value" ] && return 0
-    [ -n "${!var:-}" ] && return 0
-    export "$var=$value"
-}
-
-export_key WIDGET_CLAUDE_ADMIN_KEY claudeAdmin
-export_key WIDGET_OPENAI_API_KEY openai
-export_key WIDGET_MISTRAL_API_KEY mistral
-export_key WIDGET_OPENROUTER_API_KEY openrouter
-export_key WIDGET_GROK_API_KEY grok
-export_key WIDGET_ZAI_TOKEN zai
-export_key WIDGET_GITHUB_TOKEN github
-export_key WIDGET_DEEPSEEK_API_KEY deepseek
-
-if [ -z "${WIDGET_COPILOT_QUOTA:-}" ]; then
-    copilot_quota="$(printf '%s' "$cfg" | jq -r '.copilotQuota // .keys.copilotQuota // 300' 2>/dev/null)"
-    case "$copilot_quota" in
-        '' | *[!0-9]*) copilot_quota=300 ;;
-    esac
-    export WIDGET_COPILOT_QUOTA="$copilot_quota"
-fi
-
-provider_enabled() {
-    case "$OPT_IN_PROVIDERS" in
-        *" $1 "*)
-            printf '%s' "$cfg" | jq -e --arg id "$1" '.providers[$id] == true' >/dev/null 2>&1
-            ;;
-        *)
-            printf '%s' "$cfg" | jq -e --arg id "$1" '.providers[$id] != false' >/dev/null 2>&1
-            ;;
-    esac
-}
-
-# ── Helpers ─────────────────────────────────────────────────────────────────
-
-# Echo the argument when it is a valid JSON document, otherwise "null", so it
-# can always be handed to jq via --argjson.
-as_json() {
-    local value="${1:-}"
-    if [ -n "$value" ] && printf '%s' "$value" | jq empty >/dev/null 2>&1; then
-        printf '%s' "$value"
-    else
-        printf 'null'
-    fi
-}
-
-read_json_file() {
-    local path="$1"
-    [ -f "$path" ] || { printf 'null'; return 0; }
-    as_json "$(cat "$path" 2>/dev/null)"
-}
-
-# Run a provider tool, returning its stdout. Tools legitimately print an
-# {"error": …} document *and* exit non-zero, so the exit status is ignored and
-# only the payload is inspected.
-run_tool() {
-    local out
-    out="$("$TOOLS/$1" 2>/dev/null)" || true
-    as_json "$out"
-}
-
-# The frontend-facing error vocabulary, which is deliberately shorter than the
-# per-provider wording the helpers use (see docs/provider-contract.md).
-http_error_text() {
-    case "$1" in
-        000 | '') printf 'offline' ;;
-        401) printf 'token expired' ;;
-        403) printf 'access denied' ;;
-        429) printf 'rate limited' ;;
-        *) printf 'err %s' "$1" ;;
-    esac
-}
-
-# Fetch a Statuspage summary, memoised on disk so a fast poll interval does not
-# hammer four status hosts. Never fatal: an unreachable status page just leaves
-# the panel without an incident banner.
-status_json() {
-    local name="$1" url="$2" cache body
-    cache="$CACHE_DIR/status-$name.json"
-    if [ -f "$cache" ]; then
-        local age
-        age=$(($(date +%s) - $(stat -c %Y "$cache" 2>/dev/null || printf 0)))
-        if [ "$age" -ge 0 ] && [ "$age" -lt "$STATUS_TTL" ]; then
-            read_json_file "$cache"
-            return 0
-        fi
-    fi
-    HTTP_TIMEOUT=12 http_json "" "$url"
-    body="$HTTP_BODY"
-    if [ "$HTTP_STATUS" = "200" ] && printf '%s' "$body" | jq empty >/dev/null 2>&1; then
-        mkdir -p "$CACHE_DIR" 2>/dev/null && printf '%s' "$body" >"$cache" 2>/dev/null
-        printf '%s' "$body"
-    elif [ -f "$cache" ]; then
-        read_json_file "$cache"
-    else
-        printf 'null'
-    fi
-}
-
-normalize() {
-    jq -c -L "$JQ_DIR" 'include "providers"; normalize(.)'
-}
-
-# ── Raw input collection ────────────────────────────────────────────────────
-
-collect_claude() {
-    local creds token admin usage usage_error org settings stats status
-
-    creds="$(run_tool get-claude-credentials)"
-    token="$(printf '%s' "$creds" | jq -r '.claudeAiOauth.accessToken // empty' 2>/dev/null)"
-    admin="$(printf '%s' "$creds" | jq -r '.claudeAdminApiKey // empty' 2>/dev/null)"
-
-    usage='null'
-    usage_error=''
-    if [ -n "$token" ]; then
-        HTTP_TIMEOUT=12 http_json CLAUDE_USAGE_RESPONSE_FILE \
-            "https://api.anthropic.com/api/oauth/usage" \
-            -H "Authorization: Bearer $token" \
-            -H "anthropic-beta: oauth-2025-04-20" \
-            -H "User-Agent: claude-code/2.1.0"
-        if [ "$HTTP_STATUS" = "200" ]; then
-            usage="$(as_json "$HTTP_BODY")"
-            [ "$usage" = "null" ] && usage_error='parse error'
-        else
-            usage_error="$(http_error_text "$HTTP_STATUS")"
-        fi
-    fi
-
-    org='null'
-    if [ -n "$admin" ]; then
-        local start end
-        end="$(date -u +%Y-%m-%d)"
-        start="$(date -u -d '30 days ago' +%Y-%m-%d 2>/dev/null || printf '%s' "$end")"
-        HTTP_TIMEOUT=12 http_json CLAUDE_ORG_USAGE_RESPONSE_FILE \
-            "https://api.anthropic.com/v1/organization/usage?start_date=$start&end_date=$end" \
-            -H "x-api-key: $admin" \
-            -H "anthropic-version: 2023-06-01" \
-            -H "Content-Type: application/json"
-        [ "$HTTP_STATUS" = "200" ] && org="$(as_json "$HTTP_BODY")"
-    fi
-
-    settings="$(read_json_file "$HOME/.claude/settings.json")"
-    stats="$(read_json_file "$HOME/.claude/stats-cache.json")"
-    status="$(status_json claude "https://status.claude.com/api/v2/summary.json")"
-
-    jq -n --arg id claude --argjson now "$NOW" \
-        --argjson credentials "$creds" \
-        --argjson usage "$usage" \
-        --arg usageError "$usage_error" \
-        --argjson orgUsage "$org" \
-        --argjson settings "$settings" \
-        --argjson stats "$stats" \
-        --argjson status "$status" \
-        '{ id: $id, now: $now,
-           inputs: { credentials: ($credentials // {}), usage: $usage, usageError: $usageError,
-                     orgUsage: $orgUsage, settings: ($settings // {}), stats: ($stats // {}),
-                     status: $status } }'
-}
-
-collect_openai() {
-    local creds token account api_key codex codex_error org stats status
-
-    creds="$(run_tool get-openai-usage)"
-    token="$(printf '%s' "$creds" | jq -r '.codexAccessToken // empty' 2>/dev/null)"
-    account="$(printf '%s' "$creds" | jq -r '.accountId // empty' 2>/dev/null)"
-    api_key="$(printf '%s' "$creds" | jq -r '.openaiApiKey // empty' 2>/dev/null)"
-
-    # The local Codex app-server is authoritative; the authenticated web
-    # endpoint is the fallback, exactly as the Plasma widget used to do.
-    codex='null'
-    codex_error=''
-    if [ -n "${CODEX_USAGE_RESPONSE_FILE:-}" ]; then
-        codex="$(read_json_file "$CODEX_USAGE_RESPONSE_FILE")"
-    else
-        codex="$(run_tool get-codex-rate-limits)"
-        if [ "$(printf '%s' "$codex" | jq -r 'if (.rateLimits // .rate_limit) != null then "yes" else "no" end' 2>/dev/null)" != "yes" ] && [ -n "$token" ]; then
-            if [ -n "$account" ]; then
-                HTTP_TIMEOUT=12 http_json "" "https://chatgpt.com/backend-api/codex/usage" \
-                    -H "Authorization: Bearer $token" \
-                    -H "chatgpt-account-id: $account" \
-                    -H "User-Agent: codex-cli"
-            else
-                HTTP_TIMEOUT=12 http_json "" "https://chatgpt.com/backend-api/codex/usage" \
-                    -H "Authorization: Bearer $token" \
-                    -H "User-Agent: codex-cli"
-            fi
-            if [ "$HTTP_STATUS" = "200" ]; then
-                codex="$(as_json "$HTTP_BODY")"
-            else
-                codex_error="$(http_error_text "$HTTP_STATUS")"
-            fi
-        fi
-    fi
-
-    org='null'
-    if [ -n "$api_key" ]; then
-        local start end
-        end="$NOW"
-        start=$((NOW - 30 * 86400))
-        HTTP_TIMEOUT=12 http_json OPENAI_ORG_USAGE_RESPONSE_FILE \
-            "https://api.openai.com/v1/organization/usage/completions?start_time=$start&end_time=$end&group_by=model&limit=100" \
-            -H "Authorization: Bearer $api_key" \
-            -H "Content-Type: application/json"
-        [ "$HTTP_STATUS" = "200" ] && org="$(as_json "$HTTP_BODY")"
-    fi
-
-    stats="$(run_tool get-codex-stats)"
-    status="$(status_json openai "https://status.openai.com/api/v2/summary.json")"
-
-    jq -n --arg id openai --argjson now "$NOW" \
-        --argjson credentials "$creds" \
-        --argjson codex "$codex" \
-        --arg codexError "$codex_error" \
-        --argjson orgUsage "$org" \
-        --argjson stats "$stats" \
-        --argjson status "$status" \
-        '{ id: $id, now: $now,
-           inputs: { credentials: ($credentials // {}), codex: ($codex // {}), codexError: $codexError,
-                     orgUsage: $orgUsage, stats: ($stats // {}), status: $status } }'
-}
-
-collect_simple() {
-    local id="$1" tool="$2" status_name="${3:-}" status_url="${4:-}" usage status
-
-    usage="$(run_tool "$tool")"
-    status='null'
-    [ -n "$status_url" ] && status="$(status_json "$status_name" "$status_url")"
-
-    jq -n --arg id "$id" --argjson now "$NOW" \
-        --argjson usage "$usage" --argjson status "$status" \
-        '{ id: $id, now: $now, inputs: { usage: ($usage // {}), status: $status } }'
-}
-
-collect() {
-    case "$1" in
-        claude) collect_claude ;;
-        openai) collect_openai ;;
-        antigravity) collect_simple antigravity get-antigravity-usage ;;
-        kiro) collect_simple kiro get-kiro-usage ;;
-        mistral) collect_simple mistral get-mistral-usage mistral "https://status.mistral.ai/api/v2/summary.json" ;;
-        openrouter) collect_simple openrouter get-openrouter-usage openrouter "https://status.openrouter.ai/api/v2/summary.json" ;;
-        grok) collect_simple grok get-grok-usage ;;
-        zai) collect_simple zai get-zai-usage ;;
-        copilot) collect_simple copilot get-copilot-usage ;;
-        deepseek) collect_simple deepseek get-deepseek-balance ;;
-        *) jq -n --arg id "$1" --argjson now "$NOW" '{ id: $id, now: $now, inputs: {} }' ;;
-    esac
-}
-
-# ── Entry point ─────────────────────────────────────────────────────────────
-
-mode=''
-requested=''
-
-while [ $# -gt 0 ]; do
-    case "$1" in
-        --all)
-            mode=all
-            shift
-            ;;
-        --provider)
-            mode=provider
-            requested="${2:-}"
-            shift
-            [ $# -gt 0 ] && shift
-            ;;
-        --provider=*)
-            mode=provider
-            requested="${1#--provider=}"
-            shift
-            ;;
-        --normalize)
-            mode=normalize
-            shift
-            ;;
-        --list)
-            printf '%s\n' $ALL_PROVIDERS
-            exit 0
-            ;;
-        -h | --help)
-            usage
-            exit 0
-            ;;
-        *)
-            printf 'get-ai-usage: unknown argument: %s\n' "$1" >&2
-            usage >&2
-            exit 2
-            ;;
-    esac
-done
-
-if [ "$mode" = "normalize" ]; then
-    normalize
+if [ "${1:-}" = "--list" ]; then
+    printf '%s\n' $ALL_PROVIDERS
     exit 0
 fi
 
-[ -z "$mode" ] && mode=all
-
-selected=''
-if [ "$mode" = "provider" ]; then
-    if [ -z "$requested" ]; then
-        printf 'get-ai-usage: --provider needs at least one id\n' >&2
-        exit 2
+if ! command -v "$PY" >/dev/null 2>&1; then
+    if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
+        printf 'usage: get-ai-usage [--all | --provider <id>[,<id>...] | --normalize]\n\nproviders: %s\n' "$ALL_PROVIDERS"
+        exit 0
     fi
-    for id in $(printf '%s' "$requested" | tr ',' ' '); do
-        case " $ALL_PROVIDERS " in
-            *" $id "*) selected="$selected $id" ;;
-            *)
-                printf 'get-ai-usage: unknown provider: %s\n' "$id" >&2
-                exit 2
-                ;;
-        esac
+    if [ "${1:-}" = "--normalize" ]; then
+        printf 'get-ai-usage: python3 is required but was not found on PATH\n' >&2
+        exit 1
+    fi
+
+    # Degrade to a contract-shaped error envelope so the frontends can render
+    # something readable instead of failing opaquely. main.qml treats
+    # "python3 missing" as non-retryable, unlike "offline" or "rate limited"
+    # (see the error vocabulary in docs/provider-contract.md).
+    mode="${1:-}"
+    requested="${2:-}"
+    case "$mode" in
+        --provider=*)
+            requested="${mode#--provider=}"
+            mode="--provider"
+            ;;
+    esac
+    ids="$ALL_PROVIDERS"
+    if [ "$mode" = "--provider" ] && [ -n "$requested" ]; then
+        ids="$(printf '%s' "$requested" | tr ',' ' ')"
+    fi
+
+    now="$(date +%s)"
+    providers=""
+    first=true
+    for id in $ids; do
+        $first || providers="$providers,"
+        first=false
+        providers="$providers{\"id\":\"$id\",\"label\":\"$id\",\"accent\":\"#888888\",\"ok\":false,\"stale\":true,\"error\":\"python3 missing\",\"updatedAt\":$now,\"summary\":{\"pct\":0,\"text\":\"unavailable\",\"detail\":\"python3 missing\",\"hasChart\":true},\"quotaWindows\":[],\"chartWindows\":[],\"slots\":[{\"pct\":0,\"color\":\"#888888\",\"text\":\"—\",\"tooltip\":\"python3 missing\"}],\"historyValues\":{},\"details\":{}}"
     done
-else
-    for id in $ALL_PROVIDERS; do
-        provider_enabled "$id" && selected="$selected $id"
-    done
+    printf '{"schemaVersion":1,"updatedAt":%s,"active":"","providers":[%s]}\n' "$now" "$providers"
+    exit 0
 fi
 
-# Providers are independent and every one of them is dominated by network
-# latency, so fan them out instead of walking the list. Each job owns its own
-# output file — nothing is appended to a shared one — and the results are
-# joined in $selected order afterwards, so both the providers[] order and the
-# `active` pick below stay deterministic no matter which job finishes first.
-work="$(mktemp -d)"
-trap 'rm -rf "$work"' EXIT
+# The aiusage package lives one directory up from this script (tools/aiusage,
+# this script is tools/sh/get-ai-usage). `python3 -m aiusage` resolves the
+# module from cwd or PYTHONPATH, and Plasma's executable DataEngine sets
+# neither, so it must be exported explicitly here.
+PKG_TOOLS="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export PYTHONPATH="$PKG_TOOLS${PYTHONPATH:+:$PYTHONPATH}"
 
-for id in $selected; do
-    collect "$id" | normalize >"$work/p-$id" &
-done
-wait
-
-tmp="$work/joined"
-: >"$tmp"
-for id in $selected; do
-    [ -s "$work/p-$id" ] && cat "$work/p-$id" >>"$tmp"
-done
-
-jq -s -L "$JQ_DIR" \
-    --argjson updatedAt "$NOW" \
-    'include "providers";
-     { schemaVersion: schema_version,
-       updatedAt: $updatedAt,
-       active: ((map(select(.ok == true)) | .[0].id) // (.[0].id) // ""),
-       providers: . }' "$tmp"
+# -B: never write __pycache__ into the installed plasmoid — `make pack` only
+# excludes *.swp and *~, so stray bytecode would otherwise ship in the zip.
+exec "$PY" -B -m aiusage "$@"

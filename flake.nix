@@ -99,13 +99,7 @@
               export PATH=${pkgs.lib.makeBinPath [
                 pkgs.bash
                 pkgs.coreutils
-                pkgs.curl
-                pkgs.findutils
-                pkgs.gawk
-                pkgs.gnugrep
-                pkgs.gnused
-                pkgs.jq
-                pkgs.perl
+                pkgs.python3
               ]}:"$PATH"
               config=${self}/hyprland/shell.qml
               desktop_dir="''${XDG_DATA_HOME:-$HOME/.local/share}/applications"
@@ -134,6 +128,8 @@
               kdePackages.plasma-sdk
               pre-commit
               zip
+              python3
+              ruff
             ];
             shellHook = ''
               pre-commit install -f --install-hooks

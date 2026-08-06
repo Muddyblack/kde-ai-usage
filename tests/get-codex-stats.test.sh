@@ -1,17 +1,25 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# get-codex-stats used to be a standalone awk+jq script; the aggregation now
+# lives in aiusage.providers.codex_stats, called in-process by get-ai-usage.
+# This test drives that function directly via python3 instead of a CLI.
+
 repo="$(cd "$(dirname "$0")/.." && pwd)"
-script="$repo/package/contents/tools/sh/get-codex-stats"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
+export PYTHONPATH="$repo/package/contents/tools"
 export XDG_CACHE_HOME="$tmp/cache"
 export CODEX_CONFIG_FILE="$tmp/config.toml"
 export CODEX_SESSIONS_DIR="$tmp/sessions"
 
+run() {
+    python3 -B -c "from aiusage.providers.codex_stats import get_codex_stats; import json; print(json.dumps(get_codex_stats()))"
+}
+
 # No sessions directory at all -> empty object, like the other helpers.
-test "$($script)" = '{}'
+test "$(run)" = '{}'
 
 day="$CODEX_SESSIONS_DIR/2026/07/19"
 mkdir -p "$day"
@@ -36,7 +44,7 @@ cat >"$day/rollout-b.jsonl" <<'EOF'
 {"timestamp":"2026-07-19T10:00:03.000Z","type":"event_msg","payload":{"type":"token_count","info":{"model_context_window":258400,"total_token_usage":{"input_tokens":10,"cached_input_tokens":0,"output_tokens":5,"reasoning_output_tokens":0,"total_tokens":15}}}}
 EOF
 
-actual="$($script)"
+actual="$(run)"
 
 jq -e '.totalSessions == 2'   <<<"$actual" >/dev/null
 jq -e '.totalMessages == 3'   <<<"$actual" >/dev/null
@@ -63,12 +71,12 @@ with open(sys.argv[1], "w") as f:
 PY
 
 rm -rf "$XDG_CACHE_HOME"
-actual="$($script)"
+actual="$(run)"
 jq -e '.totalSessions == 3' <<<"$actual" >/dev/null
 jq -e '.modelUsage["gpt-5.4"].totalTokens == 10' <<<"$actual" >/dev/null
 
 # Cache is reused until a rollout is newer than it.
-cached="$($script)"
+cached="$(run)"
 test "$cached" = "$actual"
 
 echo "get-codex-stats: all assertions passed"

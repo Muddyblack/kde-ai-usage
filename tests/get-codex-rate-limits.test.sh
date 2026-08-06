@@ -1,9 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# get-codex-rate-limits used to be a standalone bash+jq JSON-RPC client; that
+# logic now lives in aiusage.providers.codex_rate_limits, called in-process by
+# get-ai-usage. This test drives that function directly via python3 instead of
+# a CLI, still faking the `codex` binary on PATH.
+
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
+
+export PYTHONPATH="$repo/package/contents/tools"
+
+run() {
+    PATH="$tmp:$PATH" python3 -B -c "from aiusage.providers.codex_rate_limits import get_codex_rate_limits; import json; print(json.dumps(get_codex_rate_limits()))"
+}
 
 cat >"$tmp/codex" <<'EOF'
 #!/usr/bin/env bash
@@ -18,7 +29,7 @@ printf '%s\n' '{"id":2,"result":{"rateLimits":{"primary":{"usedPercent":42,"wind
 EOF
 chmod +x "$tmp/codex"
 
-actual="$(PATH="$tmp:$PATH" "$repo/package/contents/tools/sh/get-codex-rate-limits")"
+actual="$(run)"
 jq -e '.rateLimits.primary.windowDurationMins == 10080 and .rateLimits.primary.usedPercent == 42' <<<"$actual" >/dev/null
 
 cat >"$tmp/codex" <<'EOF'
@@ -29,6 +40,6 @@ IFS= read -r read_limits
 EOF
 chmod +x "$tmp/codex"
 
-test "$(PATH="$tmp:$PATH" "$repo/package/contents/tools/sh/get-codex-rate-limits")" = '{}'
+test "$(run)" = '{}'
 
 echo "get-codex-rate-limits: all assertions passed"

@@ -101,7 +101,7 @@ usage before its limit is exhausted. See
 |---|---|
 | KDE Plasma 6.0+ | `X-Plasma-API-Minimum-Version: 6.0` |
 | `plasma5support` | Provides the `executable` DataEngine for running the backend |
-| `jq` and `curl` | Required by the shared provider backend and every fetch helper |
+| `python3` | Runs the shared provider backend (standard library only, no `pip install`) |
 
 Enable only the services you use. Each one has its own setup requirement:
 
@@ -230,10 +230,10 @@ get-ai-usage --provider claude        # one provider (Plasma: active tab + pins)
 get-ai-usage --all                    # every enabled provider (Hyprland panel)
 ```
 
-Normalization lives in `package/contents/tools/jq/providers.jq` and is pure, so
-`get-ai-usage --normalize` can replay a recorded provider response offline.
-Credential lookup, HTTP calls and status-code handling are shared by every
-helper via `package/contents/tools/sh/lib/http.sh`.
+The backend itself is a standard-library-only Python package,
+`package/contents/tools/aiusage`; `get-ai-usage` is a thin bash launcher that
+execs into it. Normalization is pure, so `get-ai-usage --normalize` can replay
+a recorded provider response offline without touching the network.
 
 The QML on both sides is presentation only: no provider URLs, no response
 parsing, no percentage or window arithmetic, and not even the table of which
