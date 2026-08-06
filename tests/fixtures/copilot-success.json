@@ -1,0 +1,15 @@
+{
+  "id": "copilot",
+  "now": 1785000000,
+  "inputs": {
+    "usage": {
+      "hasKey": true,
+      "keyValid": true,
+      "username": "octocat",
+      "used": 125,
+      "quota": 500,
+      "pct": 25
+    },
+    "status": null
+  }
+}

@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+#
+# get-ai-usage — the shared provider backend for every frontend of this widget.
+#
+# This is a thin launcher. All logic — credential discovery, provider API
+# requests, response parsing, quota/percentage maths, reset timestamps and
+# error/stale state — lives in ../aiusage, a Python package using only the
+# standard library. See docs/provider-contract.md for the schema and
+# ../aiusage/__main__.py for the CLI.
+#
+#   get-ai-usage --provider claude          one provider (KDE's active tab)
+#   get-ai-usage --provider claude,openai   several providers (active + pinned)
+#   get-ai-usage --all                      every enabled provider (Hyprland)
+#   get-ai-usage --normalize < envelope     replay a raw envelope offline (tests)
+#   get-ai-usage --list                     known provider ids
+#
+# Three consumers hardcode this path (package/contents/ui/main.qml,
+# hyprland/shell.qml, hyprland/tray/main.cpp), so it has to keep working even
+# when python3 is missing — hence the fallback envelope below instead of a
+# bare shebang failure.
+
+set -u
+
+# Keep in sync with aiusage/config.py:ALL_PROVIDERS — duplicated here so
+# --list and the missing-python3 fallback work without importing Python.
+ALL_PROVIDERS="claude antigravity openai kiro mistral openrouter grok zai copilot deepseek kimi"
+
+PY="${PYTHON3:-python3}"
+
+if [ "${1:-}" = "--list" ]; then
+    printf '%s\n' $ALL_PROVIDERS
+    exit 0
+fi
+
+if ! command -v "$PY" >/dev/null 2>&1; then
+    if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
+        printf 'usage: get-ai-usage [--all | --provider <id>[,<id>...] | --normalize]\n\nproviders: %s\n' "$ALL_PROVIDERS"
+        exit 0
+    fi
+    if [ "${1:-}" = "--normalize" ]; then
+        printf 'get-ai-usage: python3 is required but was not found on PATH\n' >&2
+        exit 1
+    fi
+
+    # Degrade to a contract-shaped error envelope so the frontends can render
+    # something readable instead of failing opaquely. main.qml treats
+    # "python3 missing" as non-retryable, unlike "offline" or "rate limited"
+    # (see the error vocabulary in docs/provider-contract.md).
+    mode="${1:-}"
+    requested="${2:-}"
+    case "$mode" in
+        --provider=*)
+            requested="${mode#--provider=}"
+            mode="--provider"
+            ;;
+    esac
+    ids="$ALL_PROVIDERS"
+    if [ "$mode" = "--provider" ] && [ -n "$requested" ]; then
+        ids="$(printf '%s' "$requested" | tr ',' ' ')"
+    fi
+
+    now="$(date +%s)"
+    providers=""
+    first=true
+    for id in $ids; do
+        $first || providers="$providers,"
+        first=false
+        providers="$providers{\"id\":\"$id\",\"label\":\"$id\",\"accent\":\"#888888\",\"ok\":false,\"stale\":true,\"error\":\"python3 missing\",\"updatedAt\":$now,\"summary\":{\"pct\":0,\"text\":\"unavailable\",\"detail\":\"python3 missing\",\"hasChart\":true},\"quotaWindows\":[],\"chartWindows\":[],\"slots\":[{\"pct\":0,\"color\":\"#888888\",\"text\":\"—\",\"tooltip\":\"python3 missing\"}],\"historyValues\":{},\"details\":{}}"
+    done
+    printf '{"schemaVersion":1,"updatedAt":%s,"active":"","providers":[%s]}\n' "$now" "$providers"
+    exit 0
+fi
+
+# The aiusage package lives one directory up from this script (tools/aiusage,
+# this script is tools/sh/get-ai-usage). `python3 -m aiusage` resolves the
+# module from cwd or PYTHONPATH, and Plasma's executable DataEngine sets
+# neither, so it must be exported explicitly here.
+PKG_TOOLS="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export PYTHONPATH="$PKG_TOOLS${PYTHONPATH:+:$PYTHONPATH}"
+
+# -B: never write __pycache__ into the installed plasmoid — `make pack` only
+# excludes *.swp and *~, so stray bytecode would otherwise ship in the zip.
+exec "$PY" -B -m aiusage "$@"

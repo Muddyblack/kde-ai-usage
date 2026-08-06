@@ -1,0 +1,14 @@
+{
+  "id": "mistral",
+  "now": 1785000000,
+  "inputs": {
+    "usage": {
+      "hasKey": false,
+      "keyValid": false,
+      "error": "Invalid API key (401)",
+      "vibeSessionCount": 4,
+      "vibeTotalCost": 12.5
+    },
+    "status": null
+  }
+}

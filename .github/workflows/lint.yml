@@ -20,3 +20,29 @@ jobs:
 
       - name: qmlformat check
         run: nix develop --command bash -c 'find package/contents -name "*.qml" | xargs qmlformat --dry-run 2>&1 | grep -q "would reformat" && echo "Files need formatting, run qmlformat -i" && exit 1 || true'
+
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ruff check
+        uses: astral-sh/ruff-action@v3
+        with:
+          args: "check package/contents/tools/aiusage"
+
+      - name: ruff format check
+        uses: astral-sh/ruff-action@v3
+        with:
+          args: "format --check package/contents/tools/aiusage"
+
+      - name: provider contract tests
+        run: ./tests/get-ai-usage.test.sh
+
+      - name: codex helper tests
+        run: |
+          ./tests/get-codex-stats.test.sh
+          ./tests/get-codex-rate-limits.test.sh
+
+      - name: shared frontend code tests
+        run: node --test tests/*.test.js

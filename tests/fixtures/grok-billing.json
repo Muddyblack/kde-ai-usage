@@ -1,0 +1,25 @@
+{
+  "id": "grok",
+  "now": 1785000000,
+  "inputs": {
+    "usage": {
+      "loggedIn": true,
+      "xaiApiKey": "xai-secret",
+      "creditUsagePercent": 42,
+      "used": 21,
+      "monthlyLimit": 50,
+      "email": "dev@example.com",
+      "teamName": "Team Rocket",
+      "tierId": "tier-2",
+      "billingPeriodEnd": "2026-08-01T00:00:00Z",
+      "sessionCount": 1,
+      "totalTokens": 900,
+      "totalToolCalls": 4,
+      "hasBilling": true,
+      "quotaKind": "billing",
+      "quotaWindow": "monthly",
+      "billingError": ""
+    },
+    "status": null
+  }
+}

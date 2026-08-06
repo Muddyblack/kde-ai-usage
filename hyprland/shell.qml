@@ -5,13 +5,15 @@ import QtQuick.Controls.Basic as QC
 import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
+import "../package/contents/code/Format.js" as Format
+import "../package/contents/code/UsageHistory.js" as UsageHistory
 
 ShellRoot {
     id: root
 
     readonly property string baseDir: Qt.resolvedUrl(".").toString().replace("file://", "")
-    // Shared provider backend used independently of either desktop frontend.
-    readonly property string snapshotCommand: baseDir + "/../package/contents/tools/sh/get-usage-snapshot"
+    // Shared provider backend — the same executable the Plasma widget calls.
+    readonly property string backendCommand: baseDir + "/../package/contents/tools/sh/get-ai-usage"
     readonly property string iconSource: "file://" + baseDir + "/../package/contents/icons/org.muddyblack.aiUsageWidget.svg"
 
     // Shared with the Plasma widget: both variants mirror history to this file.
@@ -22,7 +24,7 @@ ShellRoot {
     }
     readonly property string historyPath: historyDir + "/usage-history-latest.json"
 
-    // Settings the in-popup page writes; the snapshot script reads the same file
+    // Settings the in-popup page writes; the backend reads the same file
     // (AI_USAGE_CONFIG / XDG_CONFIG_HOME) for provider toggles + API keys.
     readonly property string configDir: {
         var xdg = Quickshell.env("XDG_CONFIG_HOME");
@@ -228,143 +230,37 @@ ShellRoot {
         return p ? p.accent : "#cc785c";
     }
 
-    // ── Chart window mapping (mirrors Plasma's _windowForTab) ────────────────
+    // ── Chart ranges ─────────────────────────────────────────────────────────
+    // Which history series a provider has, and how wide each range is, comes
+    // from the backend (chartWindows in the contract) — no table here.
     function windowsForProvider(id) {
-        var H = 3600000;
-        if (id === "claude")
-            return [
-                {
-                    id: "session",
-                    key: "s",
-                    label: "5H",
-                    size: 5 * H
-                },
-                {
-                    id: "day",
-                    key: "s",
-                    label: "24H",
-                    size: 24 * H
-                },
-                {
-                    id: "weekly",
-                    key: "w",
-                    label: "7D",
-                    size: 168 * H
-                }
-            ];
-        if (id === "openai")
-            return [
-                {
-                    id: "codex_primary",
-                    key: "cp",
-                    label: "5H",
-                    size: 5 * H
-                },
-                {
-                    id: "codex_day",
-                    key: "cp",
-                    label: "24H",
-                    size: 24 * H
-                },
-                {
-                    id: "codex_weekly",
-                    key: "cw",
-                    label: "7D",
-                    size: 168 * H
-                }
-            ];
-        if (id === "kiro")
-            return [
-                {
-                    id: "kiro",
-                    key: "kr",
-                    label: "30D",
-                    size: 720 * H
-                }
-            ];
-        if (id === "antigravity")
-            return [
-                {
-                    id: "antigravity",
-                    key: "ag",
-                    label: "30D",
-                    size: 720 * H
-                }
-            ];
-        if (id === "openrouter")
-            return [
-                {
-                    id: "openrouter",
-                    key: "or",
-                    label: "30D",
-                    size: 720 * H
-                }
-            ];
-        if (id === "mistral")
-            return [
-                {
-                    id: "mistral",
-                    key: "mv",
-                    label: "30D",
-                    size: 720 * H
-                }
-            ];
-        if (id === "grok")
-            return [
-                {
-                    id: "grok",
-                    key: "gr",
-                    label: "30D",
-                    size: 720 * H
-                }
-            ];
-        if (id === "zai")
-            return [
-                {
-                    id: "zai",
-                    key: "za",
-                    label: "30D",
-                    size: 720 * H
-                }
-            ];
-        if (id === "copilot")
-            return [
-                {
-                    id: "copilot",
-                    key: "gh",
-                    label: "30D",
-                    size: 720 * H
-                }
-            ];
-        if (id === "deepseek")
-            return [
-                {
-                    id: "deepseek",
-                    key: "ds",
-                    label: "30D",
-                    size: 720 * H
-                }
-            ];
+        for (var i = 0; i < root.providers.length; i++) {
+            if (root.providers[i].id === id)
+                return root.providers[i].chartWindows || [];
+        }
         return [];
     }
 
-    function windowGranularity(win) {
-        if (win === "session" || win === "codex_primary")
-            return "5h";
-        if (win === "day" || win === "codex_day")
-            return "24h";
-        if (win === "weekly" || win === "codex_weekly")
-            return "7d";
-        return "";
+    // Window ID for a provider at the remembered granularity, so the selected
+    // range carries across tabs.
+    function windowForProvider(id, gran) {
+        var wins = windowsForProvider(id);
+        if (wins.length === 0)
+            return root.chartWindow;
+        for (var i = 0; i < wins.length; i++) {
+            if (wins[i].granularity === gran)
+                return wins[i].id;
+        }
+        return wins[wins.length - 1].id;
     }
 
-    function windowForProvider(id, gran) {
-        if (id === "claude")
-            return gran === "5h" ? "session" : gran === "24h" ? "day" : "weekly";
-        if (id === "openai")
-            return gran === "5h" ? "codex_primary" : gran === "24h" ? "codex_day" : "codex_weekly";
-        var wins = windowsForProvider(id);
-        return wins.length > 0 ? wins[0].id : "weekly";
+    function windowGranularity(win) {
+        var wins = windowsForProvider(root.activeId);
+        for (var i = 0; i < wins.length; i++) {
+            if (wins[i].id === win)
+                return wins[i].granularity;
+        }
+        return "";
     }
 
     onActiveIdChanged: {
@@ -380,54 +276,16 @@ ShellRoot {
             root.chartGranularity = gran;
     }
 
-    // ── Countdown chips (Plasma formatCountdown port) ────────────────────────
+    // ── Countdown chips ──────────────────────────────────────────────────────
     function countdownFor(resetAt) {
-        if (!resetAt || resetAt <= 0)
-            return "";
-        var diffMs = resetAt * 1000 - root.nowTick;
-        if (diffMs <= 0)
-            return "resetting...";
-        var totalMins = Math.floor(diffMs / 60000);
-        var d = Math.floor(totalMins / 1440);
-        var h = Math.floor((totalMins % 1440) / 60);
-        var m = totalMins % 60;
-        var parts = [];
-        if (d > 0)
-            parts.push(d + "d");
-        if (h > 0 || d > 0)
-            parts.push(h + "h");
-        parts.push(m + "m");
-        return parts.join(" ");
+        return Format.countdownFromEpoch(resetAt, root.nowTick);
     }
 
     // ── History persistence ──────────────────────────────────────────────────
     function recordHistory() {
-        var patch = {};
-        var any = false;
-        for (var i = 0; i < root.providers.length; i++) {
-            var hist = root.providers[i].hist;
-            if (!hist)
-                continue;
-            for (var k in hist) {
-                patch[k] = hist[k];
-                any = true;
-            }
-        }
-        if (!any)
+        var history = UsageHistory.merge(root.usageHistory, UsageHistory.collect(root.providers), new Date().getTime(), root.historyLimit);
+        if (history === root.usageHistory)
             return;
-        var history = root.usageHistory.slice();
-        var now = new Date().getTime();
-        if (history.length > 0 && now - history[history.length - 1].t < 120000) {
-            var last = history[history.length - 1];
-            for (var kk in patch)
-                last[kk] = patch[kk];
-            history[history.length - 1] = last;
-        } else {
-            patch.t = now;
-            history.push(patch);
-        }
-        if (history.length > root.historyLimit)
-            history = history.slice(history.length - root.historyLimit);
         root.usageHistory = history;
         saveProcess.exec({
             command: ["sh", "-c", "mkdir -p \"$(dirname \"$2\")\"; printf '%s' \"$1\" > \"$2\"", "ai-usage", JSON.stringify(history), root.historyPath]
@@ -447,13 +305,13 @@ ShellRoot {
                 try {
                     var data = JSON.parse(this.text.trim());
                     if (Array.isArray(data))
-                        root.usageHistory = data;
+                        root.usageHistory = UsageHistory.normalize(data, root.historyLimit);
                 } catch (e) {}
             }
         }
     }
 
-    // ── Snapshot fetch ───────────────────────────────────────────────────────
+    // ── Backend fetch ────────────────────────────────────────────────────────
     function applySnapshot(text) {
         root.loading = false;
         try {
@@ -461,7 +319,7 @@ ShellRoot {
             root.providers = data.providers || [];
             root.updatedAt = data.updatedAt || 0;
             // Keep the active tab if it's still present; otherwise fall back to
-            // the snapshot's suggestion or the first provider (e.g. after the
+            // the backend's suggestion or the first provider (e.g. after the
             // active provider is disabled in settings).
             var stillThere = false;
             for (var i = 0; i < root.providers.length; i++)
@@ -473,22 +331,22 @@ ShellRoot {
             root.nowTick = new Date().getTime();
             root.recordHistory();
         } catch (e) {
-            root.errorText = "snapshot parse failed";
+            root.errorText = "usage backend returned no data";
         }
     }
 
     function refresh() {
-        if (snapshotProcess.running)
+        if (backendProcess.running)
             return;
         root.loading = true;
-        snapshotProcess.exec({
-            command: [root.snapshotCommand],
+        backendProcess.exec({
+            command: [root.backendCommand, "--all"],
             workingDirectory: root.baseDir + "/.."
         });
     }
 
     Process {
-        id: snapshotProcess
+        id: backendProcess
         stdout: StdioCollector {
             onStreamFinished: root.applySnapshot(this.text)
         }
@@ -501,7 +359,7 @@ ShellRoot {
         onExited: function (exitCode) {
             root.loading = false;
             if (exitCode !== 0 && root.errorText === "")
-                root.errorText = "snapshot command failed";
+                root.errorText = "usage backend failed";
         }
     }
 
@@ -982,12 +840,12 @@ ShellRoot {
                         if (root.showSettings)
                             return false;
                         var p = root.activeProvider();
-                        return p && p.detail !== "" && p.error === "";
+                        return p && p.summary.detail !== "" && p.error === "";
                     }
                     Layout.fillWidth: true
                     text: {
                         var p = root.activeProvider();
-                        return p ? p.detail : "";
+                        return p ? p.summary.detail : "";
                     }
                     color: "#94a3b8"
                     font.pixelSize: 11
@@ -1032,7 +890,7 @@ ShellRoot {
                     Repeater {
                         model: {
                             var p = root.activeProvider();
-                            return p ? p.rows : [];
+                            return p ? p.quotaWindows : [];
                         }
 
                         UsageRow {
@@ -1050,12 +908,12 @@ ShellRoot {
 
                 // ── Usage chart ─────────────────────────────────────────────
                 UsageChart {
-                    extraVisible: !root.showSettings && root.settings.showChart && root.activeProvider() && root.activeProvider().hasChart !== false
+                    extraVisible: !root.showSettings && root.settings.showChart && root.activeProvider() && root.activeProvider().summary.hasChart !== false
                     usageHistory: root.usageHistory
                     windows: root.windowsForProvider(root.activeId)
                     chartWindow: root.chartWindow
                     accent: root.activeAccent
-                    currency: root.activeProvider() ? (root.activeProvider().currency || "") : ""
+                    currency: root.activeProvider() ? (root.activeProvider().details.currency || "") : ""
                     onWindowSelected: function (id) {
                         root.selectChartWindow(id);
                     }

@@ -61,7 +61,7 @@ ColumnLayout {
     }
 
     ColumnLayout {
-        visible: !rootItem.copilotKeyValid && rootItem._githubToken === "" && rootItem.copilotError === ""
+        visible: !rootItem.copilotKeyValid && !rootItem.copilotHasKey && rootItem.copilotError === ""
         Layout.fillWidth: true
         spacing: 6
 

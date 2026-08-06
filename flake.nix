@@ -99,13 +99,7 @@
               export PATH=${pkgs.lib.makeBinPath [
                 pkgs.bash
                 pkgs.coreutils
-                pkgs.curl
-                pkgs.findutils
-                pkgs.gawk
-                pkgs.gnugrep
-                pkgs.gnused
-                pkgs.jq
-                pkgs.perl
+                pkgs.python3
               ]}:"$PATH"
               config=${self}/hyprland/shell.qml
               desktop_dir="''${XDG_DATA_HOME:-$HOME/.local/share}/applications"
@@ -115,7 +109,7 @@
                 "$desktop_dir/org.quickshell.desktop"
               ${self.packages.${system}.tray-helper}/bin/ai-usage-tray \
                 ${pkgs.quickshell}/bin/qs "$config" \
-                ${self}/package/contents/tools/sh/get-usage-snapshot &
+                ${self}/package/contents/tools/sh/get-ai-usage &
               tray_pid=$!
               trap 'kill "$tray_pid" 2>/dev/null || true' EXIT INT TERM
               ${pkgs.quickshell}/bin/qs -p "$config"
@@ -134,6 +128,8 @@
               kdePackages.plasma-sdk
               pre-commit
               zip
+              python3
+              ruff
             ];
             shellHook = ''
               pre-commit install -f --install-hooks

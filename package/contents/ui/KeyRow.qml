@@ -37,8 +37,6 @@ RowLayout {
                 return Plasmoid.configuration.claudeAdminApiKey || "";
             if (kr.configKey === "openaiApiKey")
                 return Plasmoid.configuration.openaiApiKey || "";
-            if (kr.configKey === "googleApiKey")
-                return Plasmoid.configuration.googleApiKey || "";
             if (kr.configKey === "mistralApiKey")
                 return Plasmoid.configuration.mistralApiKey || "";
             if (kr.configKey === "openrouterApiKey")
@@ -51,6 +49,8 @@ RowLayout {
                 return Plasmoid.configuration.githubToken || "";
             if (kr.configKey === "deepseekApiKey")
                 return Plasmoid.configuration.deepseekApiKey || "";
+            if (kr.configKey === "moonshotApiKey")
+                return Plasmoid.configuration.moonshotApiKey || "";
             return "";
         }
         onEditingFinished: {
@@ -58,8 +58,6 @@ RowLayout {
                 Plasmoid.configuration.claudeAdminApiKey = text;
             if (kr.configKey === "openaiApiKey")
                 Plasmoid.configuration.openaiApiKey = text;
-            if (kr.configKey === "googleApiKey")
-                Plasmoid.configuration.googleApiKey = text;
             if (kr.configKey === "mistralApiKey")
                 Plasmoid.configuration.mistralApiKey = text;
             if (kr.configKey === "openrouterApiKey")
@@ -72,6 +70,8 @@ RowLayout {
                 Plasmoid.configuration.githubToken = text;
             if (kr.configKey === "deepseekApiKey")
                 Plasmoid.configuration.deepseekApiKey = text;
+            if (kr.configKey === "moonshotApiKey")
+                Plasmoid.configuration.moonshotApiKey = text;
         }
     }
     QQC2.ToolButton {

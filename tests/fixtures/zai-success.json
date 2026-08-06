@@ -1,0 +1,25 @@
+{
+  "id": "zai",
+  "now": 1785000000,
+  "inputs": {
+    "usage": {
+      "hasKey": true,
+      "keyValid": true,
+      "level": "pro",
+      "tokenPct": 25,
+      "tokenResetMs": 3600000,
+      "tokenUsed": 250,
+      "tokenLimit": 1000,
+      "toolsPct": 40,
+      "toolsRemaining": 60,
+      "toolsResetMs": 7200000,
+      "models": [
+        {
+          "modelCode": "glm-4.6",
+          "usage": 12
+        }
+      ]
+    },
+    "status": null
+  }
+}

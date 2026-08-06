@@ -1,0 +1,17 @@
+{
+  "id": "grok",
+  "now": 1785000000,
+  "inputs": {
+    "usage": {
+      "loggedIn": true,
+      "creditUsagePercent": 0,
+      "hasBilling": false,
+      "quotaKind": "free-tier",
+      "quotaWindow": "rolling 24h",
+      "sessionCount": 3,
+      "totalTokens": 12000,
+      "totalToolCalls": 9
+    },
+    "status": null
+  }
+}

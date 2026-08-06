@@ -1,0 +1,26 @@
+{
+  "id": "openai",
+  "now": 1785000000,
+  "inputs": {
+    "credentials": {
+      "openaiApiKey": "sk-openai-secret"
+    },
+    "codex": {},
+    "codexError": "",
+    "orgUsage": {
+      "data": [
+        {
+          "results": [
+            {
+              "model": "gpt-4o-mini",
+              "input_tokens": 1000000,
+              "output_tokens": 1000000
+            }
+          ]
+        }
+      ]
+    },
+    "stats": {},
+    "status": null
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "id": "mistral",
+  "now": 1785000000,
+  "inputs": {
+    "usage": {
+      "hasKey": true,
+      "keyValid": true,
+      "availableModels": [
+        "mistral-large",
+        "codestral"
+      ],
+      "vibeSessionCount": 4,
+      "vibeTotalCost": 12.5,
+      "vibeTotalTokens": 90000,
+      "vibePromptTokens": 60000,
+      "vibeCompletionTokens": 30000,
+      "vibeTotalSteps": 55,
+      "vibeToolOk": 40,
+      "vibeToolFail": 2,
+      "vibeRecent": [
+        {
+          "title": "refactor",
+          "cost": 0.4
+        }
+      ]
+    },
+    "status": null
+  }
+}

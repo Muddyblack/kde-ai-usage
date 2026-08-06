@@ -1,0 +1,20 @@
+{
+  "id": "openrouter",
+  "now": 1785000000,
+  "inputs": {
+    "usage": {
+      "hasKey": true,
+      "keyValid": true,
+      "label": "personal",
+      "usageUSD": 3.25,
+      "limitUSD": 10,
+      "limitRemainingUSD": 6.75,
+      "isFreeTier": false,
+      "rateLimit": {
+        "requests": 10,
+        "interval": "10s"
+      }
+    },
+    "status": null
+  }
+}

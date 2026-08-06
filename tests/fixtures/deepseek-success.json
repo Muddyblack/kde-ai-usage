@@ -1,0 +1,22 @@
+{
+  "id": "deepseek",
+  "now": 1785000000,
+  "inputs": {
+    "usage": {
+      "hasKey": true,
+      "keyValid": true,
+      "isAvailable": true,
+      "balances": [
+        {
+          "currency": "USD",
+          "total_balance": "12.50"
+        }
+      ],
+      "primaryCurrency": "USD",
+      "primaryTotal": 12.5,
+      "primaryGranted": 2.5,
+      "primaryToppedUp": 10
+    },
+    "status": null
+  }
+}

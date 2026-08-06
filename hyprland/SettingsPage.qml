@@ -5,7 +5,7 @@ import QtQuick.Controls.Basic as QC
 // In-popup settings page, ported from the Plasma SettingsPanel: provider
 // toggles, refresh interval, usage-chart toggle, and API-key fields. Everything
 // is persisted through shell.setSetting()/saveSettings() into the JSON config
-// that the snapshot script reads.
+// that the shared backend reads.
 ColumnLayout {
     id: page
 

@@ -1,0 +1,181 @@
+{
+  "id": "claude",
+  "now": 1785000000,
+  "inputs": {
+    "credentials": {
+      "claudeAiOauth": {
+        "accessToken": "sk-oauth-secret",
+        "subscriptionType": "max",
+        "rateLimitTier": "default_max_20x"
+      },
+      "claudeAdminApiKey": "sk-ant-admin-secret",
+      "organizationUuid": "org-1234"
+    },
+    "usage": {
+      "limits": [
+        {
+          "group": "session",
+          "kind": "session",
+          "is_active": true,
+          "percent": 23,
+          "resets_at": "2026-07-19T15:00:00Z"
+        },
+        {
+          "group": "weekly",
+          "kind": "weekly_scoped",
+          "is_active": true,
+          "percent": 61,
+          "resets_at": "2026-07-25T15:00:00Z"
+        }
+      ],
+      "five_hour": {
+        "utilization": 99,
+        "resets_at": "2026-07-19T15:00:00Z",
+        "tokens_used": 120000,
+        "token_limit": 500000
+      },
+      "seven_day": {
+        "utilization": 99,
+        "resets_at": "2026-07-25T15:00:00Z",
+        "tokens_used": 3000000,
+        "token_limit": 5000000
+      },
+      "extra": {
+        "tokens_remaining": 250000
+      },
+      "extra_usage": {
+        "is_enabled": true,
+        "monthly_limit": 50,
+        "used_credits": 12.5,
+        "utilization": 25,
+        "currency": "USD"
+      }
+    },
+    "usageError": "",
+    "orgUsage": {
+      "data": [
+        {
+          "model": "claude-sonnet-4",
+          "input_tokens": 1000000,
+          "output_tokens": 200000
+        },
+        {
+          "model": "claude-sonnet-4",
+          "input_tokens": 1000000,
+          "output_tokens": 200000
+        },
+        {
+          "model": "mystery-model",
+          "input_tokens": 5000,
+          "output_tokens": 500
+        }
+      ]
+    },
+    "settings": {
+      "effortLevel": "high",
+      "autoDreamEnabled": true
+    },
+    "stats": {
+      "version": 3,
+      "totalMessages": 900,
+      "totalSessions": 40,
+      "firstSessionDate": "2026-07-01",
+      "lastComputedDate": "2026-07-24",
+      "longestSession": {
+        "duration": 7200000,
+        "messageCount": 120
+      },
+      "modelUsage": {
+        "claude-opus-4": {
+          "inputTokens": 100,
+          "outputTokens": 50,
+          "cacheReadInputTokens": 10,
+          "cacheCreationInputTokens": 5,
+          "costUSD": 1.5,
+          "webSearchRequests": 2,
+          "contextWindow": 200000
+        },
+        "claude-haiku-4": {
+          "inputTokens": 10,
+          "outputTokens": 5,
+          "costUSD": 0.1
+        }
+      },
+      "dailyModelTokens": [
+        {
+          "date": "2026-07-23",
+          "tokensByModel": {
+            "claude-opus-4": 100,
+            "claude-haiku-4": 20
+          }
+        },
+        {
+          "date": "2026-07-22",
+          "tokensByModel": {
+            "claude-opus-4": 40
+          }
+        }
+      ],
+      "dailyActivity": [
+        {
+          "date": "2026-07-22",
+          "toolCallCount": 5
+        },
+        {
+          "date": "2026-07-23",
+          "toolCallCount": 7
+        },
+        {
+          "date": "2026-07-24",
+          "toolCallCount": 1
+        }
+      ],
+      "hourCounts": {
+        "9": 4,
+        "14": 9,
+        "22": 9
+      }
+    },
+    "status": {
+      "status": {
+        "indicator": "minor",
+        "description": "Partially degraded service"
+      },
+      "components": [
+        {
+          "name": "API",
+          "status": "degraded_performance"
+        },
+        {
+          "name": "Console",
+          "status": "operational"
+        },
+        {
+          "name": "Group",
+          "status": "degraded_performance",
+          "group": true
+        }
+      ],
+      "incidents": [
+        {
+          "name": "Elevated errors",
+          "status": "investigating",
+          "incident_updates": [
+            {
+              "body": "  We are looking into it.  "
+            }
+          ]
+        },
+        {
+          "name": "Old thing",
+          "status": "resolved",
+          "incident_updates": [
+            {
+              "body": "fixed"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

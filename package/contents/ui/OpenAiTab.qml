@@ -23,7 +23,7 @@ ColumnLayout {
         border.width: 1
         border.color: Qt.rgba(1, 1, 1, 0.07)
         // Stats come from local rollouts, so they exist even without a login.
-        visible: rootItem.openaiCodexLoggedIn || rootItem._openaiApiKey !== "" || rootItem.codexStatsAvailable
+        visible: rootItem.openaiCodexLoggedIn || rootItem.openaiHasApiKey || rootItem.codexStatsAvailable
 
         RowLayout {
             anchors.fill: parent
@@ -297,7 +297,7 @@ ColumnLayout {
 
         // Notice if no API key is added, matching Claude's tip box design
         PlasmaComponents.Label {
-            visible: rootItem._openaiApiKey === ""
+            visible: !rootItem.openaiHasApiKey
             text: rootItem.codexUsageAvailable ? "Plan limits above. Add an OpenAI API key in settings for API token/cost data." : "Codex plan limits are separate from OpenAI API billing. Add an OpenAI API key in settings for token and cost data."
             font.pixelSize: 9
             opacity: 0.45
@@ -310,7 +310,7 @@ ColumnLayout {
 
     // API usage surface (bottom section, clean style)
     ColumnLayout {
-        visible: rootItem._openaiApiKey !== "" && openAiTabRoot.subTab === "usage"
+        visible: rootItem.openaiHasApiKey && openAiTabRoot.subTab === "usage"
         Layout.fillWidth: true
         spacing: 8
 
@@ -413,18 +413,18 @@ ColumnLayout {
                 ColumnLayout {
                     Layout.fillWidth: true
                     spacing: 3
-                    MouseArea {
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        propagateComposedEvents: true
-                        QQC2.ToolTip.visible: containsMouse
-                        QQC2.ToolTip.delay: 400
-                        QQC2.ToolTip.text: {
-                            var m = rootItem.openaiModels[modelData];
-                            if (!m)
-                                return modelData;
-                            return modelData + "\nInput:  " + rootItem.formatTokens(m.input_tokens) + " tokens\nOutput: " + rootItem.formatTokens(m.output_tokens) + " tokens\nCost:   " + (m.priced ? "$" + m.cost_usd.toFixed(4) : "unpriced");
-                        }
+                    // HoverHandler rather than a MouseArea: a MouseArea here would be a
+                    // layout child, and anchoring it to fill the layout is undefined behavior.
+                    HoverHandler {
+                        id: modelHover
+                    }
+                    QQC2.ToolTip.visible: modelHover.hovered
+                    QQC2.ToolTip.delay: 400
+                    QQC2.ToolTip.text: {
+                        var m = rootItem.openaiModels[modelData];
+                        if (!m)
+                            return modelData;
+                        return modelData + "\nInput:  " + rootItem.formatTokens(m.input_tokens) + " tokens\nOutput: " + rootItem.formatTokens(m.output_tokens) + " tokens\nCost:   " + (m.priced ? "$" + m.cost_usd.toFixed(4) : "unpriced");
                     }
                     RowLayout {
                         Layout.fillWidth: true
@@ -493,7 +493,7 @@ ColumnLayout {
 
     // No login and no key
     ColumnLayout {
-        visible: rootItem._openaiApiKey === "" && !rootItem.openaiCodexLoggedIn && rootItem.enabledTabs[rootItem.activeTab] === "openai" && openAiTabRoot.subTab === "usage"
+        visible: !rootItem.openaiHasApiKey && !rootItem.openaiCodexLoggedIn && rootItem.enabledTabs[rootItem.activeTab] === "openai" && openAiTabRoot.subTab === "usage"
         Layout.fillWidth: true
         spacing: 6
         PlasmaComponents.Label {

@@ -82,6 +82,11 @@ ColumnLayout {
                     color: "#4f8cff"
                 },
                 {
+                    id: "kimi",
+                    label: "Kimi",
+                    color: "#1e3a8a"
+                },
+                {
                     id: "__spacer",
                     label: "",
                     color: "transparent"
@@ -126,6 +131,8 @@ ColumnLayout {
                             return Plasmoid.configuration.copilotEnabled;
                         if (modelData.id === "deepseek")
                             return Plasmoid.configuration.deepseekEnabled;
+                        if (modelData.id === "kimi")
+                            return Plasmoid.configuration.kimiEnabled;
                         return false;
                     }
                     onToggled: {
@@ -149,6 +156,8 @@ ColumnLayout {
                             Plasmoid.configuration.copilotEnabled = checked;
                         if (modelData.id === "deepseek")
                             Plasmoid.configuration.deepseekEnabled = checked;
+                        if (modelData.id === "kimi")
+                            Plasmoid.configuration.kimiEnabled = checked;
                     }
                 }
             }
@@ -535,11 +544,6 @@ ColumnLayout {
             configKey: "openaiApiKey"
         }
         KeyRow {
-            label: "Google AI"
-            placeholder: "AIza…"
-            configKey: "googleApiKey"
-        }
-        KeyRow {
             label: "Mistral"
             placeholder: "or $MISTRAL_API_KEY"
             configKey: "mistralApiKey"
@@ -574,6 +578,12 @@ ColumnLayout {
             placeholder: "or $DEEPSEEK_API_KEY"
             configKey: "deepseekApiKey"
             rowVisible: Plasmoid.configuration.deepseekEnabled
+        }
+        KeyRow {
+            label: "Kimi / Moonshot"
+            placeholder: "or $MOONSHOT_API_KEY"
+            configKey: "moonshotApiKey"
+            rowVisible: Plasmoid.configuration.kimiEnabled
         }
         RowLayout {
             Layout.fillWidth: true

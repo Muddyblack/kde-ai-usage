@@ -1,0 +1,10 @@
+{
+  "id": "antigravity",
+  "now": 1785000000,
+  "inputs": {
+    "usage": {
+      "error": "Antigravity is not running. Please open your IDE.\nsecond line"
+    },
+    "status": null
+  }
+}

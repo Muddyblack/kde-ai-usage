@@ -1,0 +1,15 @@
+{
+  "id": "openai",
+  "now": 1785000000,
+  "inputs": {
+    "credentials": {
+      "codexAccessToken": "codex-secret",
+      "codexLoggedIn": true
+    },
+    "codex": {},
+    "codexError": "offline",
+    "orgUsage": null,
+    "stats": {},
+    "status": null
+  }
+}

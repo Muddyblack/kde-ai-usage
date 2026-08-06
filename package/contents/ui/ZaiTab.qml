@@ -65,7 +65,7 @@ ColumnLayout {
     }
 
     ColumnLayout {
-        visible: !rootItem.zaiKeyValid && rootItem._zaiToken === "" && rootItem.zaiError === ""
+        visible: !rootItem.zaiKeyValid && !rootItem.zaiHasKey && rootItem.zaiError === ""
         Layout.fillWidth: true
         spacing: 6
 
