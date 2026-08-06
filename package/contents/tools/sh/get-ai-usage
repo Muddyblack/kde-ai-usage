@@ -23,7 +23,7 @@ set -u
 
 # Keep in sync with aiusage/config.py:ALL_PROVIDERS — duplicated here so
 # --list and the missing-python3 fallback work without importing Python.
-ALL_PROVIDERS="claude antigravity openai kiro mistral openrouter grok zai copilot deepseek"
+ALL_PROVIDERS="claude antigravity openai kiro mistral openrouter grok zai copilot deepseek kimi"
 
 PY="${PYTHON3:-python3}"
 

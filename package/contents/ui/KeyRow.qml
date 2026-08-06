@@ -49,6 +49,8 @@ RowLayout {
                 return Plasmoid.configuration.githubToken || "";
             if (kr.configKey === "deepseekApiKey")
                 return Plasmoid.configuration.deepseekApiKey || "";
+            if (kr.configKey === "moonshotApiKey")
+                return Plasmoid.configuration.moonshotApiKey || "";
             return "";
         }
         onEditingFinished: {
@@ -68,6 +70,8 @@ RowLayout {
                 Plasmoid.configuration.githubToken = text;
             if (kr.configKey === "deepseekApiKey")
                 Plasmoid.configuration.deepseekApiKey = text;
+            if (kr.configKey === "moonshotApiKey")
+                Plasmoid.configuration.moonshotApiKey = text;
         }
     }
     QQC2.ToolButton {

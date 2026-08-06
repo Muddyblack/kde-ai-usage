@@ -44,13 +44,13 @@
   <img src="./readme/settings.svg?v=10" alt="Settings panel" width="340" valign="top"/>
 </p>
 
-A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple services. Monitor your **Claude** subscription windows and local activity stats, **Antigravity/Google AI Studio**, **OpenAI API and Codex plan limits**, **Grok CLI**, **Kiro**, **Mistral AI**, **OpenRouter**, **Z.AI**, **GitHub Copilot**, and **DeepSeek** usage or balance at a glance with animated segmented bars, live countdown timers, account status, and per-model breakdowns.
+A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple services. Monitor your **Claude** subscription windows and local activity stats, **Antigravity/Google AI Studio**, **OpenAI API and Codex plan limits**, **Grok CLI**, **Kiro**, **Mistral AI**, **OpenRouter**, **Z.AI**, **GitHub Copilot**, **DeepSeek**, and **Kimi / Moonshot AI** usage or balance at a glance with animated segmented bars, live countdown timers, account status, and per-model breakdowns.
 
 ---
 
 ## Features
 
-- **Multi-service support** — Switch between Claude, Antigravity, OpenAI, Grok, Kiro, Mistral, OpenRouter, Z.AI, GitHub Copilot, and DeepSeek tabs in the popup
+- **Multi-service support** — Switch between Claude, Antigravity, OpenAI, Grok, Kiro, Mistral, OpenRouter, Z.AI, GitHub Copilot, DeepSeek, and Kimi tabs in the popup
 - **Balance tracking** — DeepSeek current balance with granted / topped-up breakdown
 - **Panel view** — Compact percentage readouts in the taskbar, color-coded by usage level, with an inline spark-line trend
 - **Popup view** — Segmented bars showing exact fill level with reset times and countdowns
@@ -86,6 +86,7 @@ A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple serv
 | Z.AI | 5-hour token quota, monthly tools quota, reset countdowns, and model details | Untested |
 | GitHub Copilot | Monthly premium request usage against a configurable quota | Personal billing supported; organization/enterprise billing not yet supported |
 | DeepSeek | Available balance with granted and topped-up breakdown | Untested |
+| Kimi / Moonshot AI | Available balance with voucher and cash breakdown | Untested |
 
 Provider APIs do not all expose the same information. In particular, Codex/ChatGPT
 plan limits are separate from OpenAI API organization usage, DeepSeek reports a
@@ -117,6 +118,7 @@ Enable only the services you use. Each one has its own setup requirement:
 | Z.AI | A Z.AI token from widget settings, `$ZAI_TOKEN`, or `~/.config/zai/token` |
 | GitHub Copilot | A GitHub token from widget settings, `$GITHUB_TOKEN`, or `~/.config/github-copilot/token`, with fine-grained **Plan: read** permission; personal billing only. The quota defaults to 300 and is configurable |
 | DeepSeek | A DeepSeek API key from widget settings, `$DEEPSEEK_API_KEY`, or `~/.config/deepseek/api-key` |
+| Kimi / Moonshot AI | A Moonshot API key from widget settings, `$MOONSHOT_API_KEY`, `$KIMI_API_KEY`, or `~/.config/moonshot/api-key` |
 
 All configuration is done in the widget's settings panel (right-click the widget → *Configure*). See [How it works](#how-it-works) below for what each tab reads and where credentials are resolved from.
 
@@ -271,6 +273,9 @@ The GitHub Copilot tab reads monthly premium request usage from GitHub's user bi
 
 ### DeepSeek *(untested)*
 The DeepSeek tab calls `GET https://api.deepseek.com/user/balance` with the configured API key. It shows whether the account has sufficient balance for API calls, the primary total balance, and the granted / topped-up split. The key is resolved from widget settings → `$DEEPSEEK_API_KEY` → `~/.config/deepseek/api-key`.
+
+### Kimi / Moonshot AI *(untested)*
+The Kimi tab calls `GET https://api.moonshot.ai/v1/users/me/balance` and shows the available, voucher, and cash balances. The key is resolved from widget settings → `$MOONSHOT_API_KEY` / `$KIMI_API_KEY` → `~/.config/moonshot/api-key`.
 
 ### Usage history
 Each refresh appends the usage values that a provider actually reports to a rolling history (the last 500 samples) used by the chart, spark-lines, burn-rate ETA, and period comparison. Rolling plan windows (Claude, Codex) empty at a known instant, so when the machine was asleep across one the chart replays the drop where it actually happened instead of sloping from the last pre-sleep sample to the first one after wake-up. Most series are percentages; Mistral stores its raw vibe CLI spend and DeepSeek stores its raw balance so their charts retain meaningful units. Existing session and weekly history fields are retained even while a window is unavailable, so five-hour charts can return without migration if providers restore that limit. History is stored in the widget's Plasma config **and** mirrored to `~/.local/share/ai-usage-widget/usage-history-latest.json`, so it survives a full uninstall/reinstall — on first launch with no config history, the widget restores from that file automatically. You can also manually **Export** (writes a timestamped JSON copy) and **Import** from the settings panel. If a saved file is unreadable or in an unrecognized format, it's discarded and history starts fresh rather than erroring out.

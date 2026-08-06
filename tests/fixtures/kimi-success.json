@@ -1,0 +1,14 @@
+{
+  "id": "kimi",
+  "now": 1785000000,
+  "inputs": {
+    "usage": {
+      "hasKey": true,
+      "keyValid": true,
+      "availableBalance": 49.58894,
+      "voucherBalance": 46.58893,
+      "cashBalance": 3.00001
+    },
+    "status": null
+  }
+}

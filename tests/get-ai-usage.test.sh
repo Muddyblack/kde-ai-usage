@@ -269,6 +269,17 @@ check deepseek-error "passes the key error through" '
 check deepseek-missing "reports an unconfigured key" '
     (.ok | not) and .error == "DeepSeek: no API key configured"'
 
+# ── Kimi / Moonshot ─────────────────────────────────────────────────────────
+
+check kimi-success "reports the Moonshot balance split" '
+    .ok and .details.keyValid
+    and ((.details.availableBalance - 49.58894) | fabs) < 0.00001
+    and ((.details.voucherBalance - 46.58893) | fabs) < 0.00001
+    and ((.details.cashBalance - 3.00001) | fabs) < 0.00001
+    and .historyValues == {km: 49.58894}'
+check kimi-missing "reports a missing Moonshot API key" '
+    (.ok | not) and .error == "Kimi: no Moonshot API key configured"'
+
 # ── End-to-end: settings toggles, key plumbing and the outer envelope ───────
 
 TEST_TMP="$(mktemp -d)"

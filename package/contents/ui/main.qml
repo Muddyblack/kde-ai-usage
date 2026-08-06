@@ -31,6 +31,7 @@ PlasmoidItem {
     property bool zaiEnabled: Plasmoid.configuration.zaiEnabled
     property bool copilotEnabled: Plasmoid.configuration.copilotEnabled
     property bool deepseekEnabled: Plasmoid.configuration.deepseekEnabled
+    property bool kimiEnabled: Plasmoid.configuration.kimiEnabled
     // Computed list of enabled tab IDs in display order
     property var enabledTabs: {
         var t = [];
@@ -63,6 +64,8 @@ PlasmoidItem {
 
         if (root.deepseekEnabled)
             t.push("deepseek");
+        if (root.kimiEnabled)
+            t.push("kimi");
 
         return t;
     }
@@ -328,6 +331,13 @@ PlasmoidItem {
     property real deepseekPrimaryGranted: 0
     property real deepseekPrimaryToppedUp: 0
     property string deepseekError: ""
+    // ── Kimi / Moonshot data ─────────────────────────────────────────────────
+    property bool kimiHasKey: false
+    property bool kimiKeyValid: false
+    property real kimiAvailableBalance: 0
+    property real kimiVoucherBalance: 0
+    property real kimiCashBalance: 0
+    property string kimiError: ""
     // ── Common ────────────────────────────────────────────────────────────────
     property string errorMsg: ""
     property bool stale: false
@@ -414,6 +424,7 @@ PlasmoidItem {
     readonly property color zaiBlue: "#126ef4"
     readonly property color copilotPurple: "#8b5cf6"
     readonly property color deepseekBlue: "#4f8cff"
+    readonly property color kimiBlue: "#1e3a8a"
     readonly property color sessionColor: "#e05252"
     readonly property color weeklyColor: "#f5a623"
     readonly property color warningColor: "#ffa64d"
@@ -714,6 +725,8 @@ PlasmoidItem {
 
         if (tabId === "deepseek")
             return root.deepseekBlue;
+        if (tabId === "kimi")
+            return root.kimiBlue;
 
         return Kirigami.Theme.textColor;
     }
@@ -748,6 +761,8 @@ PlasmoidItem {
 
         if (tabId === "deepseek")
             return "DeepSeek";
+        if (tabId === "kimi")
+            return "Kimi";
 
         return tabId;
     }
@@ -798,6 +813,8 @@ PlasmoidItem {
 
         if (tabId === "deepseek")
             return Qt.resolvedUrl("../icons/deepseek-color.svg");
+        if (tabId === "kimi")
+            return Qt.resolvedUrl("../icons/kimi.svg");
 
         return "";
     }
@@ -1072,6 +1089,7 @@ PlasmoidItem {
         env += root.envAssign("WIDGET_ZAI_TOKEN", Plasmoid.configuration.zaiToken);
         env += root.envAssign("WIDGET_GITHUB_TOKEN", Plasmoid.configuration.githubToken);
         env += root.envAssign("WIDGET_DEEPSEEK_API_KEY", Plasmoid.configuration.deepseekApiKey);
+        env += root.envAssign("WIDGET_MOONSHOT_API_KEY", Plasmoid.configuration.moonshotApiKey);
         var quota = parseInt(Plasmoid.configuration.copilotQuota || 300);
         if (isNaN(quota) || quota <= 0)
             quota = 300;
@@ -1154,6 +1172,8 @@ PlasmoidItem {
             root.applyCopilot(details, provider.error || "");
         else if (provider.id === "deepseek")
             root.applyDeepSeek(details, provider.error || "");
+        else if (provider.id === "kimi")
+            root.applyKimi(details, provider.error || "");
     }
 
     function applyClaude(d) {
@@ -1425,6 +1445,15 @@ PlasmoidItem {
         root.deepseekPrimaryGranted = d.primaryGranted || 0;
         root.deepseekPrimaryToppedUp = d.primaryToppedUp || 0;
         root.deepseekError = error;
+    }
+
+    function applyKimi(d, error) {
+        root.kimiHasKey = d.hasKey === true;
+        root.kimiKeyValid = d.keyValid === true;
+        root.kimiAvailableBalance = d.availableBalance || 0;
+        root.kimiVoucherBalance = d.voucherBalance || 0;
+        root.kimiCashBalance = d.cashBalance || 0;
+        root.kimiError = error;
     }
 
     function refresh() {
@@ -2013,6 +2042,18 @@ PlasmoidItem {
                 costText: root.deepseekKeyValid ? root.formatMoney(root.deepseekPrimaryTotal, root.deepseekPrimaryCurrency) : "—"
                 tooltipText: "DeepSeek" + (root.deepseekKeyValid ? "\nBalance: " + root.formatMoney(root.deepseekPrimaryTotal, root.deepseekPrimaryCurrency) + "\nGranted: " + root.formatMoney(root.deepseekPrimaryGranted, root.deepseekPrimaryCurrency) + "\nTopped up: " + root.formatMoney(root.deepseekPrimaryToppedUp, root.deepseekPrimaryCurrency) : "\nNo API key set")
             }
+
+            PanelSlot {
+                pct: 0
+                iconColor: root.kimiBlue
+                iconSource: Qt.resolvedUrl("../icons/kimi.svg")
+                iconText: "K"
+                stale: root.stale && root.panelShows("kimi")
+                visible: root.panelShows("kimi")
+                showCost: true
+                costText: root.kimiKeyValid ? root.formatMoney(root.kimiAvailableBalance, "USD") : "—"
+                tooltipText: "Kimi / Moonshot" + (root.kimiKeyValid ? "\nBalance: " + root.formatMoney(root.kimiAvailableBalance, "USD") + "\nVoucher: " + root.formatMoney(root.kimiVoucherBalance, "USD") + "\nCash: " + root.formatMoney(root.kimiCashBalance, "USD") : "\nNo Moonshot API key set")
+            }
         }
     }
 
@@ -2249,6 +2290,9 @@ PlasmoidItem {
 
                             if (tab === "deepseek")
                                 return "DeepSeek Balance";
+
+                            if (tab === "kimi")
+                                return "Kimi Balance";
 
                             return "AI Usage Monitor";
                         }
@@ -2515,6 +2559,10 @@ PlasmoidItem {
             }
 
             DeepSeekTab {
+                rootItem: root
+            }
+
+            KimiTab {
                 rootItem: root
             }
 

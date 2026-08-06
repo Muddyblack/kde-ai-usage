@@ -41,6 +41,9 @@
     <entry name="deepseekEnabled" type="Bool">
       <default>false</default>
     </entry>
+    <entry name="kimiEnabled" type="Bool">
+      <default>false</default>
+    </entry>
     <entry name="mistralApiKey" type="String">
       <default></default>
     </entry>
@@ -57,6 +60,9 @@
       <default></default>
     </entry>
     <entry name="deepseekApiKey" type="String">
+      <default></default>
+    </entry>
+    <entry name="moonshotApiKey" type="String">
       <default></default>
     </entry>
     <entry name="copilotQuota" type="Int">

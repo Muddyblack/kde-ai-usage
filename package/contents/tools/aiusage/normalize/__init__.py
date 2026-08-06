@@ -5,6 +5,7 @@ from .copilot import normalize_copilot
 from .deepseek import normalize_deepseek
 from .grok import normalize_grok
 from .kiro import normalize_kiro
+from .moonshot import normalize_moonshot
 from .mistral import normalize_mistral
 from .openai import normalize_openai
 from .openrouter import normalize_openrouter
@@ -21,6 +22,7 @@ _DISPATCH = {
     "zai": normalize_zai,
     "copilot": normalize_copilot,
     "deepseek": normalize_deepseek,
+    "kimi": normalize_moonshot,
 }
 
 

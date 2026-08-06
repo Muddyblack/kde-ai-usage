@@ -7,11 +7,11 @@ values through WIDGET_* environment variables. Environment always wins.
 import json
 import os
 
-ALL_PROVIDERS = ["claude", "antigravity", "openai", "kiro", "mistral", "openrouter", "grok", "zai", "copilot", "deepseek"]
+ALL_PROVIDERS = ["claude", "antigravity", "openai", "kiro", "mistral", "openrouter", "grok", "zai", "copilot", "deepseek", "kimi"]
 
 # Providers that stay off until explicitly enabled (they need a token the user
 # has to paste, so defaulting them on would only produce error rows).
-OPT_IN_PROVIDERS = {"zai", "copilot", "deepseek"}
+OPT_IN_PROVIDERS = {"zai", "copilot", "deepseek", "kimi"}
 
 _KEY_EXPORTS = [
     ("WIDGET_CLAUDE_ADMIN_KEY", "claudeAdmin"),
@@ -22,6 +22,7 @@ _KEY_EXPORTS = [
     ("WIDGET_ZAI_TOKEN", "zai"),
     ("WIDGET_GITHUB_TOKEN", "github"),
     ("WIDGET_DEEPSEEK_API_KEY", "deepseek"),
+    ("WIDGET_MOONSHOT_API_KEY", "moonshot"),
 ]
 
 

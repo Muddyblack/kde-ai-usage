@@ -20,6 +20,7 @@ from .providers.deepseek import get_deepseek_balance
 from .providers.grok import get_grok_usage
 from .providers.kiro import get_kiro_usage
 from .providers.mistral import get_mistral_usage
+from .providers.moonshot import get_moonshot_balance
 from .providers.openai_credentials import get_openai_credentials
 from .providers.openrouter import get_openrouter_usage
 from .providers.zai import get_zai_usage
@@ -190,6 +191,7 @@ _SIMPLE = {
     "zai": (get_zai_usage, None, None),
     "copilot": (get_copilot_usage, None, None),
     "deepseek": (get_deepseek_balance, None, None),
+    "kimi": (get_moonshot_balance, None, None),
 }
 
 
