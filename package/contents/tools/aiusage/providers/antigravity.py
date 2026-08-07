@@ -15,7 +15,6 @@ import ssl
 import subprocess
 import urllib.error
 import urllib.request
-import datetime
 
 from ..http import as_json
 

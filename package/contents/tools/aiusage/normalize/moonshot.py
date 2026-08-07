@@ -7,9 +7,7 @@ def normalize_moonshot(raw):
     if not isinstance(res, dict) or not res:
         return provider_error("kimi", "Kimi", "#1e3a8a", now, "Kimi: no Moonshot API key configured", {"hasKey": False, "keyValid": False})
     if res.get("error") is not None:
-        return provider_error(
-            "kimi", "Kimi", "#1e3a8a", now, f"Kimi: {res['error']}", {"hasKey": res.get("hasKey") is True, "keyValid": False}
-        )
+        return provider_error("kimi", "Kimi", "#1e3a8a", now, f"Kimi: {res['error']}", {"hasKey": res.get("hasKey") is True, "keyValid": False})
 
     available = num(res.get("availableBalance"))
     voucher = num(res.get("voucherBalance"))
