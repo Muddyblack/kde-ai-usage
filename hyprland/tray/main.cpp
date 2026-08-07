@@ -1,6 +1,8 @@
 #include <QAction>
 #include <QApplication>
 #include <QColor>
+#include <QDir>
+#include <QFile>
 #include <QIcon>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -12,6 +14,7 @@
 #include <QPen>
 #include <QPixmap>
 #include <QProcess>
+#include <QProcessEnvironment>
 #include <QSystemTrayIcon>
 #include <QTimer>
 
@@ -61,10 +64,30 @@ int main(int argc, char **argv) {
     QSystemTrayIcon tray{QIcon(iconPixmap)};
     tray.setToolTip("AI Usage");
 
+    // The popup's settings page writes an optional interpreter override into the
+    // shared JSON config (same path shell.qml derives). This helper runs the
+    // backend on its own, so without this it would keep using PATH's Python
+    // while the popup used the configured one. Re-read on every refresh so a
+    // change takes effect without restarting the tray.
+    const auto configuredPython = [] {
+        QString base = qEnvironmentVariable("XDG_CONFIG_HOME");
+        if (base.isEmpty())
+            base = QDir::homePath() + "/.config";
+        QFile file(base + "/ai-usage-widget/hyprland-settings.json");
+        if (!file.open(QIODevice::ReadOnly))
+            return QString();
+        return QJsonDocument::fromJson(file.readAll()).object().value("pythonPath").toString().trimmed();
+    };
+
     QProcess backend;
     auto updateTooltip = [&] {
         if (backend.state() != QProcess::NotRunning)
             return;
+        auto environment = QProcessEnvironment::systemEnvironment();
+        const QString python = configuredPython();
+        if (!python.isEmpty())
+            environment.insert("PYTHON3", python);
+        backend.setProcessEnvironment(environment);
         backend.start(backendPath, {"--all"});
     };
     QObject::connect(&backend, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), [&](int, QProcess::ExitStatus) {

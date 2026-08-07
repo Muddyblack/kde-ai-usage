@@ -94,7 +94,8 @@ ShellRoot {
             pollSec: 300,
             showChart: true,
             pillMode: "always",
-            position: "top-right"
+            position: "top-right",
+            pythonPath: ""
         })
     property bool showSettings: false
     property bool pillRevealed: false
@@ -128,7 +129,8 @@ ShellRoot {
                         pollSec: d.pollSec || 300,
                         showChart: d.showChart !== false,
                         pillMode: d.pillMode || (d.floatingPill === false ? "tray" : "always"),
-                        position: d.position || "top-right"
+                        position: d.position || "top-right",
+                        pythonPath: d.pythonPath || ""
                     };
                 } catch (e) {}
             }
@@ -169,7 +171,7 @@ ShellRoot {
     function exportHistory() {
         var tool = root.baseDir + "/../package/contents/tools/sh/history-io";
         exportProcess.exec({
-            command: ["sh", "-c", "WIDGET_HISTORY_JSON=\"$1\" \"$2\" export", "ai-usage", JSON.stringify(root.usageHistory), tool]
+            command: ["sh", "-c", "PYTHON3=\"$1\" WIDGET_HISTORY_JSON=\"$2\" exec \"$3\" export", "ai-usage", root.settings.pythonPath || "", JSON.stringify(root.usageHistory), tool]
         });
     }
 
@@ -339,8 +341,12 @@ ShellRoot {
         if (backendProcess.running)
             return;
         root.loading = true;
+        // $PYTHON3 overrides the interpreter search in tools/sh/python-interp.sh.
+        // Passed as a positional arg rather than interpolated into the script so
+        // a path with spaces or shell metacharacters stays intact; an empty
+        // value reads as unset there, which is the auto-detect default.
         backendProcess.exec({
-            command: [root.backendCommand, "--all"],
+            command: ["sh", "-c", "PYTHON3=\"$1\" exec \"$2\" --all", "ai-usage", root.settings.pythonPath || "", root.backendCommand],
             workingDirectory: root.baseDir + "/.."
         });
     }

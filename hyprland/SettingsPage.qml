@@ -432,4 +432,67 @@ ColumnLayout {
         color: "#f8fafc"
         wrapMode: Text.WordWrap
     }
+
+    SectionLabel {
+        text: "Advanced"
+    }
+
+    // Interpreter override, exported as $PYTHON3 to the shell tools. Unlike the
+    // API keys this is a top-level setting, not a keys[] entry, because the
+    // shell scripts need it before any Python runs.
+    RowLayout {
+        Layout.fillWidth: true
+        spacing: 6
+
+        Text {
+            text: "Python"
+            font.pixelSize: 11
+            color: "#f8fafc"
+            Layout.preferredWidth: 90
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 26
+            radius: 5
+            color: Qt.rgba(1, 1, 1, 0.06)
+            border.width: 1
+            border.color: pythonField.activeFocus ? Qt.rgba(0.31, 0.62, 0.87, 0.6) : Qt.rgba(1, 1, 1, 0.12)
+
+            QC.TextField {
+                id: pythonField
+                anchors.fill: parent
+                anchors.leftMargin: 8
+                anchors.rightMargin: 4
+                text: page.shell.settings.pythonPath || ""
+                font.pixelSize: 10
+                color: "#f8fafc"
+                placeholderText: "auto-detect"
+                placeholderTextColor: Qt.rgba(1, 1, 1, 0.3)
+                verticalAlignment: TextInput.AlignVCenter
+                background: null
+                selectByMouse: true
+                onTextEdited: {
+                    page.shell.setSetting2("pythonPath", text.trim());
+                    pythonRefreshDebounce.restart();
+                }
+            }
+        }
+    }
+
+    Text {
+        Layout.fillWidth: true
+        text: "Interpreter for the backend — e.g. a venv's bin/python. Empty auto-detects from PATH (python3 → python3.x → python). The tray helper picks this up on its next refresh."
+        font.pixelSize: 9
+        opacity: 0.4
+        color: "#f8fafc"
+        wrapMode: Text.WordWrap
+    }
+
+    // Same debounce as KeyField: don't respawn the backend on every keystroke.
+    Timer {
+        id: pythonRefreshDebounce
+        interval: 1200
+        onTriggered: page.shell.refresh()
+    }
 }
