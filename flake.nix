@@ -113,7 +113,10 @@
                 pkgs.coreutils
                 pkgs.python3
               ]}:"$PATH"
-              config=${self}/hyprland/shell.qml
+              # The repo root, not hyprland/ — Quickshell roots its QML sandbox at
+              # the entry point's directory, and hyprland/ cannot reach the shared
+              # JS under package/. See shell.qml.
+              config=${self}/shell.qml
               desktop_dir="''${XDG_DATA_HOME:-$HOME/.local/share}/applications"
               ${pkgs.coreutils}/bin/mkdir -p "$desktop_dir"
               ${pkgs.coreutils}/bin/install -m 0644 \

@@ -11,6 +11,9 @@ RowLayout {
     property color iconColor: "#cc785c"
     property bool stale: false
     property string costText: ""    // when non-empty, shown instead of the %
+    // The provider's brand logo, colorized to `iconColor` — as in the Plasma
+    // compact representation, the panel reads severity from the icon's colour,
+    // so the logo contributes its shape and the backend its colour.
     property string iconSource: ""
 
     readonly property color dangerColor: "#ff4d4d"

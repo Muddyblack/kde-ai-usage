@@ -12,6 +12,27 @@ import re
 
 SCHEMA_VERSION = 1
 
+# Brand artwork per provider, as a bare filename under contents/icons/. The
+# frontends live at different depths, so each resolves the directory itself.
+# Every provider funnels through provider_base(), which is why this table can
+# stay here instead of being repeated in each normalize module — or, worse, in
+# both frontends, where the two copies would drift apart.
+# A provider with no artwork yet is simply absent; callers fall back to the
+# plain accent dot.
+PROVIDER_ICONS = {
+    "antigravity": "antigravity-color.svg",
+    "claude": "claude-color.svg",
+    "copilot": "copilot-color.svg",
+    "deepseek": "deepseek-color.svg",
+    "grok": "grok.svg",
+    "kimi": "kimi.svg",
+    "kiro": "kiro.svg",
+    "mistral": "mistral-color.svg",
+    "openai": "openai.svg",
+    "openrouter": "openrouter.svg",
+    "zai": "zai.svg",
+}
+
 
 def num(v):
     if isinstance(v, bool):
@@ -228,6 +249,7 @@ def provider_base(id_, label, accent, now):
         "id": id_,
         "label": label,
         "accent": accent,
+        "icon": PROVIDER_ICONS.get(id_, ""),
         "ok": True,
         "stale": False,
         "error": "",

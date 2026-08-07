@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls.Basic as QC
+import Quickshell
 
 // In-popup settings page, ported from the Plasma SettingsPanel: provider
 // toggles, refresh interval, usage-chart toggle, and API-key fields. Everything
@@ -198,6 +199,51 @@ ColumnLayout {
             model: ["Top left", "Top center", "Top right", "Bottom left", "Bottom center", "Bottom right"]
             currentIndex: Math.max(0, values.indexOf(page.shell.settings.position || "top-right"))
             onActivated: page.shell.setSetting2("position", values[currentIndex])
+        }
+        Item {
+            Layout.fillWidth: true
+        }
+    }
+
+    RowLayout {
+        Layout.fillWidth: true
+        spacing: 6
+        Rectangle {
+            Layout.preferredWidth: 7
+            Layout.preferredHeight: 7
+            radius: 3.5
+            color: "#a78bfa"
+            Layout.alignment: Qt.AlignVCenter
+        }
+        Text {
+            text: "Monitor"
+            font.pixelSize: 11
+            color: "#f8fafc"
+            Layout.preferredWidth: 90
+        }
+        SettingCombo {
+            id: monitorCombo
+            Layout.preferredWidth: 130
+            // The connected outputs are appended live, so the list reflects what is
+            // actually plugged in; a saved name that has since been unplugged still
+            // shows as the current value and keeps working when it comes back.
+            readonly property var values: {
+                var v = ["focused", "all"];
+                var screens = Quickshell.screens;
+                for (var i = 0; i < screens.length; i++)
+                    v.push(screens[i].name);
+                if (v.indexOf(page.shell.monitorMode) === -1)
+                    v.push(page.shell.monitorMode);
+                return v;
+            }
+            model: {
+                var m = ["Follow focus", "All monitors"];
+                for (var i = 2; i < monitorCombo.values.length; i++)
+                    m.push(monitorCombo.values[i]);
+                return m;
+            }
+            currentIndex: Math.max(0, values.indexOf(page.shell.monitorMode))
+            onActivated: page.shell.setSetting2("monitor", values[currentIndex])
         }
         Item {
             Layout.fillWidth: true

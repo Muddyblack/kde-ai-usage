@@ -64,6 +64,7 @@ when its remembered one disappears.
   "id": "claude",
   "label": "Claude",
   "accent": "#cc785c",
+  "icon": "claude-color.svg",
   "ok": true,
   "stale": false,
   "error": "",
@@ -78,6 +79,7 @@ when its remembered one disappears.
 
 | field | meaning |
 | --- | --- |
+| `icon` | brand logo filename under `contents/icons/`, `""` when the provider has no artwork yet (frontends fall back to an `accent` dot). Bare filename, not a path — the two frontends sit at different depths and each resolves the directory itself |
 | `ok` | the provider produced usable data |
 | `stale` | data is missing or older than this refresh |
 | `error` | human-readable failure, `""` when healthy. Well-known values: `offline`, `rate limited`, `token expired`, `access denied`, `err <http status>`, `python3 missing` (unlike the others, not retried — see the bash launcher in `tools/sh/get-ai-usage`; the string is fixed vocabulary and means "no Python 3 interpreter could be resolved by `tools/sh/python-interp.sh`", not that the literal `python3` binary is absent) |
