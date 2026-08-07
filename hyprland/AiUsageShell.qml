@@ -112,7 +112,10 @@ ShellRoot {
             pythonPath: ""
         })
     property bool showSettings: false
-    property bool pillRevealed: false
+    // Tray-triggered reveal is legitimately global — one tray icon controls
+    // every monitor's pill together. Edge-hover reveal is NOT: with a pill on
+    // every output, hovering one screen's edge must not pop out the others, so
+    // that state lives per PanelWindow instance (panel.hoverRevealed) instead.
     property bool trayPillRevealed: false
     readonly property string pillMode: root.settings.pillMode || "always"
     readonly property string windowPosition: root.settings.position || "top-right"
@@ -121,7 +124,6 @@ ShellRoot {
     readonly property bool positionLeft: root.windowPosition.indexOf("-left") !== -1
     readonly property bool positionCenter: root.windowPosition.indexOf("-center") !== -1
     readonly property bool positionRight: root.windowPosition.indexOf("-right") !== -1
-    readonly property bool pillShown: root.pillMode === "always" || root.trayPillRevealed || (root.pillMode === "hover" && (root.pillRevealed || root.popupOpen))
 
     // ── Output selection ─────────────────────────────────────────────────────
     // "focused" → a single screenless window, which the compositor keeps on the
@@ -129,6 +131,24 @@ ShellRoot {
     // monitor name. A name that is not currently connected falls back to
     // "focused" rather than leaving the user with no pill at all.
     readonly property string monitorMode: root.settings.monitor || "focused"
+
+    // Quickshell.screens entries and Hyprland.focusedMonitor are different types
+    // (ShellScreen vs HyprlandMonitor) that happen to share `name`, which is the
+    // only way to turn "the compositor's focused output" into something a
+    // PanelWindow can bind `screen:` to.
+    readonly property var focusedQsScreen: {
+        var name = Hyprland.focusedMonitor ? Hyprland.focusedMonitor.name : "";
+        var all = Quickshell.screens;
+        for (var i = 0; i < all.length; i++)
+            if (all[i].name === name)
+                return all[i];
+        return all.length > 0 ? all[0] : null;
+    }
+
+    // Re-evaluates whenever Hyprland.focusedMonitor changes, so "focused" tracks
+    // the compositor's live focus rather than freezing on whatever was focused
+    // when the shell launched — PanelWindow has no reactive "follow focus" mode
+    // of its own; `screen:` is a plain assignment, so this is what makes it live.
     readonly property var panelScreens: {
         if (root.monitorMode === "all")
             return Quickshell.screens;
@@ -138,7 +158,7 @@ ShellRoot {
                 if (all[i].name === root.monitorMode)
                     return [all[i]];
         }
-        return [null];
+        return [root.focusedQsScreen];
     }
 
     // With a pill on every output, only one popup may be open at a time: the one
@@ -161,8 +181,7 @@ ShellRoot {
         var m = Hyprland.focusedMonitor;
         if (m && m.name)
             return m.name;
-        var s = root.panelScreens[0];
-        return s ? s.name : "";
+        return root.focusedQsScreen ? root.focusedQsScreen.name : "";
     }
 
     function providerEnabled(id) {
@@ -492,9 +511,12 @@ ShellRoot {
             id: panel
             required property var modelData
             screen: modelData
+            // Per-instance reveal state — see the comment on trayPillRevealed.
+            property bool hoverRevealed: false
+            readonly property bool pillShown: root.pillMode === "always" || root.trayPillRevealed || (root.pillMode === "hover" && (panel.hoverRevealed || (root.popupOpen && root.popupOwnedBy(panel.screen))))
             visible: root.pillMode !== "tray" || root.trayPillRevealed
-            implicitWidth: root.pillShown ? pill.implicitWidth + 12 : 72
-            implicitHeight: root.pillShown ? 42 : 4
+            implicitWidth: panel.pillShown ? pill.implicitWidth + 12 : 72
+            implicitHeight: panel.pillShown ? 42 : 4
             color: "transparent"
             aboveWindows: true
             exclusiveZone: 0
@@ -515,7 +537,7 @@ ShellRoot {
 
             PanelPill {
                 id: pill
-                visible: root.pillShown
+                visible: panel.pillShown
                 anchors.centerIn: parent
                 // The active provider's brand logo, falling back to the app icon for
                 // providers that ship no artwork. PanelSlot tints whichever it gets to
@@ -559,17 +581,40 @@ ShellRoot {
                 }
             }
 
-            Rectangle {
-                visible: root.pillMode === "hover" && !root.pillShown
-                anchors.fill: parent
-                color: "transparent"
-                MouseArea {
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    onEntered: {
+            // Continuous hover tracking for `hover` pill mode: one HoverHandler
+            // spanning the panel's current bounds (72x4 collapsed, full pill
+            // expanded), covering both states without a handoff between them.
+            // The old design used a separate edge-zone MouseArea to reveal and
+            // the pill's own MouseArea to hide, which broke whenever the cursor
+            // left before ever registering as "over the pill" — e.g. sweeping
+            // straight through to another monitor — leaving the pill stuck open
+            // until it was hovered again directly. HoverHandler is passive/
+            // non-exclusive, so it tracks alongside PanelPill's own MouseArea
+            // without stealing its clicks.
+            HoverHandler {
+                id: panelHover
+                enabled: root.pillMode === "hover"
+                onHoveredChanged: {
+                    if (hovered) {
                         pillHideTimer.stop();
-                        root.pillRevealed = true;
+                        panel.hoverRevealed = true;
+                    } else {
+                        pillHideTimer.restart();
                     }
+                }
+            }
+
+            // Closing the popup (click elsewhere, Esc, etc.) doesn't itself move
+            // the cursor, so it never fires HoverHandler.onHoveredChanged — if
+            // pillHideTimer had already fired once and been held off by the
+            // `popupOpen` guard below, nothing would otherwise re-check it, and
+            // the pill would stay revealed until directly re-hovered. Re-arm it
+            // whenever the popup closes.
+            Connections {
+                target: root
+                function onPopupOpenChanged() {
+                    if (!root.popupOpen && root.pillMode === "hover" && !panelHover.hovered)
+                        pillHideTimer.restart();
                 }
             }
 
@@ -577,13 +622,15 @@ ShellRoot {
                 id: pillHideTimer
                 interval: 650
                 onTriggered: {
-                    if (root.pillMode === "hover" && !pill.hovered && !root.popupOpen)
-                        root.pillRevealed = false;
+                    if (root.pillMode === "hover" && !panelHover.hovered && !(root.popupOpen && root.popupOwnedBy(panel.screen)))
+                        panel.hoverRevealed = false;
                 }
             }
 
             // Hover tooltip (custom: the QQC2 ToolTip style needs Kirigami, which
-            // isn't shipped with Quickshell)
+            // isn't shipped with Quickshell). Gated on the pill's own hover, not
+            // panelHover, so it only shows once the pill is actually visible —
+            // not while hovering the collapsed edge-reveal zone.
             Timer {
                 id: tooltipDelay
                 interval: 500
@@ -593,12 +640,10 @@ ShellRoot {
                 target: pill
                 function onHoveredChanged() {
                     if (pill.hovered) {
-                        pillHideTimer.stop();
                         tooltipDelay.restart();
                     } else {
                         tooltipDelay.stop();
                         tooltipPopup.visible = false;
-                        pillHideTimer.restart();
                     }
                 }
             }
@@ -656,8 +701,8 @@ ShellRoot {
                     right: root.positionRight
                 }
                 margins {
-                    top: root.positionTop ? (root.pillShown ? 44 : 8) : 0
-                    bottom: root.positionBottom ? (root.pillShown ? 44 : 8) : 0
+                    top: root.positionTop ? (panel.pillShown ? 44 : 8) : 0
+                    bottom: root.positionBottom ? (panel.pillShown ? 44 : 8) : 0
                     left: root.positionLeft ? 12 : (root.positionCenter && popup.screen ? Math.max(0, (popup.screen.width - popup.width) / 2) : 0)
                     right: root.positionRight ? 12 : 0
                 }
