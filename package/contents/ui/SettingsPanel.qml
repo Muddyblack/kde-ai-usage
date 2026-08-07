@@ -625,4 +625,68 @@ ColumnLayout {
             }
         }
     }
+
+    Rectangle {
+        Layout.fillWidth: true
+        height: 1
+        color: Qt.rgba(1, 1, 1, 0.08)
+    }
+
+    // ── Advanced ───────────────────────────────────────────────
+    PlasmaComponents.Label {
+        text: "Advanced"
+        font.bold: true
+        font.pixelSize: 10
+        opacity: 0.5
+        color: Kirigami.Theme.textColor
+    }
+
+    ColumnLayout {
+        Layout.fillWidth: true
+        spacing: 3
+
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 4
+
+            PlasmaComponents.Label {
+                text: "Python"
+                font.pixelSize: 10
+                opacity: 0.6
+                color: Kirigami.Theme.textColor
+                Layout.preferredWidth: 76
+                elide: Text.ElideRight
+            }
+            QQC2.TextField {
+                id: pythonPathField
+
+                text: Plasmoid.configuration.pythonPath || ""
+                placeholderText: "auto-detect"
+                implicitHeight: 26
+                Layout.fillWidth: true
+                font.pixelSize: 10
+                // Exported as $PYTHON3 to the shell tools; empty restores the
+                // built-in PATH search (python3 → python3.x → python).
+                onEditingFinished: {
+                    var val = String(text).trim();
+                    if (val === Plasmoid.configuration.pythonPath)
+                        return;
+
+                    Plasmoid.configuration.pythonPath = val;
+                    text = val;
+                    // Re-run immediately so a wrong path shows up as an error
+                    // here rather than at the next poll, minutes later.
+                    rootItem.refresh();
+                }
+            }
+        }
+        PlasmaComponents.Label {
+            text: "Interpreter for the backend — e.g. a venv's bin/python. Empty auto-detects from PATH."
+            font.pixelSize: 9
+            opacity: 0.45
+            color: Kirigami.Theme.textColor
+            Layout.fillWidth: true
+            wrapMode: Text.WordWrap
+        }
+    }
 }

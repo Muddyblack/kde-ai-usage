@@ -98,6 +98,12 @@
     <entry name="pollIntervalSec" type="Int">
       <default>300</default>
     </entry>
+    <!-- Interpreter for the shell tools, exported as $PYTHON3. Empty = let
+         tools/sh/python-interp.sh search PATH. Set it to pin a specific
+         interpreter, e.g. a virtualenv's bin/python. -->
+    <entry name="pythonPath" type="String">
+      <default></default>
+    </entry>
     <!-- Appearance customizations -->
     <entry name="cardBgColor" type="String">
       <default>#100a1a</default>

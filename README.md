@@ -102,7 +102,7 @@ usage before its limit is exhausted. See
 |---|---|
 | KDE Plasma 6.0+ | `X-Plasma-API-Minimum-Version: 6.0` |
 | `plasma5support` | Provides the `executable` DataEngine for running the backend |
-| Python 3.8+ | Runs the shared provider backend (standard library only, no `pip install`). Resolved from PATH as `python3`, a versioned `python3.x`, or bare `python`; set `$PYTHON3` to force a specific interpreter. NixOS installs need no PATH entry — the flake pins the interpreter at build time |
+| Python 3.8+ | Runs the shared provider backend (standard library only, no `pip install`). Auto-detected from PATH as `python3`, a versioned `python3.x`, or bare `python`. To pin a specific interpreter — a virtualenv, a non-standard prefix — set it under **Settings → Advanced → Python**, or export `$PYTHON3`. NixOS installs need no PATH entry at all: the flake pins the interpreter at build time |
 
 Enable only the services you use. Each one has its own setup requirement:
 

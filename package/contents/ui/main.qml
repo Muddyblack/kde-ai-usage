@@ -617,14 +617,14 @@ PlasmoidItem {
 
     // Silently mirror history JSON to ~/.local/share/ai-usage-widget/usage-history-latest.json
     function autosaveHistory(json) {
-        var cmd = "WIDGET_HISTORY_JSON=\"$(printf %s '" + root.base64(json) + "' | base64 -d)\" " + root.scriptPath("history-io") + " autosave";
+        var cmd = root.pythonEnv() + "WIDGET_HISTORY_JSON=\"$(printf %s '" + root.base64(json) + "' | base64 -d)\" " + root.scriptPath("history-io") + " autosave";
         historyIOSource.disconnectSource(cmd);
         historyIOSource.connectSource(cmd);
     }
 
     // Restore from the mirror file when plasmoid config has no history (e.g. fresh install).
     function autoloadHistory() {
-        var cmd = root.scriptPath("history-io") + " autoload";
+        var cmd = root.pythonEnv() + root.scriptPath("history-io") + " autoload";
         historyIOSource.disconnectSource(cmd);
         historyIOSource.connectSource(cmd);
     }
@@ -669,7 +669,7 @@ PlasmoidItem {
                 }
                 // Use $HOME in the shell so it always resolves correctly regardless of QML context
                 var destPath = "$HOME/Downloads/" + baseName + "." + format;
-                var cmd = "mkdir -p \"$HOME/Downloads\" && " + root.scriptPath("export-snapshot") + " " + root.shellQuote(format) + " " + root.shellQuote(tmpPng) + " \"" + destPath + "\"";
+                var cmd = "mkdir -p \"$HOME/Downloads\" && " + root.pythonEnv() + root.scriptPath("export-snapshot") + " " + root.shellQuote(format) + " " + root.shellQuote(tmpPng) + " \"" + destPath + "\"";
                 if (format === "svg")
                     cmd += " " + root._exportW + " " + root._exportH;
 
@@ -684,13 +684,13 @@ PlasmoidItem {
         var json = JSON.stringify(root.usageHistory);
         // Pass the payload base64-encoded and decode it inside the shell, so the JSON
         // (quotes, brackets) never has to survive command-line quoting.
-        var cmd = "WIDGET_HISTORY_JSON=\"$(printf %s '" + root.base64(json) + "' | base64 -d)\" " + root.scriptPath("history-io") + " export";
+        var cmd = root.pythonEnv() + "WIDGET_HISTORY_JSON=\"$(printf %s '" + root.base64(json) + "' | base64 -d)\" " + root.scriptPath("history-io") + " export";
         historyIOSource.disconnectSource(cmd);
         historyIOSource.connectSource(cmd);
     }
 
     function importHistory() {
-        var cmd = root.scriptPath("history-io") + " import";
+        var cmd = root.pythonEnv() + root.scriptPath("history-io") + " import";
         historyIOSource.disconnectSource(cmd);
         historyIOSource.connectSource(cmd);
     }
@@ -1079,8 +1079,17 @@ PlasmoidItem {
         return name + "=\"$(printf %s '" + root.base64(value) + "' | base64 -d)\" ";
     }
 
+    // All three shell tools resolve their interpreter through
+    // tools/sh/python-interp.sh, which $PYTHON3 overrides. Empty setting means
+    // "search PATH", so every command below is unchanged for users who never
+    // touch it. Reuses envAssign's base64 round-trip because a path may contain
+    // spaces or shell metacharacters.
+    function pythonEnv() {
+        return root.envAssign("PYTHON3", String(Plasmoid.configuration.pythonPath || "").trim());
+    }
+
     function backendCommand(ids) {
-        var env = "";
+        var env = root.pythonEnv();
         env += root.envAssign("WIDGET_CLAUDE_ADMIN_KEY", Plasmoid.configuration.claudeAdminApiKey);
         env += root.envAssign("WIDGET_OPENAI_API_KEY", Plasmoid.configuration.openaiApiKey);
         env += root.envAssign("WIDGET_MISTRAL_API_KEY", Plasmoid.configuration.mistralApiKey);
