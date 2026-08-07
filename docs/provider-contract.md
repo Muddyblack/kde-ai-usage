@@ -80,7 +80,7 @@ when its remembered one disappears.
 | --- | --- |
 | `ok` | the provider produced usable data |
 | `stale` | data is missing or older than this refresh |
-| `error` | human-readable failure, `""` when healthy. Well-known values: `offline`, `rate limited`, `token expired`, `access denied`, `err <http status>`, `python3 missing` (unlike the others, not retried — see the bash launcher in `tools/sh/get-ai-usage`) |
+| `error` | human-readable failure, `""` when healthy. Well-known values: `offline`, `rate limited`, `token expired`, `access denied`, `err <http status>`, `python3 missing` (unlike the others, not retried — see the bash launcher in `tools/sh/get-ai-usage`; the string is fixed vocabulary and means "no Python 3 interpreter could be resolved by `tools/sh/python-interp.sh`", not that the literal `python3` binary is absent) |
 | `updatedAt` | epoch seconds when the data was collected |
 | `summary.pct` | headline percentage (0–100) |
 | `summary.text` | headline string, already formatted (`"23%"`, `"$12.5"`, `"CLI"`) |

@@ -27,6 +27,18 @@
               mkdir -p "$root"
               cp -r . "$root/"
 
+              # The shell tools resolve Python from PATH, but plasmashell inherits the
+              # systemd user session's PATH, which on NixOS has no Python at all — the
+              # widget then renders "python3 missing" for every provider. Pin the
+              # interpreter so the installed plasmoid is self-contained; this also puts
+              # python3 in the closure so it cannot be garbage-collected away.
+              # $PYTHON3 still wins at runtime, the PATH candidates still act as
+              # fallbacks, and --replace-fail turns a drifted line into a build error
+              # rather than a silently unpatched script.
+              substituteInPlace "$root/contents/tools/sh/python-interp.sh" \
+                --replace-fail 'PY_DEFAULT="python3"' \
+                               'PY_DEFAULT="${pkgs.python3}/bin/python3"'
+
               # Register icon in hicolor theme so Plasma Widget Explorer picks it up
               mkdir -p "$out/share/icons/hicolor/scalable/apps"
               cp contents/icons/org.muddyblack.aiUsageWidget.svg "$out/share/icons/hicolor/scalable/apps/org.muddyblack.aiUsageWidget.svg"

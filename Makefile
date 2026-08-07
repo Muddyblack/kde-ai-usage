@@ -23,6 +23,7 @@ install: ## install test copy to local Plasma session
 
 test: ## run the provider backend contract tests
 	@./tests/get-ai-usage.test.sh
+	@./tests/python-interp.test.sh
 	@./tests/get-codex-stats.test.sh
 	@./tests/get-codex-rate-limits.test.sh
 	@if command -v node >/dev/null 2>&1; then node --test tests/*.test.js; \

@@ -11,6 +11,10 @@ set -euo pipefail
 
 emit_err() { printf '{"error":"%s"}\n' "$1"; }
 
+# Shared interpreter resolution — sets $PY, empty when no Python 3 exists.
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/python-interp.sh"
+py_resolve || true
+
 cmd="${1:-}"
 src="${2:-}"
 dest="${3:-}"
@@ -36,8 +40,8 @@ case "$cmd" in
       magick "$src" -background "#0d0d1a" -flatten "$dest"
     elif command -v convert >/dev/null 2>&1; then
       convert -background "#0d0d1a" -flatten "$src" "$dest"
-    elif command -v python3 >/dev/null 2>&1; then
-      python3 - "$src" "$dest" <<'PYEOF'
+    elif [ -n "$PY" ]; then
+      "$PY" - "$src" "$dest" <<'PYEOF'
 import sys
 src, dest = sys.argv[1], sys.argv[2]
 try:
@@ -58,8 +62,8 @@ PYEOF
   svg)
     width="${4:-800}"
     height="${5:-600}"
-    if command -v python3 >/dev/null 2>&1; then
-      python3 - "$src" "$dest" "$width" "$height" <<'PYEOF'
+    if [ -n "$PY" ]; then
+      "$PY" - "$src" "$dest" "$width" "$height" <<'PYEOF'
 import base64, sys, os
 
 src, dest, w, h = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
@@ -84,7 +88,7 @@ with open(dest, 'w') as f:
 print(f'{{"ok":true,"path":"{dest}"}}')
 PYEOF
     else
-      emit_err "python3 not found — cannot generate SVG"
+      emit_err "no Python 3 interpreter found — cannot generate SVG"
       exit 1
     fi
     ;;

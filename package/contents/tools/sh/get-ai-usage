@@ -25,20 +25,40 @@ set -u
 # --list and the missing-python3 fallback work without importing Python.
 ALL_PROVIDERS="claude antigravity openai kiro mistral openrouter grok zai copilot deepseek kimi"
 
-PY="${PYTHON3:-python3}"
+# Interpreter resolution lives in a sibling file shared with export-snapshot
+# and history-io. Keep the inline fallback: this script's whole contract is to
+# degrade readably rather than fail opaquely, so a truncated install must not
+# turn into a bare "no such file" from the frontends.
+_SH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -r "$_SH_DIR/python-interp.sh" ]; then
+    . "$_SH_DIR/python-interp.sh"
+else
+    PY_DEFAULT="python3"
+    py_resolve() {
+        PY=""
+        for _py_candidate in "${PYTHON3:-}" "$PY_DEFAULT" python3 python; do
+            [ -n "$_py_candidate" ] || continue
+            if command -v "$_py_candidate" >/dev/null 2>&1; then
+                PY="$_py_candidate"
+                return 0
+            fi
+        done
+        return 1
+    }
+fi
 
 if [ "${1:-}" = "--list" ]; then
     printf '%s\n' $ALL_PROVIDERS
     exit 0
 fi
 
-if ! command -v "$PY" >/dev/null 2>&1; then
+if ! py_resolve; then
     if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
         printf 'usage: get-ai-usage [--all | --provider <id>[,<id>...] | --normalize]\n\nproviders: %s\n' "$ALL_PROVIDERS"
         exit 0
     fi
     if [ "${1:-}" = "--normalize" ]; then
-        printf 'get-ai-usage: python3 is required but was not found on PATH\n' >&2
+        printf 'get-ai-usage: no Python 3 interpreter found (tried $PYTHON3, python3, python3.x, python)\n' >&2
         exit 1
     fi
 

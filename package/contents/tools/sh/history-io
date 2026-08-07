@@ -11,6 +11,10 @@
 #   {"ok":true,"empty":true} | {"error":…}.
 set -euo pipefail
 
+# Shared interpreter resolution — sets $PY, empty when no Python 3 exists.
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/python-interp.sh"
+py_resolve || true
+
 DIR="${XDG_DATA_HOME:-$HOME/.local/share}/ai-usage-widget"
 LATEST="$DIR/usage-history-latest.json"
 mkdir -p "$DIR"
@@ -19,8 +23,8 @@ mkdir -p "$DIR"
 jstr() {
   if command -v jq >/dev/null 2>&1; then
     printf '%s' "$1" | jq -Rs .
-  elif command -v python3 >/dev/null 2>&1; then
-    printf '%s' "$1" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))'
+  elif [ -n "$PY" ]; then
+    printf '%s' "$1" | "$PY" -c 'import json,sys; print(json.dumps(sys.stdin.read()))'
   else
     printf '"%s"' "$1"
   fi
@@ -35,8 +39,8 @@ validate_or_delete() {
   if command -v jq >/dev/null 2>&1; then
     if jq -e 'type == "array"' "$f" >/dev/null 2>&1; then return 0; fi
     rm -f "$f"; return 1
-  elif command -v python3 >/dev/null 2>&1; then
-    if python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); assert isinstance(d,list)' "$f" 2>/dev/null; then return 0; fi
+  elif [ -n "$PY" ]; then
+    if "$PY" -c 'import json,sys; d=json.load(open(sys.argv[1])); assert isinstance(d,list)' "$f" 2>/dev/null; then return 0; fi
     rm -f "$f"; return 1
   fi
   # No validator available — don't risk deleting good data.
