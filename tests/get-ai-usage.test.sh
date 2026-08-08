@@ -241,6 +241,15 @@ check zai-success "turns relative resets into absolute timestamps" '
     and .details.tools.resetAt == 1785007200 and .details.tools.remaining == 60
     and .historyValues == {za: 25}
     and .quotaWindows[0].detail == "250 / 1000 tokens"'
+# Live responses put an absolute millisecond epoch in nextResetTime, not a
+# duration. Adding that to `now` once produced reset dates decades out, which
+# the year-less formatting hid. Both shapes have to survive.
+check zai-absolute-reset "keeps an absolute reset epoch instead of adding it to now" '
+    .ok and .details.token.resetAt == 1785007200
+    and .details.tools.resetAt == 1786000000
+    and ([.quotaWindows[] | select(.key == "zai_tokens_long")] | first | .resetAt) == 1785086400'
+check zai-absolute-reset "resets stay within a plausible horizon of now" '
+    [.quotaWindows[].resetAt] | all(. == 0 or (. > 1785000000 and . < 1785000000 + 60 * 86400))'
 check zai-invalid-token "passes the token error through" '
     (.ok | not) and .error == "Z.AI: Invalid Z.AI token"'
 check zai-missing "reports an unconfigured token" '
