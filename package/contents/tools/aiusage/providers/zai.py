@@ -38,7 +38,12 @@ def get_zai_usage():
     has_expected = limits is not None and any(lim.get("type") in ("TOKENS_LIMIT", "TIME_LIMIT") for lim in limits)
 
     if body.get("success") is True and has_expected:
-        tok = next((lim for lim in limits if lim.get("type") == "TOKENS_LIMIT"), {})
+        # Z.AI exposes multiple TOKENS_LIMIT windows (a short ~5-hour AND a
+        # longer ~weekly one). Upstream took only the first via next() and
+        # silently dropped the second; collect all in API order instead.
+        tok_windows = [lim for lim in limits if lim.get("type") == "TOKENS_LIMIT"]
+        tok = tok_windows[0] if tok_windows else {}
+        tok2 = tok_windows[1] if len(tok_windows) > 1 else {}
         tools = next((lim for lim in limits if lim.get("type") == "TIME_LIMIT"), {})
         return {
             "hasKey": True,
@@ -48,6 +53,8 @@ def get_zai_usage():
             "tokenResetMs": tok.get("nextResetTime"),
             "tokenUsed": tok.get("used") if tok.get("used") is not None else tok.get("usage"),
             "tokenLimit": tok.get("limit") if tok.get("limit") is not None else tok.get("total"),
+            "token2Pct": tok2.get("percentage") or 0,
+            "token2ResetMs": tok2.get("nextResetTime"),
             "toolsPct": tools.get("percentage") or 0,
             "toolsRemaining": tools.get("remaining"),
             "toolsResetMs": tools.get("nextResetTime"),
