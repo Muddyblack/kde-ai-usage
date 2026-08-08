@@ -69,6 +69,7 @@ A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple serv
 - **History export / import** — Save and restore usage history as JSON; history is also mirrored to disk so it survives reinstalls
 - **Stale indicator** — Dims if the last fetch failed, shows error inline
 - **Rate-limit backoff** — Respects `retry-after` headers, won't hammer the API
+- **Terminal frontend** — [`ai-usage-cli`](#terminal) prints the same data as a table, or a single status-bar line with `--compact`, on desktops without Plasma 6 and over SSH
 
 ---
 
@@ -100,7 +101,7 @@ usage before its limit is exhausted. See
 
 | Dependency | Notes |
 |---|---|
-| KDE Plasma 6.0+ | `X-Plasma-API-Minimum-Version: 6.0` |
+| KDE Plasma 6.0+ | `X-Plasma-API-Minimum-Version: 6.0`. Needed for the widget only — the Hyprland shell and the [terminal frontend](#terminal) run without it |
 | `plasma5support` | Provides the `executable` DataEngine for running the backend |
 | Python 3.8+ | Runs the shared provider backend (standard library only, no `pip install`). Auto-detected from PATH as `python3`, a versioned `python3.x`, or bare `python`. To pin a specific interpreter — a virtualenv, a non-standard prefix — set it under **Settings → Advanced → Python**, or export `$PYTHON3`. NixOS installs need no PATH entry at all: the flake pins the interpreter at build time |
 
@@ -208,6 +209,67 @@ settings are stored locally in
 `~/.config/ai-usage-widget/hyprland-settings.json` (or under
 `$XDG_CONFIG_HOME`).
 
+### Terminal
+
+`ai-usage-cli` renders the same provider data as a table, with no Plasma,
+Quickshell or compositor involved. It is the way to use this on a desktop the
+widget cannot be installed on — Plasma 5, GNOME, XFCE — as well as over SSH, in
+a shell prompt, or in a status bar.
+
+```bash
+# From a cloned checkout: put the tools on PATH …
+export PATH="$PWD/package/contents/tools/sh:$PATH"
+
+# … or link just the frontend (it resolves symlinks to find its package)
+ln -s "$PWD/package/contents/tools/sh/ai-usage-cli" ~/.local/bin/ai-usage-cli
+```
+
+```bash
+ai-usage-cli                        # every enabled provider
+ai-usage-cli --provider claude,zai  # a subset, ignoring the toggles
+ai-usage-cli --compact              # one line, for status bars
+watch -n 300 ai-usage-cli           # refresh in place
+get-ai-usage --all | ai-usage-cli   # render an envelope you already fetched
+```
+
+```
+PROVIDER  PLAN          WINDOW             USAGE                NOTE                      RESET
+────────────────────────────────────────────────────────────────────────────────────────────────────────
+Claude    max           5-hour session     [██░░░░░░░░]  23%    120000 / 500000 tokens    Jul 19, 17:00
+Claude    max           7-day window       [██████░░░░]  61%    3000000 / 5000000 tokens  Jul 25, 17:00
+────────────────────────────────────────────────────────────────────────────────────────────────────────
+Z.AI      pro           5-hour tokens      [██░░░░░░░░]  25%    250 / 1000 tokens         Jul 25, 20:20
+Z.AI      pro           Monthly tools      [████░░░░░░]  40%    60 remaining              Jul 25, 21:20
+────────────────────────────────────────────────────────────────────────────────────────────────────────
+Kimi      Moonshot API  Available balance  $49.59
+────────────────────────────────────────────────────────────────────────────────────────────────────────
+Copilot   —             —                  Copilot: no token configured
+```
+
+Colour follows the same thresholds as the panel indicators (amber from 70%, red
+from 90%) and switches off automatically when the output is not a terminal, or
+when `NO_COLOR` is set. `--color always|never` overrides that, and `--ascii`
+replaces the box drawing for terminals without a UTF-8 locale. Columns that stay
+empty — a provider set with no reset times, say — are dropped rather than
+printed blank. A provider that cannot report keeps its row and shows the reason,
+so a missing key does not look like a service you never enabled.
+
+Without a widget there is no settings page to write the config, so create it
+once by hand at `~/.config/ai-usage-widget/hyprland-settings.json` (or under
+`$XDG_CONFIG_HOME`; `AI_USAGE_CONFIG` overrides the path). Providers not listed
+default to on; credentials go in `keys`, and the `WIDGET_*` environment
+variables win over the file if you would rather not store them:
+
+```json
+{
+  "providers": { "claude": true, "zai": true, "kimi": true, "openai": false },
+  "keys": { "zai": "…", "moonshot": "…" }
+}
+```
+
+Claude needs no key — a local Claude Code login is enough. See
+[Supported Services](#supported-services) for what each of the others reads.
+
 ### Package as `.plasmoid`
 
 ```bash
@@ -221,8 +283,9 @@ settings are stored locally in
 
 ### Shared provider backend
 
-Both frontends — the Plasma widget and the Hyprland/Quickshell shell — get every
-provider value from one executable, `package/contents/tools/sh/get-ai-usage`.
+All three frontends — the Plasma widget, the Hyprland/Quickshell shell and the
+terminal frontend — get every provider value from one executable,
+`package/contents/tools/sh/get-ai-usage`.
 It owns credential discovery, provider API requests, response parsing, quota
 maths, reset timestamps and error/stale state, and returns a versioned,
 frontend-neutral JSON model:
@@ -294,8 +357,10 @@ make test
 the backend's `--normalize` mode — success, missing credentials, malformed
 responses, offline and rate-limited states for every provider — and then runs
 the real backend end to end against the fetch tools' fixture hooks. No network
-access is needed. `tests/shared-code.test.js` covers the JavaScript both
-frontends share.
+access is needed. `tests/ai-usage-cli.test.sh` renders those same fixtures
+through the terminal frontend, checking among other things that a provider which
+cannot report still gets a row instead of silently vanishing from the table.
+`tests/shared-code.test.js` covers the JavaScript both QML frontends share.
 
 ---
 

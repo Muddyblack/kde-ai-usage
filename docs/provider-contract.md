@@ -1,8 +1,8 @@
 # Provider data contract (schema version 1)
 
-Both frontends — the KDE Plasma widget (`package/contents/ui`) and the
-Hyprland/Quickshell shell (`hyprland/`) — get all of their provider data from a
-single backend:
+All three frontends — the KDE Plasma widget (`package/contents/ui`), the
+Hyprland/Quickshell shell (`hyprland/`) and the terminal frontend
+(`aiusage/render.py`) — get all of their provider data from a single backend:
 
 ```
 shared provider backend (Python, stdlib only)   package/contents/tools/aiusage
@@ -13,16 +13,16 @@ shared provider backend (Python, stdlib only)   package/contents/tools/aiusage
   package/contents/tools/sh/get-ai-usage
                  │
           stable JSON model
-           ┌─────┴─────┐
-           ▼           ▼
-      KDE Plasma   Quickshell
-          UI            UI
+           ┌─────────┼─────────┐
+           ▼         ▼         ▼
+      KDE Plasma Quickshell terminal
+          UI          UI     aiusage/render.py
    (shared JS: package/contents/code/Format.js, UsageHistory.js)
 ```
 
-Neither frontend performs a provider network request, parses a provider
-response, or computes a quota percentage or reset window. They map the fields
-below onto their own widgets and nothing else.
+No frontend performs a provider network request, parses a provider response, or
+computes a quota percentage or reset window. They map the fields below onto
+their own widgets — or columns — and nothing else.
 
 ## Invoking the backend
 
@@ -32,6 +32,15 @@ get-ai-usage --provider claude,openai     # several (KDE: active tab + pins)
 get-ai-usage --all                        # every enabled provider (Hyprland)
 get-ai-usage --normalize < envelope.json  # replay a raw envelope, no network
 get-ai-usage --list                       # known provider ids
+```
+
+The terminal frontend renders that same model, either fetching it itself or
+reading an envelope on stdin:
+
+```bash
+ai-usage-cli                        # table of every enabled provider
+ai-usage-cli --compact              # one line, for status bars
+get-ai-usage --all | ai-usage-cli   # render a fetched envelope, no second fetch
 ```
 
 `--all` respects the provider toggles in the shared settings file
@@ -217,8 +226,9 @@ hammer them.
 
 ## Shared frontend code
 
-Three things are identical in both frontends and live in
-`package/contents/code/` so they cannot drift:
+Three things are identical in both QML frontends and live in
+`package/contents/code/` so they cannot drift (the terminal frontend keeps no
+history and formats its own countdowns from `resetText`):
 
 - `Format.js` — countdown formatting (`countdown`, `countdownFromEpoch`).
 - `UsageHistory.js` — collecting `historyValues` from a response, merging into
@@ -238,11 +248,16 @@ own fixture hooks (`*_RESPONSE_FILE`, honoured by `fetch_json` in
 `aiusage/http.py`) to check settings toggles, key plumbing and the outer
 envelope.
 
-`tests/shared-code.test.js` covers the shared frontend modules. Run both with
-`make test`.
+`tests/ai-usage-cli.test.sh` renders each of those fixtures through the terminal
+frontend, asserting among other things that a provider which cannot report still
+produces a row — a state the graphical frontends show as a tab or a pill, and
+which a table could silently drop instead.
+
+`tests/shared-code.test.js` covers the shared frontend modules. Run them all
+with `make test`.
 
 ## Changing the contract
 
 Adding a field is backwards compatible. Removing or repurposing one is not:
 bump `SCHEMA_VERSION` in `package/contents/tools/aiusage/contract.py`, update
-this document, and update both frontends in the same change.
+this document, and update all three frontends in the same change.
