@@ -29,7 +29,19 @@ ALL_PROVIDERS="claude antigravity openai kiro mistral openrouter grok zai copilo
 # and history-io. Keep the inline fallback: this script's whole contract is to
 # degrade readably rather than fail opaquely, so a truncated install must not
 # turn into a bare "no such file" from the frontends.
-_SH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Resolve through symlinks first: BASH_SOURCE reports the link, not its target,
+# so a symlink into ~/.local/bin would look for the package next to the link.
+# `readlink -f` is GNU-only, so walk the chain by hand.
+_src="${BASH_SOURCE[0]}"
+while [ -L "$_src" ]; do
+    _link_dir="$(cd "$(dirname "$_src")" && pwd)"
+    _src="$(readlink "$_src")"
+    case "$_src" in
+        /*) ;;
+        *) _src="$_link_dir/$_src" ;;
+    esac
+done
+_SH_DIR="$(cd "$(dirname "$_src")" && pwd)"
 if [ -r "$_SH_DIR/python-interp.sh" ]; then
     . "$_SH_DIR/python-interp.sh"
 else
@@ -95,7 +107,7 @@ fi
 # this script is tools/sh/get-ai-usage). `python3 -m aiusage` resolves the
 # module from cwd or PYTHONPATH, and Plasma's executable DataEngine sets
 # neither, so it must be exported explicitly here.
-PKG_TOOLS="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PKG_TOOLS="$(cd "$_SH_DIR/.." && pwd)"
 export PYTHONPATH="$PKG_TOOLS${PYTHONPATH:+:$PYTHONPATH}"
 
 # -B: never write __pycache__ into the installed plasmoid — `make pack` only
