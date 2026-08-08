@@ -13,12 +13,9 @@ presentation only; see docs/provider-contract.md for the schema.
 
 import json
 import sys
-import time
-from concurrent.futures import ThreadPoolExecutor
 
-from . import config
-from .collect import collect
-from .contract import SCHEMA_VERSION, finalize
+from . import config, envelope
+from .contract import finalize
 from .normalize import normalize
 
 USAGE = """usage: get-ai-usage [--all | --provider <id>[,<id>...] | --normalize]
@@ -72,11 +69,11 @@ def main(argv):
 
     if mode == "normalize":
         try:
-            envelope = json.load(sys.stdin)
+            raw = json.load(sys.stdin)
         except ValueError as e:
             sys.stderr.write(f"get-ai-usage: invalid envelope on stdin: {e}\n")
             return 2
-        _emit(normalize(envelope))
+        _emit(normalize(raw))
         return 0
 
     if not mode:
@@ -93,29 +90,9 @@ def main(argv):
                 return 2
             selected.append(id_)
     else:
-        selected = [id_ for id_ in config.ALL_PROVIDERS if config.provider_enabled(cfg, id_)]
+        selected = envelope.enabled(cfg)
 
-    now = time.time()
-
-    def fetch_one(id_):
-        return normalize(collect(id_, now))
-
-    if selected:
-        with ThreadPoolExecutor(max_workers=len(selected)) as pool:
-            providers = list(pool.map(fetch_one, selected))
-    else:
-        providers = []
-
-    active = ""
-    for p in providers:
-        if p.get("ok") is True:
-            active = p.get("id") or ""
-            break
-    else:
-        if providers:
-            active = providers[0].get("id") or ""
-
-    _emit({"schemaVersion": SCHEMA_VERSION, "updatedAt": int(now), "active": active, "providers": providers})
+    _emit(envelope.build(selected))
     return 0
 
 
