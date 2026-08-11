@@ -70,6 +70,19 @@ check claude-success "prefers semantic limits over legacy windows" '
     and .historyValues == {s: 23, w: 61}'
 check claude-success "formats the session window for the panel" '
     (.quotaWindows[0] | .key == "session" and .available and .detail == "120000 / 500000 tokens")'
+check claude-success "keeps a scoped week out of the account week" '
+    .details.weekly.pct == 61
+    and (.details.scopedWeekly | length) == 1
+    and (.details.scopedWeekly[0] | .pct == 44 and .model == "" and .label == "7-day scoped")'
+check claude-scoped-week "reads the account week and the per-model week apart" '
+    .ok and .details.session.pct == 9 and .details.weekly.pct == 17
+    and (.details.scopedWeekly | length) == 1
+    and (.details.scopedWeekly[0] | .pct == 13 and .model == "Fable"
+         and .key == "weekly_fable" and .label == "7-day Fable"
+         and .resetAt == 1786949999)'
+check claude-scoped-week "shows a scoped week that is not the binding limit" '
+    (.quotaWindows | map(.key)) == ["session", "weekly", "weekly_fable"]
+    and (.quotaWindows[2] | .available and .pct == 13 and .label == "7-day Fable")'
 check claude-success "reports credential presence, not values" '
     .details.hasOAuth == true and .details.hasAdminKey == true
     and .details.subscriptionType == "max" and .details.organizationUuid == "org-1234"'

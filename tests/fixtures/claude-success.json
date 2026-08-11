@@ -22,9 +22,16 @@
         },
         {
           "group": "weekly",
-          "kind": "weekly_scoped",
+          "kind": "weekly_all",
           "is_active": true,
           "percent": 61,
+          "resets_at": "2026-07-25T15:00:00Z"
+        },
+        {
+          "group": "weekly",
+          "kind": "weekly_scoped",
+          "is_active": true,
+          "percent": 44,
           "resets_at": "2026-07-25T15:00:00Z"
         }
       ],
