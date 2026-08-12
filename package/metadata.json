@@ -6,7 +6,7 @@
     "Description": "Multi-service AI quota tracker with cost breakdown (Claude, Antigravity, OpenAI, Grok, Kiro, OpenRouter & Mistral)",
     "Icon": "org.muddyblack.aiUsageWidget",
     "Category": "Utilities",
-    "Version": "2.0.3",
+    "Version": "2.1.0",
     "Website": "https://github.com/Muddyblack/kde-ai-usage",
     "Authors": [
       {
