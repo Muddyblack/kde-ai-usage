@@ -14,10 +14,14 @@
 #
 set -u
 
-# Resolve through symlinks before locating the package: unlike the widget's
-# other tools, this one is meant to be linked into ~/.local/bin, and
-# BASH_SOURCE reports the link rather than its target. `readlink -f` is not
-# portable, so walk the chain by hand.
+# Resolve through symlinks before locating the package: BASH_SOURCE reports the
+# link rather than its target, and this frontend in particular is meant to be
+# linked into ~/.local/bin. `readlink -f` is not portable, so walk the chain by
+# hand.
+#
+# This repeats the loop in get-ai-usage instead of sharing it via
+# python-interp.sh, and has to: resolving the path is precisely what lets a
+# launcher find that sibling file, so the resolution cannot live inside it.
 _src="${BASH_SOURCE[0]}"
 while [ -L "$_src" ]; do
     _link_dir="$(cd "$(dirname "$_src")" && pwd)"
