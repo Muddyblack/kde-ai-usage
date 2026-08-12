@@ -104,6 +104,14 @@
               echo "wrote $out"
             '');
           };
+          cli = {
+            type = "app";
+            program = toString (pkgs.writeShellScript "ai-usage-cli" ''
+              set -eu
+              export PATH=${pkgs.lib.makeBinPath [ pkgs.python3 ]}:"$PATH"
+              exec ${self}/package/contents/tools/sh/ai-usage-cli "$@"
+            '');
+          };
           hyprland = {
             type = "app";
             program = toString (pkgs.writeShellScript "ai-usage-hyprland" ''
