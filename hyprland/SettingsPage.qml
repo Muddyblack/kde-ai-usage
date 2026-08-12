@@ -541,4 +541,65 @@ ColumnLayout {
         interval: 1200
         onTriggered: page.shell.refresh()
     }
+
+    SectionLabel {
+        text: "Terminal"
+    }
+
+    // Read-only path to the shared CLI, resolved at runtime like backendCommand
+    // so it stays correct wherever this is installed.
+    RowLayout {
+        Layout.fillWidth: true
+        spacing: 6
+
+        Text {
+            text: "Command"
+            font.pixelSize: 11
+            color: "#f8fafc"
+            Layout.preferredWidth: 90
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 26
+            radius: 5
+            color: Qt.rgba(1, 1, 1, 0.06)
+            border.width: 1
+            border.color: Qt.rgba(1, 1, 1, 0.12)
+
+            QC.TextField {
+                id: cliPathField
+                anchors.fill: parent
+                anchors.leftMargin: 8
+                anchors.rightMargin: 4
+                readOnly: true
+                text: page.shell.baseDir + "/../package/contents/tools/sh/ai-usage-cli"
+                font.pixelSize: 10
+                color: "#f8fafc"
+                verticalAlignment: TextInput.AlignVCenter
+                background: null
+                selectByMouse: true
+            }
+        }
+
+        SettingsButton {
+            text: "Copy"
+            // QML has no clipboard API without a C++ helper; selecting the
+            // read-only field and copying it is the portable way.
+            onClicked: {
+                cliPathField.selectAll();
+                cliPathField.copy();
+                cliPathField.deselect();
+            }
+        }
+    }
+
+    Text {
+        Layout.fillWidth: true
+        text: "Same data as this popup, as a table in a shell. Link it into ~/.local/bin to run it as ai-usage-cli, or pass --compact for one status-bar line."
+        font.pixelSize: 9
+        opacity: 0.4
+        color: "#f8fafc"
+        wrapMode: Text.WordWrap
+    }
 }
