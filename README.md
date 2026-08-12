@@ -224,6 +224,10 @@ export PATH="$PWD/package/contents/tools/sh:$PATH"
 ln -s "$PWD/package/contents/tools/sh/ai-usage-cli" ~/.local/bin/ai-usage-cli
 ```
 
+If the widget is already installed, its settings page lists the path under
+**Terminal** with a copy button, so the plasmoid directory does not have to be
+hunted down by hand.
+
 ```bash
 ai-usage-cli                        # every enabled provider
 ai-usage-cli --provider claude,zai  # a subset, ignoring the toggles
