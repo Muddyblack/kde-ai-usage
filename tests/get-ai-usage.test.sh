@@ -263,6 +263,26 @@ check zai-absolute-reset "keeps an absolute reset epoch instead of adding it to 
     and ([.quotaWindows[] | select(.key == "zai_tokens_long")] | first | .resetAt) == 1785086400'
 check zai-absolute-reset "resets stay within a plausible horizon of now" '
     [.quotaWindows[].resetAt] | all(. == 0 or (. > 1785000000 and . < 1785000000 + 60 * 86400))'
+# The monitor endpoints report consumption, not a share of a quota, so the
+# row carries a value instead of a meter and is ruled off from the windows.
+check zai-today "reports the service day total beside the quota windows" '
+    .ok and .details.today.available
+    and .details.today.tokens == 41175632 and .details.today.calls == 370
+    and .details.today.date == "2026-08-11"
+    and (.details.today.models | map(.name)) == ["GLM-5.2", "GLM-5-Turbo", "GLM-4.7"]'
+check zai-today "renders the day total as a value, not a meter" '
+    (.quotaWindows | map(.key)) == ["zai_tokens", "zai_tokens_long", "zai_tools", "zai_today"]
+    and (.quotaWindows[3] | .detail == "41.18M tokens" and .note == "370 calls"
+         and (.showMeter | not) and .resetAt == 1786485600)'
+# The reset column shows the date this rolls over TO, so the label has to name
+# the day being summed — otherwise the row reads as being about tomorrow.
+check zai-today "names the day it is summing" '
+    (.quotaWindows[3].label) == "Today (Aug 11)"'
+# A day total that has stopped growing would read as a stuck counter, so the
+# date change is carried rather than left to the reader to work out.
+check zai-success "stays silent about a day total that was not fetched" '
+    (.details.today.available | not)
+    and ([.quotaWindows[] | select(.key == "zai_today")] | length) == 0'
 check zai-invalid-token "passes the token error through" '
     (.ok | not) and .error == "Z.AI: Invalid Z.AI token"'
 check zai-missing "reports an unconfigured token" '
