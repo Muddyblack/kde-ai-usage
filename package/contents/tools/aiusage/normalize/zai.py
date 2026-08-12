@@ -2,6 +2,23 @@ import math
 
 from ..contract import flat_window, jround, monthly_window, num, pct_clamp, provider_base, provider_error
 
+# Anything at or above this, read as a duration, would be more than 31 years —
+# so it is an absolute epoch instead. Live z.ai responses put an absolute
+# millisecond timestamp in `nextResetTime`, despite the field name; treating it
+# as a duration and adding it to `now` produced reset dates in the 2080s, which
+# went unnoticed because the formatted string carries no year.
+_ABSOLUTE_MS_FLOOR = 1000000000000
+
+
+def _reset_at(value, now):
+    """Reset epoch in seconds from a value that may be absolute or relative."""
+    ms = num(value)
+    if ms <= 0:
+        return 0
+    if ms >= _ABSOLUTE_MS_FLOOR:
+        return math.floor(ms / 1000)
+    return math.floor(now + ms / 1000)
+
 
 def normalize_zai(raw):
     now = raw["now"]
@@ -22,9 +39,9 @@ def normalize_zai(raw):
     token_pct = pct_clamp(num(res.get("tokenPct")))
     token2_pct = pct_clamp(num(res.get("token2Pct")))
     tools_pct = pct_clamp(num(res.get("toolsPct")))
-    token_reset = math.floor(now + num(res.get("tokenResetMs")) / 1000) if num(res.get("tokenResetMs")) > 0 else 0
-    token2_reset = math.floor(now + num(res.get("token2ResetMs")) / 1000) if num(res.get("token2ResetMs")) > 0 else 0
-    tools_reset = math.floor(now + num(res.get("toolsResetMs")) / 1000) if num(res.get("toolsResetMs")) > 0 else 0
+    token_reset = _reset_at(res.get("tokenResetMs"), now)
+    token2_reset = _reset_at(res.get("token2ResetMs"), now)
+    tools_reset = _reset_at(res.get("toolsResetMs"), now)
     token_detail = (
         f"{num(res.get('tokenUsed'))} / {num(res.get('tokenLimit'))} tokens"
         if res.get("tokenUsed") is not None and res.get("tokenLimit") is not None
