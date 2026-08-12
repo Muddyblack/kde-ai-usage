@@ -1,0 +1,58 @@
+{
+  "id": "zai",
+  "now": 1786440000,
+  "inputs": {
+    "usage": {
+      "hasKey": true,
+      "keyValid": true,
+      "level": "pro",
+      "tokenPct": 48,
+      "tokenResetMs": 1786472953562,
+      "token2Pct": 17,
+      "token2ResetMs": 1786912954987,
+      "toolsPct": 0,
+      "toolsRemaining": 1000,
+      "toolsResetMs": 1787344954972,
+      "models": [
+        {
+          "modelCode": "search-prime",
+          "usage": 0
+        },
+        {
+          "modelCode": "web-reader",
+          "usage": 0
+        },
+        {
+          "modelCode": "zread",
+          "usage": 0
+        }
+      ],
+      "today": {
+        "date": "2026-08-11",
+        "rollsOverAt": 1786485600,
+        "tokens": 41175632,
+        "calls": 370,
+        "models": [
+          {
+            "name": "GLM-5.2",
+            "tokens": 36114679
+          },
+          {
+            "name": "GLM-5-Turbo",
+            "tokens": 5058547
+          },
+          {
+            "name": "GLM-4.7",
+            "tokens": 2406
+          }
+        ],
+        "tools": {
+          "search": 0,
+          "reader": 0,
+          "zread": 0
+        }
+      }
+    },
+    "status": null
+  }
+}

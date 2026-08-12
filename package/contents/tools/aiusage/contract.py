@@ -138,8 +138,8 @@ def quota_window(key, label, w, detail):
     }
 
 
-def flat_window(key, label, pct, reset_at, detail, meter):
-    return {
+def flat_window(key, label, pct, reset_at, detail, meter, note=""):
+    w = {
         "key": key,
         "label": label,
         "pct": pct_clamp(pct),
@@ -149,6 +149,12 @@ def flat_window(key, label, pct, reset_at, detail, meter):
         "detail": detail,
         "showMeter": meter,
     }
+    if note:
+        # A meterless row spends `detail` on the value itself, leaving nothing
+        # beside it. `note` is the aside such a row would otherwise have to
+        # cram into the value.
+        w["note"] = note
+    return w
 
 
 def chart_window(id_, key, label, size, gran):

@@ -3,9 +3,90 @@
 Ported from tools/sh/get-zai-usage.
 """
 
+import datetime
 import os
 
 from ..http import as_json, error_json, fetch_json, http_error_json, resolve_key
+
+# The API rejects ISO-8601 with a "T" separator by name, asking for this.
+_TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+
+def _report_day():
+    """Today's date as the API wants it, plus the epoch at which it changes.
+
+    The bounds are the plain local calendar date, deliberately sent without
+    timezone conversion — that is what the vendor's own dashboard does, and
+    matching it is the point of the figure. Verified against a live account:
+    the string "2026-08-11" returned 41,175,632 tokens with a per-model split
+    of 36.11M / 5.06M / 2.41K, which is what the dashboard showed for that day
+    down to the last digit.
+
+    The service applies those bounds on its own clock, which runs ahead of
+    Europe, so the day being summed is shifted by some hours and the total
+    stops growing before local midnight. That shift is the vendor's, not ours;
+    converting it away would produce a number the account holder cannot find
+    anywhere.
+    """
+    today = datetime.date.today()
+    start = datetime.datetime.combine(today, datetime.time(0, 0, 0))
+    end = datetime.datetime.combine(today, datetime.time(23, 59, 59))
+    rolls_over = datetime.datetime.combine(today + datetime.timedelta(days=1), datetime.time(0, 0, 0))
+    return start.strftime(_TIME_FORMAT), end.strftime(_TIME_FORMAT), int(rolls_over.timestamp())
+
+
+def _fetch_window(path, api_key, start, end, fixture_env):
+    """One monitor time-series call. Returns its `data` object, or None."""
+    from urllib.parse import quote
+
+    result = fetch_json(
+        f"https://api.z.ai/api/monitor/usage/{path}?startTime={quote(start)}&endTime={quote(end)}",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Accept": "application/json",
+            "User-Agent": "kde-ai-usage/zai",
+        },
+        timeout=10,
+        fixture_path=os.environ.get(fixture_env),
+    )
+    if result.status != 200:
+        return None
+    body = as_json(result.body)
+    if not isinstance(body, dict) or body.get("success") is not True:
+        return None
+    data = body.get("data")
+    return data if isinstance(data, dict) else None
+
+
+def _today_usage(api_key):
+    """Today's totals, or None. Never raises the caller's failure mode: the
+    quota windows are the point of this provider, and losing an extra
+    statistic must not cost us those."""
+    start, end, rolls_over = _report_day()
+    models = _fetch_window("model-usage", api_key, start, end, "ZAI_MODEL_USAGE_RESPONSE_FILE")
+    tools = _fetch_window("tool-usage", api_key, start, end, "ZAI_TOOL_USAGE_RESPONSE_FILE")
+    if models is None and tools is None:
+        return None
+
+    totals = (models or {}).get("totalUsage") or {}
+    tool_totals = (tools or {}).get("totalUsage") or {}
+    summary = (models or {}).get("modelSummaryList")
+    return {
+        "date": start[:10],
+        "rollsOverAt": rolls_over,
+        "tokens": totals.get("totalTokensUsage"),
+        "calls": totals.get("totalModelCallCount"),
+        "models": [
+            {"name": m.get("modelName") or "", "tokens": m.get("totalTokens")}
+            for m in (summary if isinstance(summary, list) else [])
+            if isinstance(m, dict)
+        ],
+        "tools": {
+            "search": tool_totals.get("totalNetworkSearchCount"),
+            "reader": tool_totals.get("totalWebReadMcpCount"),
+            "zread": tool_totals.get("totalZreadMcpCount"),
+        },
+    }
 
 
 def get_zai_usage():
@@ -59,5 +140,6 @@ def get_zai_usage():
             "toolsRemaining": tools.get("remaining"),
             "toolsResetMs": tools.get("nextResetTime"),
             "models": tools.get("usageDetails") or [],
+            "today": _today_usage(api_key),
         }
     return {"hasKey": True, "keyValid": False, "error": "Z.AI unexpected response"}

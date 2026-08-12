@@ -83,7 +83,7 @@ A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple serv
 | Kiro | Monthly credits, remaining balance, reset date, overage, and inferred plan | Supported |
 | Mistral AI | Key status, available models, and local vibe CLI cost/token statistics | Supported |
 | OpenRouter | Spend, credit limit, usage percentage, and account label | Untested |
-| Z.AI | 5-hour token quota, monthly tools quota, reset countdowns, and model details | Untested |
+| Z.AI | 5-hour token quota, monthly tools quota, reset countdowns, model details, and today's token consumption | Untested |
 | GitHub Copilot | Monthly premium request usage against a configurable quota | Personal billing supported; organization/enterprise billing not yet supported |
 | DeepSeek | Available balance with granted and topped-up breakdown | Untested |
 | Kimi / Moonshot AI | Available balance with voucher and cash breakdown | Untested |
