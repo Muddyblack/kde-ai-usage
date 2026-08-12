@@ -13,14 +13,49 @@ from ..contract import (
 from ..stats import claude_stats
 
 
+def scope_name(scope):
+    # A scoped limit names what it is narrowed to, either a model or a surface.
+    scope = scope if isinstance(scope, dict) else {}
+    model = scope.get("model")
+    model = model if isinstance(model, dict) else {}
+    name = str(model.get("display_name") or "").strip()
+    if name == "":
+        name = str(scope.get("surface") or "").strip()
+    return name
+
+
+def scoped_key(name):
+    slug = "".join(c if c.isalnum() else "_" for c in name.lower()).strip("_")
+    return "weekly_" + slug if slug else "weekly_scoped"
+
+
+def scoped_label(name):
+    # An unnamed scope still gets a row; "scoped" is vague but it is not a lie,
+    # and dropping the row would hide a budget that is being spent.
+    return "7-day " + name if name else "7-day scoped"
+
+
 def claude_windows(u):
     session = unavailable_window()
     weekly = unavailable_window()
+    scoped = []
     for i in u.get("limits") or []:
         group, kind = i.get("group"), i.get("kind")
         if group == "session" or kind == "session":
             session = window_value(i.get("percent"), i.get("resets_at"), i.get("is_active"))
-        if group == "weekly" or kind in ("weekly", "weekly_scoped"):
+        elif kind == "weekly_scoped":
+            # A scoped week is a second, narrower budget running alongside the
+            # all-models week, not a reading of it — Claude Code lists it as its
+            # own "Current week (<model>)" row. Folding it into `weekly` would
+            # report the model's percentage as the account's.
+            #
+            # It is read as active for the same reason the legacy windows below
+            # are: `is_active` marks which limit is currently binding, not
+            # whether the number is real, and a percentage that came back is a
+            # percentage worth showing. An inapplicable limit has no percent and
+            # still falls out as unavailable.
+            scoped.append((scope_name(i.get("scope")), window_value(i.get("percent"), i.get("resets_at"), True)))
+        elif group == "weekly" or kind in ("weekly", "weekly_all"):
             weekly = window_value(i.get("percent"), i.get("resets_at"), i.get("is_active"))
     if not session["available"] and u.get("five_hour") is not None:
         fh = u["five_hour"]
@@ -28,7 +63,7 @@ def claude_windows(u):
     if not weekly["available"] and u.get("seven_day") is not None:
         sd = u["seven_day"]
         weekly = window_value(sd.get("utilization"), sd.get("resets_at"), True)
-    return {"session": session, "weekly": weekly}
+    return {"session": session, "weekly": weekly, "scoped": scoped}
 
 
 def normalize_claude(raw):
@@ -57,6 +92,7 @@ def normalize_claude(raw):
         "organizationUsage": org,
         "stats": stats,
         "status": status,
+        "scopedWeekly": [],
     }
 
     if token == "":
@@ -114,7 +150,7 @@ def normalize_claude(raw):
     r["quotaWindows"] = [
         quota_window("session", "5-hour session", w["session"], s_detail),
         quota_window("weekly", "7-day window", w["weekly"], w_detail),
-    ]
+    ] + [quota_window(scoped_key(name), scoped_label(name), win, "") for name, win in w["scoped"] if win["available"]]
     r["slots"] = [
         {
             "pct": w["session"]["pct"],
@@ -142,6 +178,9 @@ def normalize_claude(raw):
         **base_details,
         "session": {**w["session"], "tokensUsed": s_tokens, "tokenLimit": s_limit},
         "weekly": {**w["weekly"], "tokensUsed": w_tokens, "tokenLimit": w_limit},
+        "scopedWeekly": [
+            {"key": scoped_key(name), "label": scoped_label(name), "model": name, **win} for name, win in w["scoped"] if win["available"]
+        ],
         "extraTokens": extra_tokens,
         "extraUsage": {
             "enabled": extra_usage.get("is_enabled") is True,

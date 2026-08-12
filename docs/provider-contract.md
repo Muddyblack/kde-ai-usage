@@ -156,7 +156,10 @@ needs in order to call the plan endpoints.
 
 **claude** — `hasOAuth`, `hasAdminKey`, `subscriptionType`, `rateLimitTier`,
 `organizationUuid`, `effortLevel`, `autoDream`, `session`/`weekly`
-(`available`, `pct`, `resetAt`, `tokensUsed`, `tokenLimit`), `extraTokens`,
+(`available`, `pct`, `resetAt`, `tokensUsed`, `tokenLimit`), `scopedWeekly`
+(one entry per `weekly_scoped` limit — a narrower week that runs alongside the
+all-models one, such as Fable; `key`, `label`, `model`, `available`, `pct`,
+`resetAt`, and a matching `quotaWindows` row), `extraTokens`,
 `extraUsage` (`enabled`, `limit`, `used`, `pct`, `currency`),
 `organizationUsage` (`models` keyed by model with `input_tokens`,
 `output_tokens`, `cost_usd`, `priced`, plus `totalInputTokens`,
