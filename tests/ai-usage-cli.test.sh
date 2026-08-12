@@ -99,6 +99,10 @@ renders kimi-success     "renders money without a meter"   'Available balance +\
 renders kimi-success     "draws no meter for a balance"    '^Kimi' --color never
 renders_not kimi-success "omits the meter on a balance row" 'Available balance +\[' --color never
 renders openrouter-unlimited "keeps the window note"       'unlimited' --color never
+# The value belongs in the usage column and the call count beside it, so a
+# meterless row keeps its aside instead of cramming both into one cell.
+renders zai-today        "prints the day total as a value" 'Today \(Aug 11\) +41\.18M tokens +370 calls' --color never
+renders_not zai-today    "draws no meter for a day total" 'Today +\[' --color never
 
 # ── Compact mode ────────────────────────────────────────────────────────────
 

@@ -127,6 +127,11 @@ def _provider_rows(p, unicode_ok):
             usage = _cell((detail or "—",))
             note = ""
 
+        # An explicit note wins over the derived one, which is what lets a
+        # meterless row keep an aside after `detail` became the value.
+        if w.get("note"):
+            note = str(w["note"]).strip()
+
         rows.append(
             [
                 _cell((label, "bold")),
