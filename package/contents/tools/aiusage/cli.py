@@ -38,17 +38,20 @@ providers: """ + " ".join(config.ALL_PROVIDERS)
 
 
 def _stdin_envelope_waiting():
-    """True when stdin is a pipe or a redirected file.
+    """True when stdin is a pipe.
 
     Deliberately narrower than "not a tty": under cron, a systemd unit or a
     status bar stdin is typically /dev/null or closed, and treating that as
-    "an envelope is coming" would turn a normal run into a parse error.
+    "an envelope is coming" would turn a normal run into a parse error. A
+    regular file is excluded for the same reason — stdin inherited from an
+    unrelated redirect (`while read …; done < hosts.txt`, systemd's
+    StandardInput=file:) is not an envelope, and eating it breaks the caller.
     """
     try:
         mode = os.fstat(sys.stdin.fileno()).st_mode
     except (OSError, ValueError, AttributeError):
         return False
-    return stat.S_ISFIFO(mode) or stat.S_ISREG(mode)
+    return stat.S_ISFIFO(mode)
 
 
 def _want_color(when, stream):
@@ -133,7 +136,11 @@ def main(argv):
             sys.stderr.write(f"ai-usage-cli: invalid envelope on stdin: {e}\n")
             return 2
         if selected:
-            env = dict(env, providers=[p for p in (env.get("providers") or []) if p.get("id") in selected])
+            kept = [p for p in (env.get("providers") or []) if p.get("id") in selected]
+            # `active` may name a provider the filter just removed; --json would
+            # otherwise emit an envelope that contradicts its own provider list.
+            active = env.get("active") if env.get("active") in {p.get("id") for p in kept} else ""
+            env = dict(env, providers=kept, active=active)
     else:
         cfg = config.load_settings()
         config.apply_widget_env(cfg)
