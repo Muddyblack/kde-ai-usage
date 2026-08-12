@@ -689,4 +689,64 @@ ColumnLayout {
             wrapMode: Text.WordWrap
         }
     }
+
+    // ── Terminal ───────────────────────────────────────────────
+    PlasmaComponents.Label {
+        text: "Terminal"
+        font.bold: true
+        font.pixelSize: 10
+        opacity: 0.5
+        color: Kirigami.Theme.textColor
+    }
+
+    ColumnLayout {
+        Layout.fillWidth: true
+        spacing: 3
+
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 4
+
+            PlasmaComponents.Label {
+                text: "Command"
+                font.pixelSize: 10
+                opacity: 0.6
+                color: Kirigami.Theme.textColor
+                Layout.preferredWidth: 76
+                elide: Text.ElideRight
+            }
+            QQC2.TextField {
+                id: cliPathField
+
+                // Resolved at runtime like every other tool path, so it stays
+                // correct wherever the plasmoid is installed.
+                readOnly: true
+                text: rootItem.scriptDir + "ai-usage-cli"
+                implicitHeight: 26
+                Layout.fillWidth: true
+                font.pixelSize: 10
+            }
+            PlasmaComponents.Button {
+                text: "Copy"
+                icon.name: "edit-copy"
+                implicitHeight: 26
+                font.pixelSize: 10
+                // QML has no clipboard API without a C++ helper; selecting the
+                // read-only field and copying it is the portable way.
+                onClicked: {
+                    cliPathField.selectAll();
+                    cliPathField.copy();
+                    cliPathField.deselect();
+                }
+            }
+        }
+        PlasmaComponents.Label {
+            text: "Same data as this popup, as a table in a shell. Link it into ~/.local/bin to run it as ai-usage-cli, or pass --compact for one status-bar line."
+            font.pixelSize: 9
+            opacity: 0.45
+            color: Kirigami.Theme.textColor
+            Layout.fillWidth: true
+            wrapMode: Text.WordWrap
+        }
+    }
 }
