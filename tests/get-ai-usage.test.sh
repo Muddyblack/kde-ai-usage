@@ -408,6 +408,30 @@ if ! printf '%s' "$defaults" | jq -e '(.providers | length) == 0 and .active == 
     failures=$((failures + 1))
 fi
 
+# ── Credentials from the environment are stripped ───────────────────────────
+# A token pasted into the widget's settings field with a trailing newline is
+# passed straight through as WIDGET_*. urllib rejects such a header value with
+# a ValueError whose message contains the credential, so an unstripped value
+# both breaks the provider and prints the secret in the traceback. Tested here
+# rather than through a provider call: a fixture returns before the header is
+# built, so only resolve_key itself can show the difference.
+# shellcheck source=../package/contents/tools/sh/python-interp.sh
+. "$ROOT/package/contents/tools/sh/python-interp.sh"
+if py_resolve; then
+    checks=$((checks + 1))
+    # $'…' keeps the newline: command substitution would strip it and the case
+    # under test would silently disappear.
+    stripped="$(WIDGET_TEST_KEY=$'secret-value\n' \
+        PYTHONPATH="$ROOT/package/contents/tools" "$PY" -c '
+from aiusage.http import resolve_key
+print(repr(resolve_key("WIDGET_TEST_KEY", "", )))
+')"
+    if [ "$stripped" != "'secret-value'" ]; then
+        printf 'FAIL: a trailing newline must not survive into a credential\n  got: %s\n' "$stripped" >&2
+        failures=$((failures + 1))
+    fi
+fi
+
 if [ "$failures" -ne 0 ]; then
     printf '%d of %d checks failed\n' "$failures" "$checks" >&2
     exit 1

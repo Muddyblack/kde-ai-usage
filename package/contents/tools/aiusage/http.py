@@ -20,10 +20,16 @@ class HttpResult:
 def resolve_key(widget_var, env_var, *files):
     """Credential precedence, identical for every provider: the value the
     widget passed in, then a conventional environment variable, then the
-    first readable config file."""
-    value = os.environ.get(widget_var, "")
+    first readable config file.
+
+    Environment values are stripped like the file ones: a credential pasted
+    with a trailing newline would otherwise reach urllib, which rejects the
+    header with a ValueError — and that exception carries the credential into
+    the traceback, defeating the guarantee that no secret leaves this package.
+    """
+    value = os.environ.get(widget_var, "").strip()
     if not value and env_var:
-        value = os.environ.get(env_var, "")
+        value = os.environ.get(env_var, "").strip()
     if not value:
         for path in files:
             if not path or not os.path.isfile(path):
