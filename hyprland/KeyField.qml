@@ -53,7 +53,11 @@ RowLayout {
                 background: null
                 selectByMouse: true
                 onTextEdited: {
-                    keyRow.shell.setSetting("keys", keyRow.settingKey, text);
+                    // Store trimmed: a pasted key often carries a trailing
+                    // space or newline. The field itself is left alone — this
+                    // fires while typing, and rewriting the text would move the
+                    // cursor mid-edit.
+                    keyRow.shell.setSetting("keys", keyRow.settingKey, String(text).trim());
                     refreshDebounce.restart();
                 }
             }
