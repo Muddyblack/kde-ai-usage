@@ -116,7 +116,7 @@ Enable only the services you use. Each one has its own setup requirement:
 | Kiro | Kiro IDE, signed in at least once |
 | Mistral AI | A Mistral API key; vibe CLI is optional and adds local session statistics |
 | OpenRouter | An OpenRouter API key entered in widget settings |
-| Z.AI | A Z.AI token from widget settings, `$ZAI_TOKEN`, `$Z_AI_API_KEY`, `~/.config/zai/token`, or `~/.zai/token` |
+| Z.AI | A Z.AI token from widget settings, `$ZAI_TOKEN`, `$Z_AI_API_KEY`, `~/.config/zai/token`, `~/.zai/token`, or the one `glm-acp-agent --setup` already stored |
 | GitHub Copilot | A GitHub token from widget settings, `$GITHUB_TOKEN`, or `~/.config/github-copilot/token`, with fine-grained **Plan: read** permission; personal billing only. The quota defaults to 300 and is configurable |
 | DeepSeek | A DeepSeek API key from widget settings, `$DEEPSEEK_API_KEY`, or `~/.config/deepseek/api-key` |
 | Kimi / Moonshot AI | A Moonshot API key from widget settings, `$MOONSHOT_API_KEY`, `$KIMI_API_KEY`, or `~/.config/moonshot/api-key` |

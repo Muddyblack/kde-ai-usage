@@ -58,7 +58,10 @@ variables, then the first readable config file. Where a vendor documents a diffe
 variable name than the one this package grew up with, both are accepted —
 `Z_AI_API_KEY` alongside `ZAI_TOKEN`, `KIMI_API_KEY` alongside `MOONSHOT_API_KEY` —
 because a provider that knows only one spelling reports "no token configured" at
-somebody who did set the key. `tests/credentials.test.sh` pins the order.
+somebody who did set the key. Two providers additionally borrow the credential another tool already stores
+(`~/.config/glm-acp-agent/credentials.json` for Z.AI, `~/.vibe/config.toml` for
+Mistral); a borrowed key always ranks last, so an explicit one wins.
+`tests/credentials.test.sh` pins the order.
 
 ## Envelope
 
