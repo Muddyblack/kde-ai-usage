@@ -70,6 +70,26 @@ ZAI_TOKEN=from-native-env Z_AI_API_KEY=from-vendor-env \
     expect "prefers this tool's own ZAI_TOKEN over the vendor spelling" \
     "from-native-env" "zai:_zai_key"
 
+# glm-acp-agent --setup is where a lot of people paste the coding-plan key.
+fresh_home
+mkdir -p "$tmp/home/.config/glm-acp-agent"
+printf '{"z_ai_api_key": "from-acp-agent"}\n' >"$tmp/home/.config/glm-acp-agent/credentials.json"
+expect "reads the glm-acp-agent credentials file" "from-acp-agent" "zai:_zai_key"
+
+mkdir -p "$tmp/home/.config/zai"
+printf 'from-config-file\n' >"$tmp/home/.config/zai/token"
+expect "an explicit token still beats the borrowed one" "from-config-file" "zai:_zai_key"
+
+fresh_home
+mkdir -p "$tmp/home/.config/glm-acp-agent"
+printf 'not json at all\n' >"$tmp/home/.config/glm-acp-agent/credentials.json"
+expect "a corrupt credentials file is empty, not an exception" "" "zai:_zai_key"
+
+fresh_home
+mkdir -p "$tmp/home/.config/glm-acp-agent"
+printf '{"z_ai_api_key": null}\n' >"$tmp/home/.config/glm-acp-agent/credentials.json"
+expect "a null key is treated as absent" "" "zai:_zai_key"
+
 # ── Moonshot / Kimi ─────────────────────────────────────────────────────────
 
 fresh_home
