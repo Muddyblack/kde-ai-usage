@@ -52,6 +52,14 @@ API keys come from `WIDGET_*` environment variables (what Plasma passes) or from
 the `keys` object of the settings file (what the Hyprland settings page writes).
 The environment always wins.
 
+Beyond that, each provider searches the places its vendor's own tooling uses, in a
+fixed order: the `WIDGET_*` variable, then one or more conventional environment
+variables, then the first readable config file. Where a vendor documents a different
+variable name than the one this package grew up with, both are accepted —
+`Z_AI_API_KEY` alongside `ZAI_TOKEN`, `KIMI_API_KEY` alongside `MOONSHOT_API_KEY` —
+because a provider that knows only one spelling reports "no token configured" at
+somebody who did set the key. `tests/credentials.test.sh` pins the order.
+
 ## Envelope
 
 ```json

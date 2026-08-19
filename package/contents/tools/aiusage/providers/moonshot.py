@@ -14,16 +14,21 @@ def _number(value):
         return 0
 
 
+def _moonshot_key():
+    """Both spellings of the variable, then the conventional files. Kept as a
+    named function so the credential tests exercise the same order production
+    does instead of restating it."""
+    return resolve_key(
+        "WIDGET_MOONSHOT_API_KEY",
+        ("MOONSHOT_API_KEY", "KIMI_API_KEY"),
+        os.path.expanduser("~/.config/moonshot/api-key"),
+        os.path.expanduser("~/.moonshot/api-key"),
+        os.path.expanduser("~/.config/kimi/api-key"),
+    )
+
+
 def get_moonshot_balance():
-    api_key = os.environ.get("WIDGET_MOONSHOT_API_KEY") or os.environ.get("MOONSHOT_API_KEY") or os.environ.get("KIMI_API_KEY") or ""
-    if not api_key:
-        api_key = resolve_key(
-            "",
-            "",
-            os.path.expanduser("~/.config/moonshot/api-key"),
-            os.path.expanduser("~/.moonshot/api-key"),
-            os.path.expanduser("~/.config/kimi/api-key"),
-        )
+    api_key = _moonshot_key()
     if not api_key:
         return {}
 

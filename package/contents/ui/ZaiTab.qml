@@ -78,7 +78,7 @@ ColumnLayout {
         }
 
         PlasmaComponents.Label {
-            text: "Set a Z.AI token in settings or via\n$ZAI_TOKEN / ~/.config/zai/token"
+            text: "Set a Z.AI token in settings or via\n$ZAI_TOKEN / $Z_AI_API_KEY / ~/.config/zai/token"
             font.pixelSize: 10
             opacity: 0.5
             color: Kirigami.Theme.textColor

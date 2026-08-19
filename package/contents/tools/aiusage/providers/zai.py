@@ -89,8 +89,19 @@ def _today_usage(api_key):
     }
 
 
+def _zai_key():
+    """The credential search, as one callable so the tests exercise the same
+    order production does instead of restating it."""
+    return resolve_key(
+        "WIDGET_ZAI_TOKEN",
+        ("ZAI_TOKEN", "Z_AI_API_KEY"),
+        os.path.expanduser("~/.config/zai/token"),
+        os.path.expanduser("~/.zai/token"),
+    )
+
+
 def get_zai_usage():
-    api_key = resolve_key("WIDGET_ZAI_TOKEN", "ZAI_TOKEN", os.path.expanduser("~/.config/zai/token"))
+    api_key = _zai_key()
     if not api_key:
         return {}
 
