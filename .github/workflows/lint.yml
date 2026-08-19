@@ -45,6 +45,9 @@ jobs:
       - name: terminal frontend tests
         run: ./tests/ai-usage-cli.test.sh
 
+      - name: credential discovery tests
+        run: ./tests/credentials.test.sh
+
       - name: codex helper tests
         run: |
           ./tests/get-codex-stats.test.sh
