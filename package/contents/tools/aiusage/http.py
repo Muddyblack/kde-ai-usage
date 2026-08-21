@@ -37,8 +37,10 @@ def resolve_key(widget_var, env_var, *files):
     knows only one of them reports "no token configured" at a user who did
     set the key, which is the least debuggable failure we can produce.
     """
+
     def _clean(s):
         return s.translate(str.maketrans("", "", "\n\r ")).strip()
+
     value = _clean(os.environ.get(widget_var, "")) if widget_var else ""
     if not value and env_var:
         names = (env_var,) if isinstance(env_var, str) else env_var
