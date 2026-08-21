@@ -60,6 +60,14 @@ RowLayout {
                     keyRow.shell.setSetting("keys", keyRow.settingKey, String(text).trim());
                     refreshDebounce.restart();
                 }
+                onEditingFinished: {
+                    // Once typing has settled, rewrite the visible text too, so
+                    // what is shown matches what was stored — the same guarantee
+                    // KeyRow.qml (the Plasma frontend) gives on blur.
+                    var val = String(text).trim();
+                    if (val !== text)
+                        text = val;
+                }
             }
 
             Text {

@@ -22,21 +22,25 @@ def resolve_key(widget_var, env_var, *files):
     widget passed in, then a conventional environment variable, then the
     first readable config file.
 
-    Environment values are stripped like the file ones: a credential pasted
-    with a trailing newline would otherwise reach urllib, which rejects the
-    header with a ValueError — and that exception carries the credential into
-    the traceback, defeating the guarantee that no secret leaves this package.
+    Every source is cleaned the same way: strip the surrounding whitespace,
+    then drop any \n, \r or space left embedded in the middle. A credential
+    pasted with a trailing newline would otherwise reach urllib, which
+    rejects the header with a ValueError — and that exception carries the
+    credential into the traceback, defeating the guarantee that no secret
+    leaves this package. This only covers whitespace/CR/LF; a credential
+    containing other control characters would still reach urllib as-is.
     """
-    value = os.environ.get(widget_var, "").strip()
+    _clean = lambda s: s.translate(str.maketrans("", "", "\n\r ")).strip()
+    value = _clean(os.environ.get(widget_var, ""))
     if not value and env_var:
-        value = os.environ.get(env_var, "").strip()
+        value = _clean(os.environ.get(env_var, ""))
     if not value:
         for path in files:
             if not path or not os.path.isfile(path):
                 continue
             try:
                 with open(path) as f:
-                    value = f.read().translate(str.maketrans("", "", "\n\r ")).strip()
+                    value = _clean(f.read())
             except OSError:
                 value = ""
             if value:
