@@ -54,24 +54,33 @@ RowLayout {
             return "";
         }
         onEditingFinished: {
+            // A key is pasted, never typed, and a paste out of a browser or a
+            // password manager often carries a trailing space or newline. Trim
+            // once here, the same way the Python interpreter field does, so the
+            // stored value is the one the user meant — and write it back to the
+            // field, so what is shown is what was saved.
+            var val = String(text).trim();
+            if (val !== text)
+                text = val;
+
             if (kr.configKey === "claudeAdminApiKey")
-                Plasmoid.configuration.claudeAdminApiKey = text;
+                Plasmoid.configuration.claudeAdminApiKey = val;
             if (kr.configKey === "openaiApiKey")
-                Plasmoid.configuration.openaiApiKey = text;
+                Plasmoid.configuration.openaiApiKey = val;
             if (kr.configKey === "mistralApiKey")
-                Plasmoid.configuration.mistralApiKey = text;
+                Plasmoid.configuration.mistralApiKey = val;
             if (kr.configKey === "openrouterApiKey")
-                Plasmoid.configuration.openrouterApiKey = text;
+                Plasmoid.configuration.openrouterApiKey = val;
             if (kr.configKey === "grokApiKey")
-                Plasmoid.configuration.grokApiKey = text;
+                Plasmoid.configuration.grokApiKey = val;
             if (kr.configKey === "zaiToken")
-                Plasmoid.configuration.zaiToken = text;
+                Plasmoid.configuration.zaiToken = val;
             if (kr.configKey === "githubToken")
-                Plasmoid.configuration.githubToken = text;
+                Plasmoid.configuration.githubToken = val;
             if (kr.configKey === "deepseekApiKey")
-                Plasmoid.configuration.deepseekApiKey = text;
+                Plasmoid.configuration.deepseekApiKey = val;
             if (kr.configKey === "moonshotApiKey")
-                Plasmoid.configuration.moonshotApiKey = text;
+                Plasmoid.configuration.moonshotApiKey = val;
         }
     }
     QQC2.ToolButton {
