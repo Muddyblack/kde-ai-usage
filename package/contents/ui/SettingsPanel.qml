@@ -110,55 +110,10 @@ ColumnLayout {
                 }
                 QQC2.Switch {
                     implicitHeight: 20
-                    checked: {
-                        if (modelData.id === "claude")
-                            return Plasmoid.configuration.claudeEnabled;
-                        if (modelData.id === "antigravity")
-                            return Plasmoid.configuration.antigravityEnabled;
-                        if (modelData.id === "openai")
-                            return Plasmoid.configuration.openaiEnabled;
-                        if (modelData.id === "kiro")
-                            return Plasmoid.configuration.kiroEnabled;
-                        if (modelData.id === "mistral")
-                            return Plasmoid.configuration.mistralEnabled;
-                        if (modelData.id === "openrouter")
-                            return Plasmoid.configuration.openrouterEnabled;
-                        if (modelData.id === "grok")
-                            return Plasmoid.configuration.grokEnabled;
-                        if (modelData.id === "zai")
-                            return Plasmoid.configuration.zaiEnabled;
-                        if (modelData.id === "copilot")
-                            return Plasmoid.configuration.copilotEnabled;
-                        if (modelData.id === "deepseek")
-                            return Plasmoid.configuration.deepseekEnabled;
-                        if (modelData.id === "kimi")
-                            return Plasmoid.configuration.kimiEnabled;
-                        return false;
-                    }
-                    onToggled: {
-                        if (modelData.id === "claude")
-                            Plasmoid.configuration.claudeEnabled = checked;
-                        if (modelData.id === "antigravity")
-                            Plasmoid.configuration.antigravityEnabled = checked;
-                        if (modelData.id === "openai")
-                            Plasmoid.configuration.openaiEnabled = checked;
-                        if (modelData.id === "kiro")
-                            Plasmoid.configuration.kiroEnabled = checked;
-                        if (modelData.id === "mistral")
-                            Plasmoid.configuration.mistralEnabled = checked;
-                        if (modelData.id === "openrouter")
-                            Plasmoid.configuration.openrouterEnabled = checked;
-                        if (modelData.id === "grok")
-                            Plasmoid.configuration.grokEnabled = checked;
-                        if (modelData.id === "zai")
-                            Plasmoid.configuration.zaiEnabled = checked;
-                        if (modelData.id === "copilot")
-                            Plasmoid.configuration.copilotEnabled = checked;
-                        if (modelData.id === "deepseek")
-                            Plasmoid.configuration.deepseekEnabled = checked;
-                        if (modelData.id === "kimi")
-                            Plasmoid.configuration.kimiEnabled = checked;
-                    }
+                    // Config key follows a fixed "<id>Enabled" convention for every
+                    // provider, so it can be looked up rather than enumerated.
+                    checked: Plasmoid.configuration[modelData.id + "Enabled"] || false
+                    onToggled: Plasmoid.configuration[modelData.id + "Enabled"] = checked
                 }
             }
         }
