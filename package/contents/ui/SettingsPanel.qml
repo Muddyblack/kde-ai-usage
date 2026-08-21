@@ -30,71 +30,12 @@ ColumnLayout {
         rowSpacing: 2
 
         Repeater {
-            model: [
-                {
-                    id: "claude",
-                    label: "Claude",
-                    color: "#cc785c"
-                },
-                {
-                    id: "antigravity",
-                    label: "Antigravity",
-                    color: "#4285f4"
-                },
-                {
-                    id: "openai",
-                    label: "OpenAI",
-                    color: "#10a37f"
-                },
-                {
-                    id: "kiro",
-                    label: "Kiro",
-                    color: "#8b5cf6"
-                },
-                {
-                    id: "mistral",
-                    label: "Mistral",
-                    color: "#ff7000"
-                },
-                {
-                    id: "openrouter",
-                    label: "OpenRouter",
-                    color: "#9333ea"
-                },
-                {
-                    id: "grok",
-                    label: "Grok",
-                    color: "#e6e6e6"
-                },
-                {
-                    id: "zai",
-                    label: "Z.AI",
-                    color: "#126ef4"
-                },
-                {
-                    id: "copilot",
-                    label: "Copilot",
-                    color: "#8b5cf6"
-                },
-                {
-                    id: "deepseek",
-                    label: "DeepSeek",
-                    color: "#4f8cff"
-                },
-                {
-                    id: "kimi",
-                    label: "Kimi",
-                    color: "#1e3a8a"
-                },
-                {
-                    id: "__spacer",
-                    label: "",
-                    color: "transparent"
-                }
-            ]
+            // Labels and brand colours come from the provider registry in
+            // main.qml rather than being restated here, so a colour change
+            // cannot leave this dot disagreeing with the tab it represents.
+            model: rootItem.providers
             RowLayout {
                 spacing: 6
-                visible: modelData.id !== "__spacer"
                 Rectangle {
                     width: 7
                     height: 7
