@@ -7,6 +7,7 @@ import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.plasma5support as Plasma5Support
 import org.kde.plasma.plasmoid
 import "../code/Format.js" as Format
+import "../code/Shell.js" as Shell
 import "../code/UsageHistory.js" as UsageHistory
 
 PlasmoidItem {
@@ -482,7 +483,7 @@ PlasmoidItem {
     property int pollIntervalSec: Plasmoid.configuration.pollIntervalSec || 300
 
     function shellQuote(s) {
-        return "'" + String(s).replace(/'/g, "'\\''") + "'";
+        return Shell.quote(s);
     }
 
     function scriptPath(name) {
@@ -1049,34 +1050,17 @@ PlasmoidItem {
         };
     }
 
-    // Qt.btoa(string) is deprecated and encodes latin1, which mangles non-ASCII;
-    // encode UTF-8 bytes ourselves and use the array-like overload.
+    // Encoding lives in code/Shell.js so it can be unit-tested outside a QML
+    // engine (tests/shared-code.test.js) — the widget-config keys used to reach
+    // the backend mangled, and nothing here could catch it.
     function base64(text) {
-        var s = String(text);
-        var bytes = [];
-        for (var i = 0; i < s.length; ++i) {
-            var c = s.charCodeAt(i);
-            if (c < 0x80) {
-                bytes.push(c);
-            } else if (c < 0x800) {
-                bytes.push(0xC0 | (c >> 6), 0x80 | (c & 0x3F));
-            } else if (c >= 0xD800 && c <= 0xDBFF && i + 1 < s.length) {
-                var cp = 0x10000 + ((c & 0x3FF) << 10) + (s.charCodeAt(++i) & 0x3FF);
-                bytes.push(0xF0 | (cp >> 18), 0x80 | ((cp >> 12) & 0x3F), 0x80 | ((cp >> 6) & 0x3F), 0x80 | (cp & 0x3F));
-            } else {
-                bytes.push(0xE0 | (c >> 12), 0x80 | ((c >> 6) & 0x3F), 0x80 | (c & 0x3F));
-            }
-        }
-        return Qt.btoa(new Uint8Array(bytes));
+        return Shell.base64(text);
     }
 
     // base64-encode secrets so shell metacharacters in them can't break out of
     // the command string (decoded back in the env assignment).
     function envAssign(name, value) {
-        if (!value)
-            return "";
-
-        return name + "=\"$(printf %s '" + root.base64(value) + "' | base64 -d)\" ";
+        return Shell.envAssign(name, value);
     }
 
     // All three shell tools resolve their interpreter through

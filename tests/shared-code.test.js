@@ -2,6 +2,8 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const Format = require("../package/contents/code/Format.js");
 const UsageHistory = require("../package/contents/code/UsageHistory.js");
+const Shell = require("../package/contents/code/Shell.js");
+const { execFileSync } = require("node:child_process");
 
 // Both frontends import these modules, so a change here shows up in the Plasma
 // popup and the Quickshell panel at once. Provider parsing and the chart-range
@@ -103,4 +105,63 @@ test("leaves a series alone when the window never resets", () => {
     const series = [{ t: 1, v: 1 }, { t: 2, v: 2 }];
     assert.equal(UsageHistory.withResets(series, 0, 0, 0, 10), series);
     assert.equal(UsageHistory.withResets(series, 5, 0, 0, 10), series);
+});
+
+// ── Shell.js ────────────────────────────────────────────────────────────────
+// The Plasma widget hands the backend its configured API keys as environment
+// assignments in a /bin/sh command line, base64-encoded so metacharacters in a
+// key cannot break out of it. Encoding this wrong does not fail loudly — the
+// backend receives a well-formed but wrong credential and the provider answers
+// with an auth error, which is issue #16: keys pasted into the widget's own
+// settings fields were encoded as the *stringified* byte array ("119,105,...")
+// and every provider rejected them, while the same key worked from $ENV.
+
+test("encodes ASCII bytes the way `base64 -d` reads them back", () => {
+    assert.equal(Shell.base64(""), "");
+    assert.equal(Shell.base64("a"), "YQ==");
+    assert.equal(Shell.base64("ab"), "YWI=");
+    assert.equal(Shell.base64("abc"), "YWJj");
+    const key = "5c8f2e1b4d3a4b7e9c2f1a2b3c4d5e6f.AbCdEfGhIjKlMnOp";
+    assert.equal(Shell.base64(key), Buffer.from(key, "utf8").toString("base64"));
+});
+
+test("encodes UTF-8, including characters outside the BMP", () => {
+    for (const text of ["clé-ünïcode-ñ", "密钥", "key 🔑 end", "\u{1F600}\u{1F680}"])
+        assert.equal(Shell.base64(text), Buffer.from(text, "utf8").toString("base64"));
+});
+
+test("never emits invalid UTF-8 for an unpaired surrogate", () => {
+    for (const text of ["\uD800", "x\uDC00y"])
+        assert.equal(Shell.base64(text), Buffer.from(text, "utf8").toString("base64"));
+});
+
+test("builds no assignment for an empty value", () => {
+    assert.equal(Shell.envAssign("WIDGET_ZAI_TOKEN", ""), "");
+    assert.equal(Shell.envAssign("WIDGET_ZAI_TOKEN", null), "");
+    assert.equal(Shell.envAssign("WIDGET_ZAI_TOKEN", undefined), "");
+});
+
+test("delivers the value byte-for-byte through a real shell", () => {
+    // The end-to-end claim of the round-trip: whatever the user pasted is what
+    // the backend's environment holds. Run through /bin/sh, the interpreter
+    // Plasma's executable DataEngine uses, rather than trusting the encoder.
+    const values = [
+        "5c8f2e1b4d3a4b7e9c2f1a2b3c4d5e6f.AbCdEfGhIjKlMnOp",
+        "sk-proj_a-b_c.d~e",
+        "spaces and $HOME and `backticks` and \"quotes\" and 'single'",
+        "semi;colon | pipe && amp > redirect",
+        "clé-🔑-密钥"
+    ];
+    for (const value of values) {
+        // Read it back from a *child* process: an assignment prefix lands in
+        // the launched command's environment, which is exactly where the
+        // Python backend reads it from — os.environ, not the parent shell.
+        const cmd = Shell.envAssign("WIDGET_TEST_KEY", value) + '/bin/sh -c \'printf %s "$WIDGET_TEST_KEY"\'';
+        assert.equal(execFileSync("/bin/sh", ["-c", cmd], { encoding: "utf8" }), value);
+    }
+});
+
+test("quotes a path for the shell without losing a quote", () => {
+    const cmd = "printf %s " + Shell.quote("/home/u/it's a dir/get-ai-usage");
+    assert.equal(execFileSync("/bin/sh", ["-c", cmd], { encoding: "utf8" }), "/home/u/it's a dir/get-ai-usage");
 });
