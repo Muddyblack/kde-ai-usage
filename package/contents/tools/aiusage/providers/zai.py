@@ -89,8 +89,44 @@ def _today_usage(api_key):
     }
 
 
+def _glm_acp_key():
+    """The key `glm-acp-agent --setup` stores, read as a last resort.
+
+    That ACP agent (used from Zed and other ACP clients) talks to the same
+    Z.AI coding plan with the same key, and its setup command is where a lot
+    of people paste it. Without this, a machine can hold a perfectly valid
+    credential while this provider still reports "no token configured" —
+    which is what happened to me. Same courtesy `_vibe_key` extends to
+    Mistral, and it ranks last so an explicit token always wins.
+    """
+    path = os.path.expanduser("~/.config/glm-acp-agent/credentials.json")
+    if not os.path.isfile(path):
+        return ""
+    try:
+        with open(path, errors="replace") as f:
+            data = as_json(f.read())
+    except OSError:
+        return ""
+    key = data.get("z_ai_api_key") if isinstance(data, dict) else None
+    return key.strip() if isinstance(key, str) else ""
+
+
+def _zai_key():
+    """The credential search, as one callable so the tests exercise the same
+    order production does instead of restating it."""
+    return (
+        resolve_key(
+            "WIDGET_ZAI_TOKEN",
+            ("ZAI_TOKEN", "Z_AI_API_KEY"),
+            os.path.expanduser("~/.config/zai/token"),
+            os.path.expanduser("~/.zai/token"),
+        )
+        or _glm_acp_key()
+    )
+
+
 def get_zai_usage():
-    api_key = resolve_key("WIDGET_ZAI_TOKEN", "ZAI_TOKEN", os.path.expanduser("~/.config/zai/token"))
+    api_key = _zai_key()
     if not api_key:
         return {}
 

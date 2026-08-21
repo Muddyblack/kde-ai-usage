@@ -22,52 +22,14 @@ PlasmoidItem {
     // ── Script directory ──────────────────────────────────────────────────────
     readonly property string scriptDir: Qt.resolvedUrl("../tools/sh/").toString().replace("file://", "")
     // ── Settings: which tabs are enabled (persisted via Plasmoid.configuration) ─
-    property bool claudeEnabled: Plasmoid.configuration.claudeEnabled
-    property bool antigravityEnabled: Plasmoid.configuration.antigravityEnabled
-    property bool openaiEnabled: Plasmoid.configuration.openaiEnabled
-    property bool kiroEnabled: Plasmoid.configuration.kiroEnabled
-    property bool mistralEnabled: Plasmoid.configuration.mistralEnabled
-    property bool openrouterEnabled: Plasmoid.configuration.openrouterEnabled
-    property bool grokEnabled: Plasmoid.configuration.grokEnabled
-    property bool zaiEnabled: Plasmoid.configuration.zaiEnabled
-    property bool copilotEnabled: Plasmoid.configuration.copilotEnabled
-    property bool deepseekEnabled: Plasmoid.configuration.deepseekEnabled
-    property bool kimiEnabled: Plasmoid.configuration.kimiEnabled
-    // Computed list of enabled tab IDs in display order
+    // Computed list of enabled tab IDs, in the registry's display order.
     property var enabledTabs: {
         var t = [];
-        if (root.claudeEnabled)
-            t.push("claude");
-
-        if (root.antigravityEnabled)
-            t.push("antigravity");
-
-        if (root.openaiEnabled)
-            t.push("openai");
-
-        if (root.kiroEnabled)
-            t.push("kiro");
-
-        if (root.mistralEnabled)
-            t.push("mistral");
-
-        if (root.openrouterEnabled)
-            t.push("openrouter");
-
-        if (root.grokEnabled)
-            t.push("grok");
-
-        if (root.zaiEnabled)
-            t.push("zai");
-
-        if (root.copilotEnabled)
-            t.push("copilot");
-
-        if (root.deepseekEnabled)
-            t.push("deepseek");
-        if (root.kimiEnabled)
-            t.push("kimi");
-
+        for (var i = 0; i < root.providers.length; i++) {
+            var p = root.providers[i];
+            if (Plasmoid.configuration[p.id + "Enabled"])
+                t.push(p.id);
+        }
         return t;
     }
     property int activeTab: 0
@@ -430,6 +392,90 @@ PlasmoidItem {
     readonly property color weeklyColor: "#f5a623"
     readonly property color warningColor: "#ffa64d"
     readonly property color dangerColor: "#ff4d4d"
+    // ── Provider registry ─────────────────────────────────────────────────────
+    // The single source of truth for every provider the widget knows about, in
+    // display order. tabName/tabColor/tabIcon/enabledTabs and the settings
+    // panel's service toggles all derive from this list, so adding a provider
+    // is one row here instead of edits to four parallel if-chains that could
+    // drift apart. Enabled state lives in Plasmoid.configuration under a fixed
+    // "<id>Enabled" key. Icon filenames are listed rather than derived: the
+    // "-color" suffix is inconsistent upstream artwork, not a convention.
+    readonly property var providers: [
+        {
+            id: "claude",
+            label: "Claude",
+            color: root.claudeOrange,
+            icon: "claude-color.svg"
+        },
+        {
+            id: "antigravity",
+            label: "Antigravity",
+            color: root.googleBlue,
+            icon: "antigravity-color.svg"
+        },
+        {
+            id: "openai",
+            label: "OpenAI",
+            color: root.openaiGreen,
+            icon: "openai.svg"
+        },
+        {
+            id: "kiro",
+            label: "Kiro",
+            color: root.kiroPurple,
+            icon: "kiro.svg"
+        },
+        {
+            id: "mistral",
+            label: "Mistral",
+            color: root.mistralOrange,
+            icon: "mistral-color.svg"
+        },
+        {
+            id: "openrouter",
+            label: "OpenRouter",
+            color: root.openrouterPurple,
+            icon: "openrouter.svg"
+        },
+        {
+            id: "grok",
+            label: "Grok",
+            color: root.grokWhite,
+            icon: "grok.svg"
+        },
+        {
+            id: "zai",
+            label: "Z.AI",
+            color: root.zaiBlue,
+            icon: "zai.svg"
+        },
+        {
+            id: "copilot",
+            label: "Copilot",
+            color: root.copilotPurple,
+            icon: "copilot-color.svg"
+        },
+        {
+            id: "deepseek",
+            label: "DeepSeek",
+            color: root.deepseekBlue,
+            icon: "deepseek-color.svg"
+        },
+        {
+            id: "kimi",
+            label: "Kimi",
+            color: root.kimiBlue,
+            icon: "kimi.svg"
+        }
+    ]
+
+    function providerById(tabId) {
+        for (var i = 0; i < root.providers.length; i++) {
+            if (root.providers[i].id === tabId)
+                return root.providers[i];
+        }
+        return null;
+    }
     // ── Accent (theme-aware) ────────────────────────────────────────────────────
     property bool useThemeAccent: Plasmoid.configuration.useThemeAccent
     // Accent for the currently active tab
@@ -697,75 +743,13 @@ PlasmoidItem {
     }
 
     function tabColor(tabId) {
-        if (tabId === "claude")
-            return root.claudeOrange;
-
-        if (tabId === "antigravity")
-            return root.googleBlue;
-
-        if (tabId === "openai")
-            return root.openaiGreen;
-
-        if (tabId === "kiro")
-            return root.kiroPurple;
-
-        if (tabId === "mistral")
-            return root.mistralOrange;
-
-        if (tabId === "openrouter")
-            return root.openrouterPurple;
-
-        if (tabId === "grok")
-            return root.grokWhite;
-
-        if (tabId === "zai")
-            return root.zaiBlue;
-
-        if (tabId === "copilot")
-            return root.copilotPurple;
-
-        if (tabId === "deepseek")
-            return root.deepseekBlue;
-        if (tabId === "kimi")
-            return root.kimiBlue;
-
-        return Kirigami.Theme.textColor;
+        var p = root.providerById(tabId);
+        return p ? p.color : Kirigami.Theme.textColor;
     }
 
     function tabName(tabId) {
-        if (tabId === "claude")
-            return "Claude";
-
-        if (tabId === "antigravity")
-            return "Antigravity";
-
-        if (tabId === "openai")
-            return "OpenAI";
-
-        if (tabId === "kiro")
-            return "Kiro";
-
-        if (tabId === "mistral")
-            return "Mistral";
-
-        if (tabId === "openrouter")
-            return "OpenRouter";
-
-        if (tabId === "grok")
-            return "Grok";
-
-        if (tabId === "zai")
-            return "Z.AI";
-
-        if (tabId === "copilot")
-            return "Copilot";
-
-        if (tabId === "deepseek")
-            return "DeepSeek";
-        if (tabId === "kimi")
-            return "Kimi";
-
-        return tabId;
+        var p = root.providerById(tabId);
+        return p ? p.label : tabId;
     }
 
     function formatMoney(value, currency) {
@@ -785,39 +769,8 @@ PlasmoidItem {
     // Brand logo for a tab, or "" when the provider has no artwork yet (callers
     // fall back to the plain colour dot).
     function tabIcon(tabId) {
-        if (tabId === "claude")
-            return Qt.resolvedUrl("../icons/claude-color.svg");
-
-        if (tabId === "antigravity")
-            return Qt.resolvedUrl("../icons/antigravity-color.svg");
-
-        if (tabId === "openai")
-            return Qt.resolvedUrl("../icons/openai.svg");
-
-        if (tabId === "kiro")
-            return Qt.resolvedUrl("../icons/kiro.svg");
-
-        if (tabId === "mistral")
-            return Qt.resolvedUrl("../icons/mistral-color.svg");
-
-        if (tabId === "openrouter")
-            return Qt.resolvedUrl("../icons/openrouter.svg");
-
-        if (tabId === "grok")
-            return Qt.resolvedUrl("../icons/grok.svg");
-
-        if (tabId === "zai")
-            return Qt.resolvedUrl("../icons/zai.svg");
-
-        if (tabId === "copilot")
-            return Qt.resolvedUrl("../icons/copilot-color.svg");
-
-        if (tabId === "deepseek")
-            return Qt.resolvedUrl("../icons/deepseek-color.svg");
-        if (tabId === "kimi")
-            return Qt.resolvedUrl("../icons/kimi.svg");
-
-        return "";
+        var p = root.providerById(tabId);
+        return p ? Qt.resolvedUrl("../icons/" + p.icon) : "";
     }
 
     function accentFor(tabId) {

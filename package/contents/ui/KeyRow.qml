@@ -32,27 +32,9 @@ RowLayout {
         font.pixelSize: 10
         implicitHeight: 26
         echoMode: krReveal.checked ? TextInput.Normal : TextInput.Password
-        text: {
-            if (kr.configKey === "claudeAdminApiKey")
-                return Plasmoid.configuration.claudeAdminApiKey || "";
-            if (kr.configKey === "openaiApiKey")
-                return Plasmoid.configuration.openaiApiKey || "";
-            if (kr.configKey === "mistralApiKey")
-                return Plasmoid.configuration.mistralApiKey || "";
-            if (kr.configKey === "openrouterApiKey")
-                return Plasmoid.configuration.openrouterApiKey || "";
-            if (kr.configKey === "grokApiKey")
-                return Plasmoid.configuration.grokApiKey || "";
-            if (kr.configKey === "zaiToken")
-                return Plasmoid.configuration.zaiToken || "";
-            if (kr.configKey === "githubToken")
-                return Plasmoid.configuration.githubToken || "";
-            if (kr.configKey === "deepseekApiKey")
-                return Plasmoid.configuration.deepseekApiKey || "";
-            if (kr.configKey === "moonshotApiKey")
-                return Plasmoid.configuration.moonshotApiKey || "";
-            return "";
-        }
+        // Plasmoid.configuration is a QQmlPropertyMap, so it supports bracket
+        // access by key name — no need to enumerate every provider here.
+        text: Plasmoid.configuration[kr.configKey] || ""
         onEditingFinished: {
             // A key is pasted, never typed, and a paste out of a browser or a
             // password manager often carries a trailing space or newline. Trim
@@ -62,25 +44,7 @@ RowLayout {
             var val = String(text).trim();
             if (val !== text)
                 text = val;
-
-            if (kr.configKey === "claudeAdminApiKey")
-                Plasmoid.configuration.claudeAdminApiKey = val;
-            if (kr.configKey === "openaiApiKey")
-                Plasmoid.configuration.openaiApiKey = val;
-            if (kr.configKey === "mistralApiKey")
-                Plasmoid.configuration.mistralApiKey = val;
-            if (kr.configKey === "openrouterApiKey")
-                Plasmoid.configuration.openrouterApiKey = val;
-            if (kr.configKey === "grokApiKey")
-                Plasmoid.configuration.grokApiKey = val;
-            if (kr.configKey === "zaiToken")
-                Plasmoid.configuration.zaiToken = val;
-            if (kr.configKey === "githubToken")
-                Plasmoid.configuration.githubToken = val;
-            if (kr.configKey === "deepseekApiKey")
-                Plasmoid.configuration.deepseekApiKey = val;
-            if (kr.configKey === "moonshotApiKey")
-                Plasmoid.configuration.moonshotApiKey = val;
+            Plasmoid.configuration[kr.configKey] = val;
         }
     }
     QQC2.ToolButton {

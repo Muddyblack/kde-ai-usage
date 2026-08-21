@@ -29,11 +29,27 @@ def resolve_key(widget_var, env_var, *files):
     credential into the traceback, defeating the guarantee that no secret
     leaves this package. This only covers whitespace/CR/LF; a credential
     containing other control characters would still reach urllib as-is.
+
+    `env_var` accepts either a single name or a sequence of them, tried in
+    order. Several vendors ship two spellings of the same variable — Moonshot
+    is read as both MOONSHOT_API_KEY and KIMI_API_KEY, Z.AI documents
+    Z_AI_API_KEY while this package reads ZAI_TOKEN — and a provider that
+    knows only one of them reports "no token configured" at a user who did
+    set the key, which is the least debuggable failure we can produce.
     """
-    _clean = lambda s: s.translate(str.maketrans("", "", "\n\r ")).strip()
-    value = _clean(os.environ.get(widget_var, ""))
+
+    def _clean(s):
+        return s.translate(str.maketrans("", "", "\n\r ")).strip()
+
+    value = _clean(os.environ.get(widget_var, "")) if widget_var else ""
     if not value and env_var:
-        value = _clean(os.environ.get(env_var, ""))
+        names = (env_var,) if isinstance(env_var, str) else env_var
+        for name in names:
+            if not name:
+                continue
+            value = _clean(os.environ.get(name, ""))
+            if value:
+                break
     if not value:
         for path in files:
             if not path or not os.path.isfile(path):
