@@ -36,7 +36,16 @@ def _scan_processes():
             parts = parts[:-1]
         args = [a.decode("utf-8", "replace") for a in parts]
         text = " ".join(args)
-        if "antigravity" not in text or "--csrf_token" not in text:
+        argv0_name = os.path.basename(args[0]) if args else ""
+        # The standalone IDE (and, when active, the VS Code extension's
+        # language server) mention "antigravity" in their cmdline and carry
+        # a --csrf_token flag we can read straight out of /proc. The
+        # Antigravity CLI's "agy --hub" process is also Antigravity, but
+        # doesn't expose its CSRF token via cmdline or (thanks to Yama
+        # ptrace_scope) environ, so it can never be queried here - it's
+        # still matched so we can report it as "found but unreachable"
+        # instead of falsely claiming Antigravity isn't running at all.
+        if "antigravity" not in text and argv0_name != "agy":
             continue
 
         csrf_token, ext_port = "", ""
@@ -48,15 +57,13 @@ def _scan_processes():
                 csrf_token = args[i]
             elif a.startswith("--csrf_token="):
                 csrf_token = a.split("=", 1)[1]
-            elif a == "--extension_server_port" and i + 1 < len(args):
+            elif a in ("--extension_server_port", "--hub-port") and i + 1 < len(args):
                 i += 1
                 ext_port = args[i]
-            elif a.startswith("--extension_server_port="):
+            elif a.startswith("--extension_server_port=") or a.startswith("--hub-port="):
                 ext_port = a.split("=", 1)[1]
             i += 1
 
-        if not csrf_token:
-            continue
         found.append((pid, csrf_token, ext_port))
     return found
 
@@ -186,6 +193,69 @@ def _format_user_status(data):
     }
 
 
+def _account_email():
+    path = os.path.expanduser("~/.gemini/google_accounts.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return None
+    return data.get("active") if isinstance(data, dict) else None
+
+
+def _run_agy_usage(agy_path):
+    try:
+        proc = subprocess.run(
+            [agy_path, "--output-format", "json", "--print=/usage"],
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if proc.returncode != 0:
+        return None
+    parsed = as_json(proc.stdout)
+    if not isinstance(parsed, dict) or parsed.get("status") != "SUCCESS":
+        return None
+    command = parsed.get("command") or {}
+    return command.get("data") if command.get("name") == "usage" else None
+
+
+def _format_agy_usage(data):
+    models = []
+    for group in data.get("groups") or []:
+        group_name = group.get("name") or "Unknown"
+        # Only the weekly bucket drives the group's pct: it's the binding
+        # constraint over time. The 5-hour bucket is a burst limiter that
+        # sits near 100% outside of active bursts, and normalize_antigravity
+        # averages every model in a family together, so mixing it in here
+        # would wash out the weekly figure instead of adding information.
+        bucket = next((b for b in group.get("buckets") or [] if b.get("window") == "weekly"), None)
+        if bucket is None:
+            continue
+        remaining = bucket.get("remaining_fraction")
+        remaining = remaining if isinstance(remaining, (int, float)) and not isinstance(remaining, bool) else None
+        models.append(
+            {
+                "label": group_name,
+                "modelId": bucket.get("id") or f"{group_name}-weekly",
+                "remainingPercentage": remaining,
+                "isExhausted": remaining == 0,
+                "resetTime": bucket.get("reset_time"),
+                "isAutocompleteOnly": False,
+            }
+        )
+    return {
+        "timestamp": datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+        "method": "cli",
+        "email": _account_email(),
+        "planType": None,
+        "promptCredits": None,
+        "models": models,
+    }
+
+
 def get_antigravity_usage():
     cli = shutil.which("aiu") or shutil.which("antigravity-usage")
     if cli:
@@ -197,9 +267,24 @@ def get_antigravity_usage():
             parsed = as_json(proc.stdout)
             return parsed if isinstance(parsed, dict) else {}
 
+    # The CLI itself (google-antigravity-cli's "agy") answers /usage as a
+    # one-shot, non-interactive command - it needs neither a running IDE
+    # nor the language server's CSRF token, so try it before falling back
+    # to scanning /proc for a live server to probe.
+    agy = shutil.which("agy")
+    if agy:
+        agy_data = _run_agy_usage(agy)
+        if agy_data is not None:
+            return _format_agy_usage(agy_data)
+
     found_any_process = False
     for pid, csrf_token, ext_port in _scan_processes():
         found_any_process = True
+        if not csrf_token:
+            # No token available to us (e.g. the CLI's "agy --hub" process,
+            # which doesn't put it on the cmdline) - any request would just
+            # 401. Still counts as "found" for the error message below.
+            continue
         ports = _pid_listening_ports(pid)
         if not ports and ext_port:
             try:
