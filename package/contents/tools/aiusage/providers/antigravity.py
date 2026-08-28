@@ -267,16 +267,10 @@ def get_antigravity_usage():
             parsed = as_json(proc.stdout)
             return parsed if isinstance(parsed, dict) else {}
 
-    # The CLI itself (google-antigravity-cli's "agy") answers /usage as a
-    # one-shot, non-interactive command - it needs neither a running IDE
-    # nor the language server's CSRF token, so try it before falling back
-    # to scanning /proc for a live server to probe.
-    agy = shutil.which("agy")
-    if agy:
-        agy_data = _run_agy_usage(agy)
-        if agy_data is not None:
-            return _format_agy_usage(agy_data)
-
+    # A reachable local language server (the standalone IDE, or the VS Code
+    # extension's own server) answers with real per-model quota - richer
+    # than agy's /usage, which only reports two family-level weekly
+    # buckets. Prefer it whenever one is actually reachable.
     found_any_process = False
     for pid, csrf_token, ext_port in _scan_processes():
         found_any_process = True
@@ -298,6 +292,15 @@ def get_antigravity_usage():
             data = _fetch_user_status(scheme, port, csrf_token)
             if data is not None:
                 return _format_user_status(data)
+
+    # No reachable local server - fall back to agy's own /usage command.
+    # It needs neither a running IDE nor the language server's CSRF token,
+    # just the CLI itself, but only reports coarse per-family quota.
+    agy = shutil.which("agy")
+    if agy:
+        agy_data = _run_agy_usage(agy)
+        if agy_data is not None:
+            return _format_agy_usage(agy_data)
 
     if found_any_process:
         return {"error": "Antigravity language server found but could not connect to API"}
