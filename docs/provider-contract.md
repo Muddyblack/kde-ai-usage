@@ -151,6 +151,8 @@ after wake-up (`UsageHistory.withResets`).
 | `s` / `w` | Claude 5-hour / 7-day |
 | `cp` / `cw` | Codex 5-hour / weekly |
 | `ag` | Antigravity average |
+| `agg` | Antigravity Gemini |
+| `age` | Antigravity External / rest |
 | `kr` | Kiro credits |
 | `or` | OpenRouter credit usage |
 | `mv` | Mistral vibe spend (absolute USD, auto-scaled by the chart) |

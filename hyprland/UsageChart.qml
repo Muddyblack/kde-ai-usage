@@ -7,7 +7,7 @@ import "../package/contents/code/UsageHistory.js" as UsageHistory
 Rectangle {
     id: chart
 
-    // Full unified history: [{t, s?, w?, cp?, cw?, kr?, ag?, or?, mv?, gr?, za?, gh?, ds?}]
+    // Full unified history: [{t, s?, w?, cp?, cw?, kr?, ag?, agg?, age?, or?, mv?, gr?, za?, gh?, ds?}]
     property var usageHistory: []
     // Chart ranges for the active tab, straight from the provider contract:
     // [{id, key, label, size, granularity, raw, resets}] (size in ms)
@@ -16,13 +16,19 @@ Rectangle {
     property color accent: "#7dd3fc"
     property string currency: ""
     property real chartTimeOffset: 0
+    property string activeId: ""
+    property string antigravityFilter: "both"
     // Gate from the host (settings toggle / settings page open) combined with
     // the "have at least one data point" check below.
     property bool extraVisible: true
 
     signal windowSelected(string id)
+    signal antigravityFilterSelected(string filter)
 
     onChartWindowChanged: chartTimeOffset = 0
+
+    readonly property color googleBlue: "#4285f4"
+    readonly property color googleGreen: "#34a853"
 
     readonly property var currentWindow: {
         for (var i = 0; i < windows.length; i++)
@@ -30,12 +36,51 @@ Rectangle {
                 return windows[i];
         return windows.length > 0 ? windows[0] : null;
     }
-    readonly property string historyKey: currentWindow ? currentWindow.key : "w"
+
+    readonly property bool isAntigravity: activeId === "antigravity" || (currentWindow && currentWindow.key && currentWindow.key.indexOf("ag") === 0)
+    readonly property bool hasModelFilter: isAntigravity
+    readonly property bool isBoth: isAntigravity && antigravityFilter === "both"
+
+    readonly property string historyKey: {
+        if (isAntigravity) {
+            if (antigravityFilter === "gemini")
+                return "agg";
+            if (antigravityFilter === "rest")
+                return "age";
+            return "ag";
+        }
+        return currentWindow ? currentWindow.key : "w";
+    }
     readonly property real windowSize: currentWindow ? currentWindow.size : 7 * 24 * 3600000
     // Money series (Mistral spend, DeepSeek balance) are absolute amounts the
     // chart auto-scales; rolling plan windows are the ones that drop at a reset.
     readonly property bool isCost: currentWindow ? currentWindow.raw === true : false
     readonly property bool windowHasResets: currentWindow ? currentWindow.resets === true : false
+
+    function extractSeries(key, fallbackKey) {
+        var out = [];
+        var now_ms = new Date().getTime();
+        var maxT = now_ms - chart.chartTimeOffset;
+        var minT = maxT - chart.windowSize;
+        for (var i = 0; i < usageHistory.length; i++) {
+            var p = usageHistory[i];
+            var v = p[key];
+            if ((v === undefined || v === null) && fallbackKey) {
+                v = p[fallbackKey];
+            }
+            if (v === undefined || v === null)
+                continue;
+            if (p.t >= minT && p.t <= maxT)
+                out.push({
+                    t: p.t,
+                    v: v
+                });
+        }
+        return out;
+    }
+
+    readonly property var geminiSeries: isAntigravity ? extractSeries("agg", "ag") : []
+    readonly property var restSeries: isAntigravity ? extractSeries("age", null) : []
 
     // {t, v[, raw]} view of the selected series inside the visible window
     readonly property var series: {
@@ -46,6 +91,9 @@ Rectangle {
         for (var i = 0; i < usageHistory.length; i++) {
             var p = usageHistory[i];
             var v = p[chart.historyKey];
+            if ((v === undefined || v === null) && chart.isAntigravity && chart.historyKey === "agg") {
+                v = p["ag"];
+            }
             if (v === undefined || v === null)
                 continue;
             if (p.t >= minT && p.t <= maxT)
@@ -77,9 +125,19 @@ Rectangle {
     // paging back past the data, instead of vanishing and trapping the user.
     readonly property bool hasAnySeriesData: {
         for (var i = 0; i < usageHistory.length; i++) {
-            var v = usageHistory[i][chart.historyKey];
-            if (v !== undefined && v !== null)
-                return true;
+            var p = usageHistory[i];
+            if (chart.isAntigravity) {
+                if (p.ag !== undefined && p.ag !== null)
+                    return true;
+                if (p.agg !== undefined && p.agg !== null)
+                    return true;
+                if (p.age !== undefined && p.age !== null)
+                    return true;
+            } else {
+                var v = p[chart.historyKey];
+                if (v !== undefined && v !== null)
+                    return true;
+            }
         }
         return false;
     }
@@ -135,6 +193,9 @@ Rectangle {
         for (var i = 0; i < usageHistory.length; i++) {
             var p = usageHistory[i];
             var v = p[chart.historyKey];
+            if (chart.isAntigravity && (v === undefined || v === null)) {
+                v = p.ag;
+            }
             if (v === undefined || v === null)
                 continue;
             if (p.t < now_ms - lookbackMs)
@@ -145,14 +206,15 @@ Rectangle {
         }
         if (first === null || last === null || last.t <= first.t)
             return null;
-        var lv = last[chart.historyKey], fv = first[chart.historyKey];
+        var lv = last[chart.historyKey] !== undefined ? last[chart.historyKey] : last.ag;
+        var fv = first[chart.historyKey] !== undefined ? first[chart.historyKey] : first.ag;
         return (lv - fv) / ((last.t - first.t) / 3600000);
     }
 
-    visible: extraVisible && hasAnySeriesData
+    visible: extraVisible && hasAnySeriesData && windows.length > 0
     Layout.fillWidth: true
     Layout.preferredHeight: implicitHeight
-    implicitHeight: 184
+    implicitHeight: hasModelFilter ? 208 : 184
     radius: 10
     color: Qt.rgba(1, 1, 1, 0.045)
     border.width: 1
@@ -188,7 +250,8 @@ Rectangle {
                 var oldestT = 0;
                 for (var i = 0; i < chart.usageHistory.length; i++) {
                     var p = chart.usageHistory[i];
-                    if (p[chart.historyKey] !== undefined && p[chart.historyKey] !== null) {
+                    var hasPt = chart.isAntigravity ? (p.ag !== undefined || p.agg !== undefined || p.age !== undefined) : (p[chart.historyKey] !== undefined && p[chart.historyKey] !== null);
+                    if (hasPt) {
                         oldestT = p.t;
                         break;
                     }
@@ -289,6 +352,84 @@ Rectangle {
         }
     }
 
+    // ── Antigravity model filter (Both / Combined / Gemini / Rest) ──
+    RowLayout {
+        id: modelFilterRow
+        visible: chart.hasModelFilter
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.topMargin: 29
+        anchors.leftMargin: 36
+        spacing: 4
+
+        readonly property var options: [
+            {
+                id: "both",
+                label: "Both",
+                dotColor: ""
+            },
+            {
+                id: "combined",
+                label: "Combined",
+                dotColor: ""
+            },
+            {
+                id: "gemini",
+                label: "Gemini",
+                dotColor: chart.googleBlue
+            },
+            {
+                id: "rest",
+                label: "Rest",
+                dotColor: chart.googleGreen
+            }
+        ]
+
+        Repeater {
+            model: modelFilterRow.options
+            Rectangle {
+                required property var modelData
+                radius: 4
+                implicitHeight: 16
+                implicitWidth: filterPillContent.implicitWidth + 12
+                color: chart.antigravityFilter === modelData.id ? chart.accent : Qt.rgba(1, 1, 1, 0.06)
+                opacity: chart.antigravityFilter === modelData.id ? 0.9 : 1.0
+                Behavior on color {
+                    ColorAnimation {
+                        duration: 150
+                    }
+                }
+                RowLayout {
+                    id: filterPillContent
+                    anchors.centerIn: parent
+                    spacing: 4
+                    Rectangle {
+                        visible: modelData.dotColor !== ""
+                        width: 5
+                        height: 5
+                        radius: 2.5
+                        color: modelData.dotColor
+                        Layout.alignment: Qt.AlignVCenter
+                    }
+                    Text {
+                        text: modelData.label
+                        font.pixelSize: 9
+                        font.bold: chart.antigravityFilter === modelData.id
+                        color: chart.antigravityFilter === modelData.id ? "#ffffff" : "#f8fafc"
+                        opacity: chart.antigravityFilter === modelData.id ? 1.0 : 0.65
+                    }
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        chart.antigravityFilterSelected(modelData.id);
+                    }
+                }
+            }
+        }
+    }
+
     // ── Y-axis labels ──
     Text {
         anchors.right: chartCanvas.left
@@ -326,14 +467,24 @@ Rectangle {
         anchors.right: parent.right
         anchors.leftMargin: 36
         anchors.rightMargin: 8
-        anchors.topMargin: 28
+        anchors.topMargin: chart.hasModelFilter ? 52 : 28
         anchors.bottomMargin: 2
 
         property var history: chart.series
+        property var geminiHistory: chart.geminiSeries
+        property var restHistory: chart.restSeries
+        property bool isBoth: chart.isBoth
         property color accentColor: chart.accent
         property real pulse: 0
         property int scrubIndex: -1
+        property var scrubGeminiPt: null
+        property var scrubRestPt: null
+        property real scrubTimestamp: 0
+
         onHistoryChanged: requestPaint()
+        onGeminiHistoryChanged: requestPaint()
+        onRestHistoryChanged: requestPaint()
+        onIsBothChanged: requestPaint()
         onAccentColorChanged: requestPaint()
         onPulseChanged: requestPaint()
         onScrubIndexChanged: requestPaint()
@@ -365,12 +516,21 @@ Rectangle {
         onClimbingFastChanged: if (!climbingFast)
             pulse = 0
 
+        // Empty-window hint: shown while paging back (or forward) into a range
+        // that has no recorded points, so the chart keeps its frame + nav arrows
+        // instead of disappearing.
+        Text {
+            anchors.centerIn: parent
+            visible: (!chartCanvas.isBoth && (!chartCanvas.history || chartCanvas.history.length === 0)) || (chartCanvas.isBoth && (!chartCanvas.geminiHistory || chartCanvas.geminiHistory.length === 0) && (!chartCanvas.restHistory || chartCanvas.restHistory.length === 0))
+            text: "No data in this range"
+            color: "#94a3b8"
+            font.pixelSize: 11
+            opacity: 0.7
+        }
+
         onPaint: {
             var ctx = getContext("2d");
             ctx.clearRect(0, 0, width, height);
-            var pts = history;
-            if (!pts || pts.length < 1)
-                return;
 
             var w = width, h = height;
             var now_ms = new Date().getTime();
@@ -378,27 +538,13 @@ Rectangle {
             var tRange = chart.windowSize;
             var minT = maxT - tRange;
 
-            function px(i) {
-                return ((pts[i].t - minT) / tRange) * w;
-            }
-            function py(v) {
-                return h - (v / 100) * h * 0.88 - h * 0.04;
-            }
-
-            var acR = Math.round(accentColor.r * 255);
-            var acG = Math.round(accentColor.g * 255);
-            var acB = Math.round(accentColor.b * 255);
-            function acRgba(a) {
-                return "rgba(" + acR + "," + acG + "," + acB + "," + a + ")";
-            }
-
             // dashed grid lines at 25 / 50 / 75 / 100%
             ctx.save();
             ctx.setLineDash([3, 5]);
             ctx.strokeStyle = "rgba(255,255,255,0.08)";
             ctx.lineWidth = 1;
             [25, 50, 75, 100].forEach(function (pct) {
-                var y = py(pct);
+                var y = h - (pct / 100) * h * 0.88 - h * 0.04;
                 ctx.beginPath();
                 ctx.moveTo(0, y);
                 ctx.lineTo(w, y);
@@ -406,93 +552,121 @@ Rectangle {
             });
             ctx.restore();
 
-            if (pts.length === 1) {
-                var sx = w / 2, sy = py(pts[0].v);
+            function drawCurve(seriesPts, strokeColor, showFill) {
+                if (!seriesPts || seriesPts.length < 1)
+                    return;
+
+                function spx(i) {
+                    return ((seriesPts[i].t - minT) / tRange) * w;
+                }
+                function spy(v) {
+                    return h - (v / 100) * h * 0.88 - h * 0.04;
+                }
+
+                var rR = Math.round(strokeColor.r * 255);
+                var rG = Math.round(strokeColor.g * 255);
+                var rB = Math.round(strokeColor.b * 255);
+                function sRgba(a) {
+                    return "rgba(" + rR + "," + rG + "," + rB + "," + a + ")";
+                }
+
+                if (seriesPts.length === 1) {
+                    var sx = w / 2, sy = spy(seriesPts[0].v);
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, 7, 0, Math.PI * 2);
+                    ctx.fillStyle = sRgba(0.18);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, 4, 0, Math.PI * 2);
+                    ctx.fillStyle = sRgba(1.0);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, 1.8, 0, Math.PI * 2);
+                    ctx.fillStyle = "rgba(255,255,255,0.9)";
+                    ctx.fill();
+                    return;
+                }
+
+                function sBuildPath() {
+                    ctx.moveTo(spx(0), spy(seriesPts[0].v));
+                    for (var i = 0; i < seriesPts.length - 1; i++) {
+                        var x0 = spx(i), y0 = spy(seriesPts[i].v);
+                        var x1 = spx(i + 1), y1 = spy(seriesPts[i + 1].v);
+                        var cpx = x0 + (x1 - x0) * 0.5;
+                        ctx.bezierCurveTo(cpx, y0, cpx, y1, x1, y1);
+                    }
+                }
+
+                // glow pass — wide soft strokes behind the crisp line
+                ctx.save();
+                ctx.lineJoin = "round";
+                ctx.lineCap = "round";
                 ctx.beginPath();
-                ctx.arc(sx, sy, 7, 0, Math.PI * 2);
-                ctx.fillStyle = acRgba(0.18);
+                sBuildPath();
+                ctx.strokeStyle = sRgba(0.08);
+                ctx.lineWidth = 14;
+                ctx.stroke();
+                ctx.beginPath();
+                sBuildPath();
+                ctx.strokeStyle = sRgba(0.18);
+                ctx.lineWidth = 8;
+                ctx.stroke();
+                ctx.beginPath();
+                sBuildPath();
+                ctx.strokeStyle = sRgba(0.40);
+                ctx.lineWidth = 4;
+                ctx.stroke();
+                ctx.restore();
+
+                // filled gradient area
+                if (showFill) {
+                    var grad = ctx.createLinearGradient(0, 0, 0, h);
+                    grad.addColorStop(0, sRgba(0.24));
+                    grad.addColorStop(0.6, sRgba(0.06));
+                    grad.addColorStop(1, sRgba(0.0));
+                    ctx.beginPath();
+                    sBuildPath();
+                    ctx.lineTo(spx(seriesPts.length - 1), h);
+                    ctx.lineTo(spx(0), h);
+                    ctx.closePath();
+                    ctx.fillStyle = grad;
+                    ctx.fill();
+                }
+
+                // crisp line on top
+                ctx.beginPath();
+                sBuildPath();
+                ctx.strokeStyle = sRgba(1.0);
+                ctx.lineWidth = 2;
+                ctx.lineJoin = "round";
+                ctx.lineCap = "round";
+                ctx.stroke();
+
+                // latest point: pulsing halo + dot + white pip
+                var lx = spx(seriesPts.length - 1);
+                var ly = spy(seriesPts[seriesPts.length - 1].v);
+                var haloR = 7 + pulse * 8;
+                var haloA = 0.18 + (1 - pulse) * 0.10;
+                ctx.beginPath();
+                ctx.arc(lx, ly, haloR, 0, Math.PI * 2);
+                ctx.fillStyle = sRgba(pulse > 0 ? haloA * (1 - pulse) + 0.06 : 0.18);
                 ctx.fill();
                 ctx.beginPath();
-                ctx.arc(sx, sy, 4, 0, Math.PI * 2);
-                ctx.fillStyle = acRgba(1.0);
+                ctx.arc(lx, ly, 4, 0, Math.PI * 2);
+                ctx.fillStyle = sRgba(1.0);
                 ctx.fill();
                 ctx.beginPath();
-                ctx.arc(sx, sy, 1.8, 0, Math.PI * 2);
+                ctx.arc(lx, ly, 1.8, 0, Math.PI * 2);
                 ctx.fillStyle = "rgba(255,255,255,0.9)";
                 ctx.fill();
-                return;
             }
 
-            function buildPath() {
-                ctx.moveTo(px(0), py(pts[0].v));
-                for (var i = 0; i < pts.length - 1; i++) {
-                    var x0 = px(i), y0 = py(pts[i].v);
-                    var x1 = px(i + 1), y1 = py(pts[i + 1].v);
-                    var cpx = x0 + (x1 - x0) * 0.5;
-                    ctx.bezierCurveTo(cpx, y0, cpx, y1, x1, y1);
-                }
+            if (chartCanvas.isBoth) {
+                drawCurve(chartCanvas.geminiHistory, chart.googleBlue, true);
+                drawCurve(chartCanvas.restHistory, chart.googleGreen, false);
+            } else {
+                drawCurve(chartCanvas.history, accentColor, true);
             }
-
-            // glow pass — wide soft strokes behind the crisp line
-            ctx.save();
-            ctx.lineJoin = "round";
-            ctx.lineCap = "round";
-            ctx.beginPath();
-            buildPath();
-            ctx.strokeStyle = acRgba(0.08);
-            ctx.lineWidth = 14;
-            ctx.stroke();
-            ctx.beginPath();
-            buildPath();
-            ctx.strokeStyle = acRgba(0.18);
-            ctx.lineWidth = 8;
-            ctx.stroke();
-            ctx.beginPath();
-            buildPath();
-            ctx.strokeStyle = acRgba(0.40);
-            ctx.lineWidth = 4;
-            ctx.stroke();
-            ctx.restore();
-
-            // filled gradient area
-            var grad = ctx.createLinearGradient(0, 0, 0, h);
-            grad.addColorStop(0, acRgba(0.28));
-            grad.addColorStop(0.6, acRgba(0.08));
-            grad.addColorStop(1, acRgba(0.0));
-            ctx.beginPath();
-            buildPath();
-            ctx.lineTo(px(pts.length - 1), h);
-            ctx.lineTo(px(0), h);
-            ctx.closePath();
-            ctx.fillStyle = grad;
-            ctx.fill();
-
-            // crisp line on top
-            ctx.beginPath();
-            buildPath();
-            ctx.strokeStyle = acRgba(1.0);
-            ctx.lineWidth = 2;
-            ctx.lineJoin = "round";
-            ctx.lineCap = "round";
-            ctx.stroke();
-
-            // latest point: pulsing halo + dot + white pip
-            var lx = px(pts.length - 1);
-            var ly = py(pts[pts.length - 1].v);
-            var haloR = 7 + pulse * 8;
-            var haloA = 0.18 + (1 - pulse) * 0.10;
-            ctx.beginPath();
-            ctx.arc(lx, ly, haloR, 0, Math.PI * 2);
-            ctx.fillStyle = acRgba(pulse > 0 ? haloA * (1 - pulse) + 0.06 : 0.18);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(lx, ly, 4, 0, Math.PI * 2);
-            ctx.fillStyle = acRgba(1.0);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(lx, ly, 1.8, 0, Math.PI * 2);
-            ctx.fillStyle = "rgba(255,255,255,0.9)";
-            ctx.fill();
 
             // ── Reset-boundary markers ──
             function drawResetLine(resetMs, label, drawLabel) {
@@ -518,7 +692,10 @@ Rectangle {
                 ctx.save();
                 ctx.beginPath();
                 ctx.arc(rx, h, 2, 0, Math.PI * 2);
-                ctx.fillStyle = acRgba(0.85);
+                var acR = Math.round(accentColor.r * 255);
+                var acG = Math.round(accentColor.g * 255);
+                var acB = Math.round(accentColor.b * 255);
+                ctx.fillStyle = "rgba(" + acR + "," + acG + "," + acB + ",0.85)";
                 ctx.fill();
                 ctx.restore();
             }
@@ -533,40 +710,50 @@ Rectangle {
                 }
             }
 
-            // hover scrub: vertical guide + highlighted point
-            if (scrubIndex >= 0 && scrubIndex < pts.length) {
-                var hx = px(scrubIndex);
-                var hy = py(pts[scrubIndex].v);
-                ctx.save();
-                ctx.setLineDash([2, 3]);
-                ctx.strokeStyle = acRgba(0.5);
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.moveTo(hx, 0);
-                ctx.lineTo(hx, h);
-                ctx.stroke();
-                ctx.restore();
-                ctx.beginPath();
-                ctx.arc(hx, hy, 5, 0, Math.PI * 2);
-                ctx.fillStyle = acRgba(1.0);
-                ctx.fill();
-                ctx.beginPath();
-                ctx.arc(hx, hy, 2, 0, Math.PI * 2);
-                ctx.fillStyle = "#ffffff";
-                ctx.fill();
-            }
-        }
+            // hover scrub: vertical guide + highlighted point(s)
+            if (scrubIndex >= 0) {
+                function drawScrubDot(pt, color) {
+                    var hx = ((pt.t - minT) / tRange) * w;
+                    var hy = h - (pt.v / 100) * h * 0.88 - h * 0.04;
+                    var cR = Math.round(color.r * 255);
+                    var cG = Math.round(color.g * 255);
+                    var cB = Math.round(color.b * 255);
+                    ctx.beginPath();
+                    ctx.arc(hx, hy, 5, 0, Math.PI * 2);
+                    ctx.fillStyle = "rgba(" + cR + "," + cG + "," + cB + ",1.0)";
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(hx, hy, 2, 0, Math.PI * 2);
+                    ctx.fillStyle = "#ffffff";
+                    ctx.fill();
+                }
 
-        // Empty-window hint: shown while paging back (or forward) into a range
-        // that has no recorded points, so the chart keeps its frame + nav arrows
-        // instead of disappearing.
-        Text {
-            anchors.centerIn: parent
-            visible: chart.series.length === 0
-            text: "No data in this range"
-            color: "#94a3b8"
-            font.pixelSize: 11
-            opacity: 0.7
+                var scrubT = chartCanvas.scrubTimestamp;
+                if (scrubT > 0) {
+                    var hx = ((scrubT - minT) / tRange) * w;
+                    ctx.save();
+                    ctx.setLineDash([2, 3]);
+                    var acR = Math.round(accentColor.r * 255);
+                    var acG = Math.round(accentColor.g * 255);
+                    var acB = Math.round(accentColor.b * 255);
+                    ctx.strokeStyle = chartCanvas.isBoth ? "rgba(255,255,255,0.4)" : "rgba(" + acR + "," + acG + "," + acB + ",0.5)";
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(hx, 0);
+                    ctx.lineTo(hx, h);
+                    ctx.stroke();
+                    ctx.restore();
+
+                    if (chartCanvas.isBoth) {
+                        if (chartCanvas.scrubGeminiPt)
+                            drawScrubDot(chartCanvas.scrubGeminiPt, chart.googleBlue);
+                        if (chartCanvas.scrubRestPt)
+                            drawScrubDot(chartCanvas.scrubRestPt, chart.googleGreen);
+                    } else if (chartCanvas.history && scrubIndex < chartCanvas.history.length) {
+                        drawScrubDot(chartCanvas.history[scrubIndex], accentColor);
+                    }
+                }
+            }
         }
 
         MouseArea {
@@ -574,27 +761,60 @@ Rectangle {
             anchors.fill: parent
             hoverEnabled: true
             onPositionChanged: function (mouse) {
-                var pts = chartCanvas.history;
-                if (!pts || pts.length < 1) {
-                    chartCanvas.scrubIndex = -1;
-                    return;
-                }
                 var now_ms = new Date().getTime();
                 var maxT = now_ms - chart.chartTimeOffset;
                 var tRange = chart.windowSize;
                 var minT = maxT - tRange;
                 var mouseT = minT + (mouse.x / chartCanvas.width) * tRange;
-                var best = 0, bestDist = Math.abs(pts[0].t - mouseT);
-                for (var i = 1; i < pts.length; i++) {
-                    var d = Math.abs(pts[i].t - mouseT);
-                    if (d < bestDist) {
-                        bestDist = d;
-                        best = i;
+
+                if (chartCanvas.isBoth) {
+                    var gPts = chartCanvas.geminiHistory;
+                    var rPts = chartCanvas.restHistory;
+                    if ((!gPts || gPts.length === 0) && (!rPts || rPts.length === 0)) {
+                        chartCanvas.scrubIndex = -1;
+                        return;
                     }
+                    function findClosest(pts) {
+                        if (!pts || pts.length === 0)
+                            return null;
+                        var b = 0, bd = Math.abs(pts[0].t - mouseT);
+                        for (var i = 1; i < pts.length; i++) {
+                            var d = Math.abs(pts[i].t - mouseT);
+                            if (d < bd) {
+                                bd = d;
+                                b = i;
+                            }
+                        }
+                        return pts[b];
+                    }
+                    chartCanvas.scrubGeminiPt = findClosest(gPts);
+                    chartCanvas.scrubRestPt = findClosest(rPts);
+                    chartCanvas.scrubTimestamp = chartCanvas.scrubGeminiPt ? chartCanvas.scrubGeminiPt.t : (chartCanvas.scrubRestPt ? chartCanvas.scrubRestPt.t : 0);
+                    chartCanvas.scrubIndex = 0;
+                } else {
+                    var pts = chartCanvas.history;
+                    if (!pts || pts.length < 1) {
+                        chartCanvas.scrubIndex = -1;
+                        return;
+                    }
+                    var best = 0, bestDist = Math.abs(pts[0].t - mouseT);
+                    for (var i = 1; i < pts.length; i++) {
+                        var d = Math.abs(pts[i].t - mouseT);
+                        if (d < bestDist) {
+                            bestDist = d;
+                            best = i;
+                        }
+                    }
+                    chartCanvas.scrubIndex = best;
+                    chartCanvas.scrubTimestamp = pts[best].t;
                 }
-                chartCanvas.scrubIndex = best;
             }
-            onExited: chartCanvas.scrubIndex = -1
+            onExited: {
+                chartCanvas.scrubIndex = -1;
+                chartCanvas.scrubGeminiPt = null;
+                chartCanvas.scrubRestPt = null;
+                chartCanvas.scrubTimestamp = 0;
+            }
 
             Rectangle {
                 id: scrubTooltip
@@ -603,19 +823,27 @@ Rectangle {
                 border.color: Qt.rgba(1, 1, 1, 0.10)
                 border.width: 1
                 radius: 6
-                width: tooltipRow.implicitWidth + 14
-                height: tooltipRow.implicitHeight + 8
+                width: (chartCanvas.isBoth ? bothTooltipRow.implicitWidth : tooltipRow.implicitWidth) + 14
+                height: (chartCanvas.isBoth ? bothTooltipRow.implicitHeight : tooltipRow.implicitHeight) + 8
 
                 property real dotX: {
-                    var pts = chartCanvas.history;
-                    if (chartCanvas.scrubIndex < 0 || !pts || chartCanvas.scrubIndex >= pts.length)
-                        return 0;
                     var now_ms = new Date().getTime();
                     var maxT = now_ms - chart.chartTimeOffset;
                     var tRange = chart.windowSize;
-                    return ((pts[chartCanvas.scrubIndex].t - (maxT - tRange)) / tRange) * chartCanvas.width;
+                    var minT = maxT - tRange;
+                    var t = chartCanvas.scrubTimestamp;
+                    if (!t)
+                        return 0;
+                    return ((t - minT) / tRange) * chartCanvas.width;
                 }
                 property real dotY: {
+                    if (chartCanvas.isBoth) {
+                        var gPt = chartCanvas.scrubGeminiPt;
+                        var rPt = chartCanvas.scrubRestPt;
+                        var v = gPt ? gPt.v : (rPt ? rPt.v : 50);
+                        var h = chartCanvas.height;
+                        return h - (v / 100) * h * 0.88 - h * 0.04;
+                    }
                     var pts = chartCanvas.history;
                     if (chartCanvas.scrubIndex < 0 || !pts || chartCanvas.scrubIndex >= pts.length)
                         return 0;
@@ -629,6 +857,7 @@ Rectangle {
 
                 Row {
                     id: tooltipRow
+                    visible: !chartCanvas.isBoth
                     anchors.centerIn: parent
                     spacing: 0
 
@@ -659,6 +888,64 @@ Rectangle {
                                 return "";
                             return "  ·  " + Qt.formatDateTime(new Date(pts[chartCanvas.scrubIndex].t), "MMM d, hh:mm");
                         }
+                        font.pixelSize: 11
+                        color: "#f8fafc"
+                        opacity: 0.75
+                    }
+                }
+
+                RowLayout {
+                    id: bothTooltipRow
+                    visible: chartCanvas.isBoth
+                    anchors.centerIn: parent
+                    spacing: 4
+
+                    RowLayout {
+                        spacing: 3
+                        visible: chartCanvas.scrubGeminiPt !== null
+                        Rectangle {
+                            width: 5
+                            height: 5
+                            radius: 2.5
+                            color: chart.googleBlue
+                            Layout.alignment: Qt.AlignVCenter
+                        }
+                        Text {
+                            text: chartCanvas.scrubGeminiPt ? "Gemini: " + Math.round(chartCanvas.scrubGeminiPt.v) + "%" : ""
+                            font.pixelSize: 11
+                            font.bold: true
+                            color: chart.googleBlue
+                        }
+                    }
+
+                    Text {
+                        visible: chartCanvas.scrubGeminiPt !== null && chartCanvas.scrubRestPt !== null
+                        text: "·"
+                        font.pixelSize: 11
+                        color: "#f8fafc"
+                        opacity: 0.4
+                    }
+
+                    RowLayout {
+                        spacing: 3
+                        visible: chartCanvas.scrubRestPt !== null
+                        Rectangle {
+                            width: 5
+                            height: 5
+                            radius: 2.5
+                            color: chart.googleGreen
+                            Layout.alignment: Qt.AlignVCenter
+                        }
+                        Text {
+                            text: chartCanvas.scrubRestPt ? "Rest: " + Math.round(chartCanvas.scrubRestPt.v) + "%" : ""
+                            font.pixelSize: 11
+                            font.bold: true
+                            color: chart.googleGreen
+                        }
+                    }
+
+                    Text {
+                        text: chartCanvas.scrubTimestamp > 0 ? "  ·  " + Qt.formatDateTime(new Date(chartCanvas.scrubTimestamp), "MMM d, hh:mm") : ""
                         font.pixelSize: 11
                         color: "#f8fafc"
                         opacity: 0.75

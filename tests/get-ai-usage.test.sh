@@ -102,11 +102,13 @@ check claude-success "derives local activity statistics" '
     and .details.stats.peakHour == 14
     and (.details.stats.dailyTokens | map(.date)) == ["2026-07-22", "2026-07-23"]
     and (.details.stats.dailyTokens[1].total) == 120'
-check claude-success "offers 5H/24H/7D when both windows exist" '
-    (.chartWindows | map(.id)) == ["session", "day", "weekly"]
-    and (.chartWindows | map(.key)) == ["s", "s", "w"]
+check claude-success "offers 5H/24H/7D/30D when both windows exist" '
+    (.chartWindows | map(.id)) == ["session", "day", "weekly", "monthly"]
+    and (.chartWindows | map(.key)) == ["s", "s", "w", "w"]
     and (.chartWindows[0].granularity) == "5h"
-    and (.chartWindows[2].size) == 604800000'
+    and (.chartWindows[2].size) == 604800000
+    and (.chartWindows[3].size) == 2592000000
+    and (.chartWindows[3].granularity) == "30d"'
 check claude-success "anchors resets so a sleep gap can be redrawn" '
     (.chartWindows[0] | .periodMs == 18000000 and .resetAt == 1784473200)
     and (.chartWindows[1] | .size == 86400000 and .periodMs == 18000000)
@@ -152,8 +154,8 @@ check openai-codex-success "carries Codex CLI statistics" '
     and .details.stats.effortLevel == "medium" and .details.stats.activeDays == 2
     and (.details.stats.dailyTokens | map(.date)) == ["2026-07-23", "2026-07-24"]'
 check openai-codex-success "maps chart ranges onto the Codex series" '
-    (.chartWindows | map(.id)) == ["codex_primary", "codex_day", "codex_weekly"]
-    and (.chartWindows | map(.key)) == ["cp", "cp", "cw"]'
+    (.chartWindows | map(.id)) == ["codex_primary", "codex_day", "codex_weekly", "codex_monthly"]
+    and (.chartWindows | map(.key)) == ["cp", "cp", "cw", "cw"]'
 check openai-api-key-only "offers no chart ranges without plan windows" '
     (.chartWindows | length) == 0'
 check openai-legacy-windows "classifies legacy windows even when reversed" '
@@ -179,7 +181,10 @@ check antigravity-success "averages quota per family" '
     and (.details.groups[0].key == "gemini")
     and (.details.groups[1].models == ["autocomplete-1", "claude-sonnet-4-5"])
     and .details.groups[1].isExhausted
-    and .historyValues == {ag: 60}'
+    and .historyValues == {ag: 60, agg: 40, age: 100}'
+check antigravity-success "charts 5h, 24h, 7d, 30d ranges" '
+    (.chartWindows | map(.label)) == ["5H", "24H", "7D", "30D"]
+    and (.chartWindows | all(.raw | not)) and (.chartWindows | all(.resets | not))'
 check antigravity-success "keeps models without a quota out of the average" '
     (.details.models["autocomplete-1"].hasQuota | not)
     and .details.models["gemini-3-pro"].usedPct == 60'
@@ -202,12 +207,12 @@ check kiro-error "passes the tool error through" '
 # ── Mistral ─────────────────────────────────────────────────────────────────
 
 check mistral-success "marks the spend series as a raw money value" '
-    (.chartWindows | length) == 1 and .chartWindows[0].raw and (.chartWindows[0].resets | not)'
+    (.chartWindows | length) == 4 and (.chartWindows | all(.raw)) and (.chartWindows | all(.resets | not))'
 check deepseek-success "marks the balance series as a raw money value" '
-    (.chartWindows | length) == 1 and .chartWindows[0].raw'
-check kiro-success "charts one 30-day range" '
-    (.chartWindows | map(.id)) == ["kiro"] and .chartWindows[0].label == "30D"
-    and (.chartWindows[0].raw | not) and (.chartWindows[0].resets | not)'
+    (.chartWindows | length) == 4 and (.chartWindows | all(.raw))'
+check kiro-success "charts 5h, 24h, 7d, 30d ranges" '
+    (.chartWindows | map(.label)) == ["5H", "24H", "7D", "30D"]
+    and (.chartWindows | all(.raw | not)) and (.chartWindows | all(.resets | not))'
 check mistral-success "aggregates vibe CLI spend" '
     .ok and .details.vibe.totalCost == 12.5 and .details.vibe.sessionCount == 4
     and .details.keyValid and .details.hasKey

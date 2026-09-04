@@ -314,21 +314,19 @@ PlasmoidItem {
     property var usageHistory: []
     property string chartWindow: Plasmoid.configuration.chartWindow || "weekly"
     readonly property int historyLimit: 500
-    // Granularity ("5h" | "24h" | "7d") is remembered across tabs so switching
-    // services keeps the same time range. Tabs with a single fixed window
-    // (antigravity/openrouter/mistral) ignore it but don't clobber it, so you
-    // return to your previous range when you go back to a multi-window tab.
+    // Granularity ("5h" | "24h" | "7d" | "30d") is remembered across tabs so switching
+    // services keeps the same time range.
     property string chartGranularity: Plasmoid.configuration.chartGranularity || "7d"
+    // Antigravity model filter: "both" (default), "combined", "gemini", or "rest"
+    property string antigravityChartFilter: Plasmoid.configuration.antigravityChartFilter || "both"
     // Chart ranges per provider, straight from the backend: which history series
     // exist, what each one is called and how wide it is. Keyed by provider id.
     property var providerChartWindows: ({})
-    // {t, v} view of the currently-selected chart window
-    readonly property var weeklyUsageHistory: {
+
+    function seriesForHistoryKey(key, fallbackKey) {
         var win = root.currentChartWindow();
         if (!win)
             return [];
-
-        var key = win.key;
         var out = [];
         var now_ms = new Date().getTime();
         var winSize = win.size;
@@ -337,6 +335,8 @@ PlasmoidItem {
         for (var i = 0; i < root.usageHistory.length; i++) {
             var p = root.usageHistory[i];
             var v = p[key];
+            if ((v === undefined || v === null) && fallbackKey)
+                v = p[fallbackKey];
             if (v === undefined || v === null)
                 continue;
 
@@ -346,10 +346,31 @@ PlasmoidItem {
                     "v": v
                 });
         }
-        // Redraw quota resets where they actually happened, not where the next
-        // poll noticed them (see UsageHistory.withResets).
         if (win.resets)
             out = UsageHistory.withResets(out, win.resetAt * 1000, win.periodMs, minT, maxT);
+        return out;
+    }
+
+    // {t, v} view of the currently-selected chart window
+    readonly property var weeklyUsageHistory: {
+        var win = root.currentChartWindow();
+        if (!win)
+            return [];
+
+        var key = win.key;
+        var tab = root.enabledTabs[root.activeTab] || "";
+        var fallbackKey = null;
+        if (tab === "antigravity") {
+            if (root.antigravityChartFilter === "gemini") {
+                key = "agg";
+                fallbackKey = "ag";
+            } else if (root.antigravityChartFilter === "rest") {
+                key = "age";
+            } else {
+                key = "ag";
+            }
+        }
+        var out = root.seriesForHistoryKey(key, fallbackKey);
 
         // Raw money series store absolute amounts; auto-scale to their own max so the
         // spend curve fills the chart (the canvas expects a 0-100 value).
@@ -593,7 +614,35 @@ PlasmoidItem {
 
     function _historyKey() {
         var win = root.currentChartWindow();
-        return win ? win.key : "";
+        if (!win)
+            return "";
+        var tab = root.enabledTabs[root.activeTab] || "";
+        if (tab === "antigravity") {
+            if (root.antigravityChartFilter === "gemini")
+                return "agg";
+            if (root.antigravityChartFilter === "rest")
+                return "age";
+            return "ag";
+        }
+        return win.key;
+    }
+
+    function hasAnySeriesData() {
+        var win = root.currentChartWindow();
+        if (!win)
+            return false;
+        var tab = root.enabledTabs[root.activeTab] || "";
+        var key = win.key;
+        for (var i = 0; i < root.usageHistory.length; i++) {
+            var p = root.usageHistory[i];
+            if (tab === "antigravity") {
+                if (p.agg !== undefined || p.age !== undefined || p.ag !== undefined)
+                    return true;
+            } else if (p[key] !== undefined && p[key] !== null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     function getChartWindowSize() {
@@ -625,25 +674,24 @@ PlasmoidItem {
         if (raw) {
             try {
                 root.usageHistory = JSON.parse(raw);
-                return;
             } catch (_) {
                 root.usageHistory = [];
             }
-        }
-        // Migrate legacy weekly-only history ({t, v}) into the dual-series format.
-        var legacy = Plasmoid.configuration.weeklyUsageHistory || "";
-        if (legacy) {
-            try {
-                var migrated = UsageHistory.normalize(JSON.parse(legacy), root.historyLimit);
-                root.usageHistory = migrated;
-                Plasmoid.configuration.usageHistory = JSON.stringify(migrated);
-                return;
-            } catch (_) {
-                root.usageHistory = [];
+        } else {
+            // Migrate legacy weekly-only history ({t, v}) into the dual-series format.
+            var legacy = Plasmoid.configuration.weeklyUsageHistory || "";
+            if (legacy) {
+                try {
+                    var migrated = UsageHistory.normalize(JSON.parse(legacy), root.historyLimit);
+                    root.usageHistory = migrated;
+                    Plasmoid.configuration.usageHistory = JSON.stringify(migrated);
+                } catch (_) {
+                    root.usageHistory = [];
+                }
             }
         }
-        // No history in plasmoid config (e.g. fresh install after a reinstall) —
-        // try restoring from the mirror file on disk.
+        // Always sync with the shared mirror file on disk so points recorded in
+        // Hyprland / Quickshell are merged seamlessly when switching back.
         root.autoloadHistory();
     }
 
@@ -1655,16 +1703,8 @@ PlasmoidItem {
                     // Merge autoload data with any points already recorded since startup
                     // (poll timer fires immediately and may beat the async shell).
                     if (op === "autoload" && root.usageHistory.length > 0) {
-                        var existing = root.usageHistory;
-                        var merged = norm.slice();
-                        var lastNormT = norm.length > 0 ? norm[norm.length - 1].t : 0;
-                        for (var j = 0; j < existing.length; j++) {
-                            if (existing[j].t > lastNormT)
-                                merged.push(existing[j]);
-                        }
-                        if (merged.length > root.historyLimit)
-                            merged = merged.slice(merged.length - root.historyLimit);
-
+                        // The file is the base; points recorded since startup win.
+                        var merged = UsageHistory.union(norm, root.usageHistory, root.historyLimit);
                         root.usageHistory = merged;
                         Plasmoid.configuration.usageHistory = JSON.stringify(merged);
                         root.autosaveHistory(JSON.stringify(merged));

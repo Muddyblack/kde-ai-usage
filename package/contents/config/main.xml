@@ -90,9 +90,13 @@
     <entry name="chartWindow" type="String">
       <default>weekly</default>
     </entry>
-    <!-- Remembered chart granularity ("5h" | "24h" | "7d"), shared across tabs so the time range carries when switching services -->
+    <!-- Remembered chart granularity ("5h" | "24h" | "7d" | "30d"), shared across tabs so the time range carries when switching services -->
     <entry name="chartGranularity" type="String">
       <default>7d</default>
+    </entry>
+    <!-- Antigravity model filter: "both", "combined", "gemini", or "rest" -->
+    <entry name="antigravityChartFilter" type="String">
+      <default>both</default>
     </entry>
     <!-- Poll interval in seconds (applies to all services) -->
     <entry name="pollIntervalSec" type="Int">

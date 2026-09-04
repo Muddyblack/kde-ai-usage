@@ -179,20 +179,41 @@ def resetting(cw, period, window):
     return cw
 
 
-def rolling_windows(session_id, day_id, weekly_id, session_key, weekly_key, session, weekly):
+def rolling_windows(session_id, day_id, weekly_id, session_key, weekly_key, session, weekly, monthly_id=None):
     out = []
-    if session.get("available"):
+    has_session = bool(session and session.get("available"))
+    has_weekly = bool(weekly and weekly.get("available"))
+
+    if has_session:
         out.append(resetting(chart_window(session_id, session_key, "5H", 18000000, "5h"), 18000000, session))
         out.append(resetting(chart_window(day_id, session_key, "24H", 86400000, "24h"), 18000000, session))
-    if weekly.get("available"):
+    elif has_weekly:
+        out.append(resetting(chart_window(session_id, weekly_key, "5H", 18000000, "5h"), 604800000, weekly))
+        out.append(resetting(chart_window(day_id, weekly_key, "24H", 86400000, "24h"), 604800000, weekly))
+
+    if has_weekly:
+        m_id = monthly_id or f"{weekly_id}_30d"
         out.append(resetting(chart_window(weekly_id, weekly_key, "7D", 604800000, "7d"), 604800000, weekly))
+        out.append(resetting(chart_window(m_id, weekly_key, "30D", 2592000000, "30d"), 604800000, weekly))
+    elif has_session:
+        m_id = monthly_id or f"{session_id}_30d"
+        out.append(resetting(chart_window(weekly_id, session_key, "7D", 604800000, "7d"), 18000000, session))
+        out.append(resetting(chart_window(m_id, session_key, "30D", 2592000000, "30d"), 18000000, session))
+
     return out
 
 
+def fixed_windows(id_prefix, key, raw):
+    return [
+        {**chart_window(f"{id_prefix}_5h", key, "5H", 18000000, "5h"), "raw": raw},
+        {**chart_window(f"{id_prefix}_24h", key, "24H", 86400000, "24h"), "raw": raw},
+        {**chart_window(f"{id_prefix}_7d", key, "7D", 604800000, "7d"), "raw": raw},
+        {**chart_window(f"{id_prefix}_30d", key, "30D", 2592000000, "30d"), "raw": raw},
+    ]
+
+
 def monthly_window(id_, key, raw):
-    cw = chart_window(id_, key, "30D", 2592000000, "")
-    cw["raw"] = raw
-    return [cw]
+    return fixed_windows(id_, key, raw)
 
 
 def money(v, currency):

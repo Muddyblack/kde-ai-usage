@@ -162,7 +162,16 @@ def normalize_openai(raw):
                 "tooltip": f"Codex weekly: {jround(100 - codex['weekly']['pct'])}% left",
             },
         ]
-        r["chartWindows"] = rolling_windows("codex_primary", "codex_day", "codex_weekly", "cp", "cw", codex["session"], codex["weekly"])
+        r["chartWindows"] = rolling_windows(
+            "codex_primary",
+            "codex_day",
+            "codex_weekly",
+            "cp",
+            "cw",
+            codex["session"],
+            codex["weekly"],
+            monthly_id="codex_monthly",
+        )
         r["historyValues"] = {
             **({"cp": codex["session"]["pct"]} if codex["session"]["available"] else {}),
             **({"cw": codex["weekly"]["pct"]} if codex["weekly"]["available"] else {}),

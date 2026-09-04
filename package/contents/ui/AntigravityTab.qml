@@ -149,7 +149,13 @@ ColumnLayout {
                         text: Math.round(groupCol.group.usedPct) + "%"
                         font.pixelSize: 10
                         font.bold: true
-                        color: rootItem.usageColor(groupCol.group.usedPct)
+                        color: {
+                            if (groupCol.group.usedPct >= 90)
+                                return rootItem.dangerColor;
+                            if (groupCol.group.usedPct >= 70)
+                                return rootItem.warningColor;
+                            return groupCol.group.key === "gemini" ? rootItem.googleBlue : rootItem.googleGreen;
+                        }
                     }
                 }
 
@@ -218,9 +224,10 @@ ColumnLayout {
                                     radius: 2
                                     color: {
                                         var m = rootItem.antigravityModels[modelData];
+                                        var defColor = groupCol.group.key === "gemini" ? rootItem.googleBlue : rootItem.googleGreen;
                                         if (!m)
-                                            return rootItem.googleBlue;
-                                        return m.isExhausted ? rootItem.dangerColor : m.usedPct >= 70 ? rootItem.warningColor : rootItem.googleBlue;
+                                            return defColor;
+                                        return m.isExhausted ? rootItem.dangerColor : m.usedPct >= 70 ? rootItem.warningColor : defColor;
                                     }
                                     Behavior on width {
                                         NumberAnimation {
@@ -239,7 +246,16 @@ ColumnLayout {
                                 }
                                 font.pixelSize: 10
                                 font.bold: true
-                                color: rootItem.antigravityModels[modelData] ? rootItem.usageColor(rootItem.antigravityModels[modelData].usedPct) : Kirigami.Theme.textColor
+                                color: {
+                                    var m = rootItem.antigravityModels[modelData];
+                                    if (!m)
+                                        return Kirigami.Theme.textColor;
+                                    if (m.isExhausted || m.usedPct >= 90)
+                                        return rootItem.dangerColor;
+                                    if (m.usedPct >= 70)
+                                        return rootItem.warningColor;
+                                    return groupCol.group.key === "gemini" ? rootItem.googleBlue : rootItem.googleGreen;
+                                }
                                 Layout.preferredWidth: 35
                                 horizontalAlignment: Text.AlignRight
                             }
