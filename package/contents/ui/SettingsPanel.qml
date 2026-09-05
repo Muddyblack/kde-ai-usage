@@ -481,6 +481,12 @@ ColumnLayout {
             configKey: "moonshotApiKey"
             rowVisible: Plasmoid.configuration.kimiEnabled
         }
+        KeyRow {
+            label: "Muse"
+            placeholder: "or $META_API_KEY"
+            configKey: "museApiKey"
+            rowVisible: Plasmoid.configuration.museEnabled
+        }
         RowLayout {
             Layout.fillWidth: true
             spacing: 4

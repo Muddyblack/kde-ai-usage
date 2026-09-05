@@ -322,6 +322,29 @@ check kimi-success "reports the Moonshot balance split" '
 check kimi-missing "reports a missing Moonshot API key" '
     (.ok | not) and .error == "Kimi: no Moonshot API key configured"'
 
+# ── Muse ────────────────────────────────────────────────────────────────────
+
+check muse-success "reports local session statistics" '
+    .ok and .details.hasOAuth and (.details.hasApiKey | not)
+    and .details.stats.totalSessions == 3 and .details.stats.totalOutputTokens == 30000
+    and .details.stats.model == "muse-spark-1.3-contributor"
+    and .summary.text == "30k out" and .historyValues == {mu: 30000}
+    and (.quotaWindows | length) == 3'
+check muse-error "passes the missing-sessions error through" '
+    (.ok | not) and .error == "Muse: No Muse sessions found — run muse once"'
+check muse-missing "reports empty input as no data" '
+    (.ok | not) and .error == "Muse: no data"'
+check muse-quota-success "renders live quota windows with rolling charts" '
+    .ok and .details.keyValid
+    and .details.email == "user@example.com" and .details.fullName == "Test User"
+    and (.quotaWindows | length) == 2
+    and (.quotaWindows[0] | .key == "muse_current" and .pct == 26 and .resetAt == 1788528365)
+    and (.quotaWindows[1] | .key == "muse_weekly" and .pct == 9 and .resetAt == 1788739200)
+    and .quotaWindows[0].detail == "26% used · resets Sep 4, 15:26"
+    and .summary.pct == 26 and .summary.text == "30k out"
+    and .historyValues == {mu: 30000, mc: 26, mw: 9}
+    and ([.chartWindows[].key] | sort) == ["mc", "mc", "mw"]'
+
 # ── End-to-end: settings toggles, key plumbing and the outer envelope ───────
 
 TEST_TMP="$(mktemp -d)"
@@ -331,7 +354,7 @@ cat >"$TEST_TMP/config.json" <<'JSON'
 {
   "providers": {
     "claude": false, "antigravity": false, "openai": false, "kiro": false,
-    "mistral": false, "openrouter": false, "grok": false,
+    "mistral": false, "openrouter": false, "grok": false, "muse": false,
     "zai": true, "copilot": true, "deepseek": true
   },
   "keys": { "zai": "zai-test", "github": "github-test", "deepseek": "deepseek-test" },
@@ -359,6 +382,9 @@ run_backend() {
         COPILOT_USER_RESPONSE_FILE="$TEST_TMP/github-user.json" \
         COPILOT_USAGE_RESPONSE_FILE="$TEST_TMP/github-usage.json" \
         DEEPSEEK_BALANCE_RESPONSE_FILE="$TEST_TMP/deepseek.json" \
+        MUSE_SESSIONS_DIR="$TEST_TMP/muse-sessions" \
+        MUSE_AUTH_PATH="$TEST_TMP/muse-auth.json" \
+        MUSE_QUOTA_RESPONSE_FILE="$TEST_TMP/muse-quota.json" \
         "$BACKEND" "$@"
 }
 
@@ -390,6 +416,43 @@ assert_backend "--provider fetches exactly what was asked for" '
 assert_backend "--provider ignores the enabled toggles" '
     (.providers | length) == 1 and .providers[0].id == "kiro"' --provider kiro
 
+mkdir -p "$TEST_TMP/muse-sessions/2026/09/04/aaa" "$TEST_TMP/muse-sessions/2026/09/04/aaa/subagent/bbb"
+cat >"$TEST_TMP/muse-auth.json" <<'JSON'
+{"providers": {"meta": {"mechanism": "oauth", "access_token": "muse-secret-token", "user_email": "test@example.com", "user_full_name": "Test User"}}}
+JSON
+cp "$FIXTURES/muse-quota.json" "$TEST_TMP/muse-quota.json"
+cat >"$TEST_TMP/muse-sessions/2026/09/04/aaa/session.jsonl" <<'JSON'
+{"schema_version":1,"id":"1","stream":{"kind":"session","id":"aaa"},"sequence":1,"recorded_at":1785000000000000,"record_type":"event","durability":"durable","causation_id":null,"payload_type":"runtime.session.metadata","payload_schema_version":1,"payload":{"kind":"metadata","record":{"workspace_root":"/tmp/secret-project"}}}
+{"schema_version":1,"id":"2","stream":{"kind":"session","id":"aaa"},"sequence":2,"recorded_at":1785000001000000,"record_type":"event","durability":"durable","causation_id":null,"payload_type":"run.model.configured","payload_schema_version":1,"payload":{"kind":"run_model","record":{"model_id":"test-model","provider_id":"meta"}}}
+{"schema_version":1,"id":"3","stream":{"kind":"session","id":"aaa"},"sequence":3,"recorded_at":1785000002000000,"record_type":"event","durability":"durable","causation_id":null,"payload_type":"runtime.session","payload_schema_version":1,"payload":{"kind":"run","run_id":"r1","event":{"kind":"user_prompt_display"}}}
+{"schema_version":1,"id":"4","stream":{"kind":"session","id":"aaa"},"sequence":4,"recorded_at":1785000003000000,"record_type":"event","durability":"durable","causation_id":null,"payload_type":"runtime.session","payload_schema_version":1,"payload":{"kind":"run","run_id":"r1","event":{"kind":"model_completed","model":"test-model","usage":{"input_tokens":1000,"output_tokens":200,"cached_tokens":50,"reasoning_tokens":10}}}}
+{"schema_version":1,"id":"5","stream":{"kind":"session","id":"aaa"},"sequence":5,"recorded_at":1785000004000000,"record_type":"event","durability":"durable","causation_id":null,"payload_type":"runtime.session","payload_schema_version":1,"payload":{"kind":"run","run_id":"r1","event":{"kind":"assistant_tool_calls_committed","tool_calls":[{"name":"bash"},{"name":"read"}]}}}
+{"schema_version":1,"id":"6","stream":{"kind":"session","id":"aaa"},"sequence":6,"recorded_at":1785000005000000,"record_type":"event","durability":"durable","causation_id":null,"payload_type":"runtime.session","payload_schema_version":1,"payload":{"kind":"run","run_id":"r1","event":{"kind":"assistant_message_committed"}}}
+{"schema_version":1,"id":"7","stream":{"kind":"session","id":"aaa"},"sequence":7,"recorded_at":1785000006000000,"record_type":"event","durability":"durable","causation_id":null,"payload_type":"runtime.session","payload_schema_version":1,"payload":{"kind":"run","run_id":"r1","event":{"kind":"terminal"}}}
+JSON
+printf '{"schema_version":1,"id":"8","stream":{"kind":"session","id":"bbb"},"sequence":1,"recorded_at":1785000007000000,"record_type":"event","durability":"durable","causation_id":null,"payload_type":"runtime.session","payload_schema_version":1,"payload":{"kind":"run","run_id":"r2","event":{"kind":"model_completed","model":"test-model","usage":{"input_tokens":500,"output_tokens":100,"cached_tokens":0,"reasoning_tokens":5}}}}\n' >"$TEST_TMP/muse-sessions/2026/09/04/aaa/subagent/bbb/session.jsonl"
+
+assert_backend "reads local Muse sessions with OAuth presence and no secret leaks" '
+    (.providers | length) == 1 and .providers[0].id == "muse"
+    and .providers[0].ok
+    and .providers[0].details.hasOAuth
+    and (.providers[0].details.hasApiKey | not)
+    and .providers[0].details.stats.totalSessions == 1
+    and .providers[0].details.stats.subagentSessions == 1
+    and .providers[0].details.stats.totalOutputTokens == 300
+    and .providers[0].details.stats.totalToolCalls == 2
+    and .providers[0].details.stats.totalMessages == 2
+    and .providers[0].details.stats.model == "test-model"
+    and .providers[0].details.stats.workspaceCount == 1
+    and .providers[0].details.email == "test@example.com"
+    and .providers[0].details.fullName == "Test User"
+    and .providers[0].historyValues.mu == 300
+    and (.providers[0].quotaWindows | length) == 2
+    and .providers[0].quotaWindows[0].pct == 26
+    and .providers[0].details.keyValid
+    and .providers[0].historyValues.mc == 26
+    and (tojson | test("muse-secret-token|secret-project") | not)' --provider muse
+
 checks=$((checks + 1))
 if run_backend --provider nonsense >/dev/null 2>&1; then
     printf 'FAIL: an unknown provider id should be rejected\n' >&2
@@ -398,7 +461,7 @@ fi
 
 cat >"$TEST_TMP/defaults.json" <<'JSON'
 {"providers": {"claude": false, "antigravity": false, "openai": false, "kiro": false,
-               "mistral": false, "openrouter": false, "grok": false}}
+               "mistral": false, "openrouter": false, "grok": false, "muse": false}}
 JSON
 checks=$((checks + 1))
 defaults="$(HOME="$TEST_TMP/home" AI_USAGE_CONFIG="$TEST_TMP/defaults.json" \

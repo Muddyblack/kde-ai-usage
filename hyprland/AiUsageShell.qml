@@ -97,6 +97,11 @@ ShellRoot {
             id: "deepseek",
             label: "DeepSeek",
             accent: "#4f8cff"
+        },
+        {
+            id: "muse",
+            label: "Muse",
+            accent: "#0064e0"
         }
     ]
 

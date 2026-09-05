@@ -468,6 +468,12 @@ ColumnLayout {
             placeholder: "or $DEEPSEEK_API_KEY"
             settingKey: "deepseek"
         }
+        KeyField {
+            shell: page.shell
+            label: "Muse"
+            placeholder: "or $META_API_KEY"
+            settingKey: "muse"
+        }
     }
 
     Text {

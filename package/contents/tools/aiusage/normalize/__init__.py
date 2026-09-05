@@ -7,6 +7,7 @@ from .grok import normalize_grok
 from .kiro import normalize_kiro
 from .mistral import normalize_mistral
 from .moonshot import normalize_moonshot
+from .muse import normalize_muse
 from .openai import normalize_openai
 from .openrouter import normalize_openrouter
 from .zai import normalize_zai
@@ -17,6 +18,7 @@ _DISPATCH = {
     "antigravity": normalize_antigravity,
     "kiro": normalize_kiro,
     "mistral": normalize_mistral,
+    "muse": normalize_muse,
     "openrouter": normalize_openrouter,
     "grok": normalize_grok,
     "zai": normalize_zai,

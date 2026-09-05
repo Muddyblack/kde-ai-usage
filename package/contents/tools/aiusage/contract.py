@@ -28,6 +28,7 @@ PROVIDER_ICONS = {
     "kimi": "kimi.svg",
     "kiro": "kiro.svg",
     "mistral": "mistral-color.svg",
+    "muse": "muse-color.svg",
     "openai": "openai.svg",
     "openrouter": "openrouter.svg",
     "zai": "zai.svg",

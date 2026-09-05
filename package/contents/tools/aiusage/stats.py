@@ -137,6 +137,74 @@ def claude_stats(s, now):
     }
 
 
+def muse_stats(s, now):
+    """Normalize the providers/muse.py aggregate blob.
+
+    Token sums follow the `muse trace inspect` convention (plain per-call
+    sums); per-call input_tokens are cumulative context, so the raw chart
+    series and the headline use output tokens, which are incremental.
+    """
+    if s is None or not isinstance(s, dict) or num(s.get("totalSessions")) + num(s.get("subagentSessions")) == 0:
+        return {"available": False}
+
+    usage = s.get("modelUsage") or {}
+    models = {}
+    favorite = ""
+    favorite_total = -1
+    for key, e in usage.items():
+        e = e or {}
+        out = num(e.get("outputTokens"))
+        models[key] = {
+            "input": num(e.get("inputTokens")),
+            "output": out,
+            "cached": num(e.get("cachedTokens")),
+            "reasoning": num(e.get("reasoningTokens")),
+            "total": num(e.get("totalTokens")),
+            "sessions": num(e.get("sessions")),
+            "contextWindow": num(e.get("contextWindow")),
+        }
+        if out > favorite_total:
+            favorite, favorite_total = key, out
+
+    dates = [(a.get("date") or "") for a in (s.get("dailyActivity") or []) if a is not None and (a.get("date") or "") != ""]
+    streaks = activity_streaks(dates, now)
+
+    daily_tokens = [{"date": a.get("date") or "", "total": num(a.get("total"))} for a in (s.get("dailyModelTokens") or [])]
+    daily_tokens.sort(key=lambda a: a["date"])
+
+    longest = s.get("longestSession") or {}
+
+    return {
+        "available": True,
+        "totalSessions": num(s.get("totalSessions")),
+        "subagentSessions": num(s.get("subagentSessions")),
+        "totalMessages": num(s.get("totalMessages")),
+        "totalTokens": num(s.get("totalTokens")),
+        "totalInputTokens": num(s.get("totalInputTokens")),
+        "totalOutputTokens": num(s.get("totalOutputTokens")),
+        "totalCachedTokens": num(s.get("totalCachedTokens")),
+        "totalReasoningTokens": num(s.get("totalReasoningTokens")),
+        "totalToolCalls": num(s.get("totalToolCalls")),
+        "totalTurns": num(s.get("totalTurns")),
+        "totalModelCalls": num(s.get("totalModelCalls")),
+        "maxContextTokens": num(s.get("maxContextTokens")),
+        "workspaceCount": num(s.get("workspaceCount")),
+        "favoriteModel": favorite,
+        "firstDate": s.get("firstSessionDate") or "",
+        "computedDate": s.get("lastComputedDate") or "",
+        "activeDays": len(set(dates)),
+        "spanDays": span_days_since(s.get("firstSessionDate") or "", now),
+        "currentStreak": streaks["current"],
+        "longestStreak": streaks["longest"],
+        "longestSessionMs": num(longest.get("duration")),
+        "longestSessionMessages": num(longest.get("messageCount")),
+        "peakHour": peak_hour(s.get("hourCounts") or {}),
+        "models": models,
+        "dailyTokens": daily_tokens,
+        "model": s.get("model") or "",
+    }
+
+
 def codex_stats(s, now):
     if s is None or not isinstance(s, dict) or num(s.get("totalSessions")) == 0:
         return {"available": False}

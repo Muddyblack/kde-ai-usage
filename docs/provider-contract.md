@@ -158,6 +158,8 @@ after wake-up (`UsageHistory.withResets`).
 | `za` | Z.AI tokens |
 | `gh` | Copilot premium requests |
 | `ds` | DeepSeek balance (absolute) |
+| `mu` | Muse output tokens (absolute) |
+| `mc` / `mw` | Muse Current / Weekly quota pct (phase 2) |
 
 ### Credentials
 
@@ -239,6 +241,18 @@ statistic must not cost them.
 **deepseek** — `hasKey`, `keyValid`, `isAvailable`, `balances`,
 `primaryCurrency`, `primaryTotal`, `primaryGranted`, `primaryToppedUp`,
 `currency`, `symbol`.
+
+**muse** — `hasOAuth`, `hasApiKey`, `keyValid`, `planType`, `email`,
+`fullName` (display identity from the CLI login store), `current` /
+`weekly` (`available`, `pct`, `resetAt`; empty when no credential or when
+the quota fetch fails — see `get_muse_quota`), `stats` (`available`,
+`totalSessions`, `subagentSessions`, `totalMessages`, `totalTokens`,
+`totalInputTokens`, `totalOutputTokens`, `totalCachedTokens`,
+`totalReasoningTokens`, `totalToolCalls`, `totalTurns`, `totalModelCalls`,
+`maxContextTokens`, `workspaceCount`, `favoriteModel`, `firstDate`,
+`computedDate`, `activeDays`, `spanDays`, `currentStreak`, `longestStreak`,
+`longestSessionMs`, `longestSessionMessages`, `peakHour`, `models`,
+`dailyTokens`, `model`).
 
 ### Shared sub-objects
 

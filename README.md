@@ -44,13 +44,13 @@
   <img src="./readme/settings.svg?v=10" alt="Settings panel" width="340" valign="top"/>
 </p>
 
-A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple services. Monitor your **Claude** subscription windows and local activity stats, **Antigravity/Google AI Studio**, **OpenAI API and Codex plan limits**, **Grok CLI**, **Kiro**, **Mistral AI**, **OpenRouter**, **Z.AI**, **GitHub Copilot**, **DeepSeek**, and **Kimi / Moonshot AI** usage or balance at a glance with animated segmented bars, live countdown timers, account status, and per-model breakdowns.
+A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple services. Monitor your **Claude** subscription windows and local activity stats, **Antigravity/Google AI Studio**, **OpenAI API and Codex plan limits**, **Grok CLI**, **Kiro**, **Mistral AI**, **OpenRouter**, **Z.AI**, **GitHub Copilot**, **DeepSeek**, **Kimi / Moonshot AI**, and **Muse** usage or balance at a glance with animated segmented bars, live countdown timers, account status, and per-model breakdowns.
 
 ---
 
 ## Features
 
-- **Multi-service support** — Switch between Claude, Antigravity, OpenAI, Grok, Kiro, Mistral, OpenRouter, Z.AI, GitHub Copilot, DeepSeek, and Kimi tabs in the popup
+- **Multi-service support** — Switch between Claude, Antigravity, OpenAI, Grok, Kiro, Mistral, OpenRouter, Z.AI, GitHub Copilot, DeepSeek, Kimi, and Muse tabs in the popup
 - **Balance tracking** — DeepSeek current balance with granted / topped-up breakdown
 - **Panel view** — Compact percentage readouts in the taskbar, color-coded by usage level, with an inline spark-line trend
 - **Popup view** — Segmented bars showing exact fill level with reset times and countdowns
@@ -88,6 +88,7 @@ A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple serv
 | GitHub Copilot | Monthly premium request usage against a configurable quota | Personal billing supported; organization/enterprise billing not yet supported |
 | DeepSeek | Available balance with granted and topped-up breakdown | Supported |
 | Kimi / Moonshot AI | Available balance with voucher and cash breakdown | Supported |
+| Muse | Current/Weekly subscription windows plus local session stats (sessions, output/reasoning tokens, tool calls, turns) | Supported |
 
 Provider APIs do not all expose the same information. In particular, Codex/ChatGPT
 plan limits are separate from OpenAI API organization usage, DeepSeek reports a
@@ -120,6 +121,7 @@ Enable only the services you use. Each one has its own setup requirement:
 | GitHub Copilot | A GitHub token from widget settings, `$GITHUB_TOKEN`, or `~/.config/github-copilot/token`, with fine-grained **Plan: read** permission; personal billing only. The quota defaults to 300 and is configurable |
 | DeepSeek | A DeepSeek API key from widget settings, `$DEEPSEEK_API_KEY`, or `~/.config/deepseek/api-key` |
 | Kimi / Moonshot AI | A Moonshot API key from widget settings, `$MOONSHOT_API_KEY`, `$KIMI_API_KEY`, or `~/.config/moonshot/api-key` |
+| Muse | Muse CLI, logged in with `muse login`; a Meta API key is optional (`$META_API_KEY` takes priority) |
 
 All configuration is done in the widget's settings panel (right-click the widget → *Configure*). See [How it works](#how-it-works) below for what each tab reads and where credentials are resolved from.
 
@@ -347,6 +349,11 @@ The DeepSeek tab calls `GET https://api.deepseek.com/user/balance` with the conf
 
 ### Kimi / Moonshot AI
 The Kimi tab calls `GET https://api.moonshot.ai/v1/users/me/balance` and shows the available, voucher, and cash balances. The key is resolved from widget settings → `$MOONSHOT_API_KEY` / `$KIMI_API_KEY` → `~/.config/moonshot/api-key`.
+
+### Muse
+The Muse tab aggregates the Muse Code session logs (`~/.local/share/muse/sessions/`) fully offline: session and subagent counts, output/reasoning token totals, tool calls, turns, per-model breakdown, and a 30-day output chart. Per-call input tokens are cumulative context, so the headline and chart use output tokens, which are incremental.
+
+The Current (5-hour) and Weekly subscription windows from the in-TUI `/usage` view come from one minimal streaming Responses call (`store: false`, 16 output tokens max): the server emits a `response.subscription_usage` event with `{window: {used_percent, resets_at, window_duration_mins}, weekly: {used_percent, resets_at}}`. The credential is an explicit `META_API_KEY` first (widget settings or environment — it takes priority, matching the CLI), falling back to the `api_key` of the Muse OAuth login (`$MUSE_AUTH_PATH` or `~/.config/muse/auth.json`); the OIDC `access_token` is not valid on the Model API. Quota is cached for 15 minutes (`MUSE_QUOTA_TTL_SECONDS`), so the default 5-minute poll costs a handful of tokens per quarter hour, and any quota failure degrades to the local statistics. Credentials never reach a frontend — only presence flags do.
 
 ### Usage history
 Each refresh appends the usage values that a provider actually reports to a rolling history (the last 500 samples) used by the chart, spark-lines, burn-rate ETA, and period comparison. Rolling plan windows (Claude, Codex) empty at a known instant, so when the machine was asleep across one the chart replays the drop where it actually happened instead of sloping from the last pre-sleep sample to the first one after wake-up. Most series are percentages; Mistral stores its raw vibe CLI spend and DeepSeek stores its raw balance so their charts retain meaningful units. Existing session and weekly history fields are retained even while a window is unavailable, so five-hour charts can return without migration if providers restore that limit. History is stored in the widget's Plasma config **and** mirrored to `~/.local/share/ai-usage-widget/usage-history-latest.json`, so it survives a full uninstall/reinstall — on first launch with no config history, the widget restores from that file automatically. You can also manually **Export** (writes a timestamped JSON copy) and **Import** from the settings panel. If a saved file is unreadable or in an unrecognized format, it's discarded and history starts fresh rather than erroring out.

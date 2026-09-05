@@ -21,6 +21,7 @@ from .providers.grok import get_grok_usage
 from .providers.kiro import get_kiro_usage
 from .providers.mistral import get_mistral_usage
 from .providers.moonshot import get_moonshot_balance
+from .providers.muse import get_muse_usage
 from .providers.openai_credentials import get_openai_credentials
 from .providers.openrouter import get_openrouter_usage
 from .providers.zai import get_zai_usage
@@ -186,6 +187,7 @@ _SIMPLE = {
     "antigravity": (get_antigravity_usage, None, None),
     "kiro": (get_kiro_usage, None, None),
     "mistral": (get_mistral_usage, "mistral", "https://status.mistral.ai/api/v2/summary.json"),
+    "muse": (get_muse_usage, None, None),
     "openrouter": (get_openrouter_usage, "openrouter", "https://status.openrouter.ai/api/v2/summary.json"),
     "grok": (get_grok_usage, None, None),
     "zai": (get_zai_usage, None, None),
