@@ -72,3 +72,6 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+
+# Local scratch (see CLAUDE.md: use ./tmp, never system /tmp)
+tmp/

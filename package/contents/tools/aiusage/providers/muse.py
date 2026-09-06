@@ -26,7 +26,7 @@ emits a response.subscription_usage event carrying
 {window: {used_percent, resets_at, window_duration_mins},
  weekly: {used_percent, resets_at}}. The call uses store:false,
 max_output_tokens:16 and costs a handful of tokens; quota is cached for
-MUSE_QUOTA_TTL_SECONDS (default 900) so a 5-minute poll interval does not
+MUSE_QUOTA_TTL_SECONDS (default 1800) so a 5-minute poll interval does not
 turn into a per-poll model call. Any quota failure degrades to local
 session statistics — it never fails the provider.
 """
@@ -318,16 +318,68 @@ def _muse_key():
     return resolve_key("WIDGET_MUSE_API_KEY", "META_API_KEY")
 
 
-_QUOTA_URL = "https://api.meta.ai/v1/responses"
+_QUOTA_BASE_URL = "https://api.meta.ai/v1"
+_QUOTA_URL = _QUOTA_BASE_URL + "/responses"
 _QUOTA_MODEL = "muse-spark-1.3"
 _QUOTA_TIMEOUT = 15
 
 
 def _quota_ttl():
     try:
-        return max(0, int(os.environ.get("MUSE_QUOTA_TTL_SECONDS", "900")))
+        return max(0, int(os.environ.get("MUSE_QUOTA_TTL_SECONDS", "1800")))
     except ValueError:
-        return 900
+        return 1800
+
+
+def _fetch_models(api_key):
+    """Account chat-model ids via a free GET (no tokens spent).
+
+    Lets the quota call track the newest model instead of a hardcoded id.
+    Runs at most once per quota refresh, and only when the local logs name
+    no usable model.
+    """
+    fixture_path = os.environ.get("MUSE_MODELS_RESPONSE_FILE")
+    if fixture_path and os.path.isfile(fixture_path):
+        try:
+            with open(fixture_path, errors="replace") as f:
+                doc = json.load(f)
+        except (OSError, ValueError):
+            return []
+        rows = doc.get("data") if isinstance(doc, dict) else doc
+        if not isinstance(rows, list):
+            return []
+        return [str(r.get("id") or "") for r in rows if isinstance(r, dict) and r.get("id")]
+    if not api_key:
+        return []
+
+    import urllib.error
+    import urllib.request
+
+    req = urllib.request.Request(
+        _QUOTA_BASE_URL + "/models",
+        headers={"Authorization": f"Bearer {api_key}", "Accept": "application/json", "User-Agent": "kde-ai-usage/muse"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=_QUOTA_TIMEOUT) as resp:
+            doc = json.loads(resp.read().decode("utf-8", "replace"))
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+        return []
+    rows = doc.get("data") if isinstance(doc, dict) else []
+    if not isinstance(rows, list):
+        return []
+    return [str(r.get("id") or "") for r in rows if isinstance(r, dict) and r.get("id")]
+
+
+def _quota_model(stats_model, api_key):
+    """Model id for the quota call: what the user actually runs (from local
+    logs), else the account list, else the last-known default. The snapshot
+    is account-level, so any chat model returns the same windows."""
+    if stats_model and stats_model != "unknown" and "spark" in stats_model:
+        return stats_model
+    for mid in _fetch_models(api_key):
+        if "spark" in mid and "voice" not in mid and "image" not in mid:
+            return mid
+    return _QUOTA_MODEL
 
 
 def _auth_api_key():
@@ -381,8 +433,15 @@ def _write_quota_cache(quota):
 
 
 def _parse_subscription_event(body):
-    """First response.subscription_usage object in an SSE stream, or {}."""
+    """First response.subscription_usage object in an SSE stream, or {}.
+
+    Line endings are normalised first: an SSE frame boundary is a blank line,
+    which on the wire is frequently CRLF CRLF. Splitting a CRLF stream on
+    "\n\n" finds no boundary at all and silently returns {} — the quota would
+    just never appear, with no error to explain it.
+    """
     buf = body if isinstance(body, str) else ""
+    buf = buf.replace("\r\n", "\n")
     start = 0
     while True:
         end = buf.find("\n\n", start)
@@ -424,23 +483,45 @@ def _subscription_to_quota(sub):
     return quota
 
 
-def _fetch_quota_sse(api_key, fixture_path=None):
+def _quota_error_code(exc):
+    """Stable reason code for a failed quota fetch.
+
+    Separates "the server said no" from "we could not ask". Without this a
+    network timeout was indistinguishable from a rejected credential, so a
+    flaky connection made the tab report the key as invalid.
+    """
+    status = getattr(exc, "code", None)
+    if status in (401, 403):
+        return "rejected"
+    return "unreachable"
+
+
+def _fetch_quota_sse(api_key, model, fixture_path=None):
+    """(quota, error): error is "" on success, else a _quota_error_code value."""
     if fixture_path and os.path.isfile(fixture_path):
         try:
-            with open(fixture_path, errors="replace") as f:
-                doc = json.load(f)
-        except (OSError, ValueError):
-            return {}
+            # newline="" disables universal-newline translation: a replayed
+            # capture has to carry the CRLF the wire actually sent, or it
+            # silently tests a stream nobody ever receives.
+            with open(fixture_path, errors="replace", newline="") as f:
+                raw = f.read()
+        except OSError:
+            return {}, "unreachable"
+        try:
+            doc = json.loads(raw)
+        except ValueError:
+            # Not JSON: replay it as a raw SSE capture, CRLF included.
+            return _subscription_to_quota(_parse_subscription_event(raw)), ""
         if isinstance(doc, dict) and isinstance(doc.get("subscription"), dict):
             doc = doc["subscription"]
-        return _subscription_to_quota(doc)
+        return _subscription_to_quota(doc), ""
 
     import urllib.error
     import urllib.request
 
     body = json.dumps(
         {
-            "model": _QUOTA_MODEL,
+            "model": model,
             "input": "ping",
             "stream": True,
             "max_output_tokens": 16,
@@ -461,34 +542,60 @@ def _fetch_quota_sse(api_key, fixture_path=None):
     try:
         with urllib.request.urlopen(req, timeout=_QUOTA_TIMEOUT) as resp:
             raw = resp.read().decode("utf-8", "replace")
-    except (urllib.error.URLError, TimeoutError, OSError):
-        return {}
-    return _subscription_to_quota(_parse_subscription_event(raw))
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        return {}, _quota_error_code(exc)
+    # A 200 with no snapshot is not a failure: the account simply reports no
+    # subscription windows. Only an unusable answer gets an error code.
+    return _subscription_to_quota(_parse_subscription_event(raw)), ""
 
 
-def get_muse_quota(api_key=""):
-    """Current/Weekly subscription windows, cached, never fatal.
+def get_muse_quota(api_key="", stats_model=""):
+    """(quota, error): Current/Weekly subscription windows, cached, never fatal.
+
+    `error` is "" when the snapshot came back (or when the account simply has
+    no windows), and otherwise one of "disabled", "no-credential", "rejected"
+    or "unreachable" — so the frontend can say "could not reach Meta" instead
+    of accusing a working credential of being invalid.
 
     Credential order mirrors the CLI: an explicit META_API_KEY (widget
     field or environment) wins over the OAuth login's own api_key, exactly
-    like the CLI's "META_API_KEY always takes priority".
+    like the CLI's "META_API_KEY always takes priority". The call needs a
+    chat model id but the snapshot is account-level, so the model is picked
+    dynamically (local logs, then the free account list) with the
+    last-known default as fallback.
+
+    One refresh costs a minimal streaming call (~12 input + ~120 output
+    tokens, mostly reasoning, store:false so nothing is kept server-side).
+    The stream cannot be cut short to save the output tokens: the server
+    emits response.subscription_usage as the LAST event, after
+    response.incomplete (probed live — created, in_progress,
+    output_item.added, incomplete, subscription_usage), so the generation
+    is already paid for by the time the snapshot arrives.
+    There is no free endpoint for this data (verified: the usual billing
+    paths all 404 and the snapshot exists only on the Responses stream),
+    so the switch defaults to OFF: without WIDGET_MUSE_QUOTA=1 (or
+    museQuota=true) no call is made at all and the provider renders the free
+    offline statistics only.
     """
+    if not _config.muse_quota_enabled():
+        return {}, "disabled"
     fixture_path = os.environ.get("MUSE_QUOTA_RESPONSE_FILE")
     if fixture_path and os.path.isfile(fixture_path):
         # Test replay, like fetch_json's fixture_path: no credential needed.
-        return _fetch_quota_sse("", fixture_path=fixture_path)
+        return _fetch_quota_sse("", "", fixture_path=fixture_path)
     key = _clean(api_key) or _auth_api_key()
     if not key:
-        return {}
+        return {}, "no-credential"
+    model = _quota_model(stats_model, key)
     ttl = _quota_ttl()
     if ttl > 0:
         cached = _read_quota_cache(ttl)
         if cached is not None:
-            return cached
-    quota = _fetch_quota_sse(key)
+            return cached, ""
+    quota, error = _fetch_quota_sse(key, model)
     if quota and ttl > 0:
         _write_quota_cache(quota)
-    return quota
+    return quota, error
 
 
 def get_muse_usage():
@@ -498,19 +605,24 @@ def get_muse_usage():
     has_oauth = slot is not None
     api_key = _muse_key()
     oauth_key = "" if api_key else _clean(meta.get("api_key") or "")
-    quota = get_muse_quota(api_key or oauth_key)
     base = {
         "hasOAuth": has_oauth,
         "hasApiKey": bool(api_key) or bool(oauth_key),
-        "keyValid": bool(quota),
-        "quota": quota,
+        "keyValid": False,
+        "quota": {},
+        "quotaError": "",
         "email": str(meta.get("user_email") or ""),
         "fullName": str(meta.get("user_full_name") or ""),
     }
 
     root = sessions_root()
     if not os.path.isdir(root):
-        base["error"] = "No Muse sessions found — run muse once"
+        base["quota"], base["quotaError"] = get_muse_quota(api_key or oauth_key)
+        base["keyValid"] = bool(base["quota"])
+        if not base["quota"]:
+            base["error"] = "No Muse sessions found — run muse once"
+        else:
+            base["stats"] = {"available": False}
         return base
 
     try:
@@ -565,8 +677,17 @@ def get_muse_usage():
         except OSError:
             pass
 
-    if not isinstance(stats, dict) or stats.get("totalSessions", 0) + stats.get("subagentSessions", 0) == 0:
-        base["error"] = "No Muse sessions found — run muse once"
+    has_sessions = isinstance(stats, dict) and stats.get("totalSessions", 0) + stats.get("subagentSessions", 0) > 0
+    model_hint = stats.get("model", "") if isinstance(stats, dict) else ""
+    quota, quota_error = get_muse_quota(api_key or oauth_key, model_hint)
+    base["quota"] = quota
+    base["quotaError"] = quota_error
+    base["keyValid"] = bool(quota)
+    if has_sessions:
+        base["stats"] = stats
         return base
-    base["stats"] = stats
+    if quota:
+        base["stats"] = {"available": False}
+        return base
+    base["error"] = "No Muse sessions found — run muse once"
     return base

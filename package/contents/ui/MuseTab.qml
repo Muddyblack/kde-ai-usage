@@ -17,13 +17,33 @@ ColumnLayout {
         spacing: 8
         visible: rootItem.museSessions > 0 || rootItem.museCurrentAvailable
 
-        Kirigami.Icon {
-            source: "code-context"
+        // Brand mark, with the generic symbolic icon as the only fallback —
+        // same Image/status === Image.Error pattern the panel slots use.
+        Item {
             width: 14
             height: 14
-            color: rootItem.museBlue
-            isMask: true
-            opacity: 0.75
+            Layout.alignment: Qt.AlignVCenter
+
+            Image {
+                id: museHeaderIcon
+                anchors.fill: parent
+                source: Qt.resolvedUrl("../icons/muse-color.svg")
+                sourceSize.width: 28
+                sourceSize.height: 28
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+                opacity: 0.9
+                visible: status !== Image.Error
+            }
+
+            Kirigami.Icon {
+                anchors.fill: parent
+                source: "code-context"
+                color: rootItem.museBlue
+                isMask: true
+                opacity: 0.75
+                visible: museHeaderIcon.status === Image.Error
+            }
         }
 
         PlasmaComponents.Label {
@@ -50,9 +70,9 @@ ColumnLayout {
             height: 18
             width: musePlanBadgeLabel.implicitWidth + 12
             radius: 4
-            color: Qt.rgba(0.0, 0.39, 0.88, 0.18)
+            color: Qt.rgba(rootItem.museBlue.r, rootItem.museBlue.g, rootItem.museBlue.b, 0.18)
             border.width: 1
-            border.color: Qt.rgba(0.0, 0.39, 0.88, 0.35)
+            border.color: Qt.rgba(rootItem.museBlue.r, rootItem.museBlue.g, rootItem.museBlue.b, 0.35)
             PlasmaComponents.Label {
                 id: musePlanBadgeLabel
                 anchors.centerIn: parent
@@ -93,7 +113,7 @@ ColumnLayout {
             text: "Muse error"
             font.pixelSize: 12
             font.bold: true
-            color: "#ef4444"
+            color: Kirigami.Theme.negativeTextColor
         }
         PlasmaComponents.Label {
             text: rootItem.museError
@@ -110,44 +130,52 @@ ColumnLayout {
         Layout.fillWidth: true
         spacing: 8
 
-        Repeater {
-            model: [
-                { "label": "Current", "available": rootItem.museCurrentAvailable, "pct": rootItem.museCurrentPct, "countdown": rootItem.museCurrentCountdown },
-                { "label": "Weekly", "available": rootItem.museWeeklyAvailable, "pct": rootItem.museWeeklyPct, "countdown": rootItem.museWeeklyCountdown }
-            ]
-            delegate: ColumnLayout {
-                visible: modelData.available
-                Layout.fillWidth: true
-                spacing: 4
-                RowLayout {
-                    Layout.fillWidth: true
-                    PlasmaComponents.Label {
-                        text: modelData.label
-                        font.pixelSize: 11
-                        opacity: 0.65
-                        color: Kirigami.Theme.textColor
-                        Layout.fillWidth: true
-                    }
-                    PlasmaComponents.Label {
-                        text: Math.round(modelData.pct) + "%" + (modelData.countdown ? " · " + modelData.countdown : "")
-                        font.pixelSize: 12
-                        font.bold: true
-                        color: rootItem.usageColor(modelData.pct)
-                    }
-                }
-                Rectangle {
-                    Layout.fillWidth: true
-                    height: 6
-                    radius: 3
-                    color: Qt.rgba(1, 1, 1, 0.08)
-                    Rectangle {
-                        width: parent.width * Math.min(100, Math.max(0, modelData.pct)) / 100
-                        height: parent.height
-                        radius: parent.radius
-                        color: rootItem.usageColor(modelData.pct)
-                    }
-                }
-            }
+        // Shared segmented bar, same as every other quota tab. Muse exposes no
+        // token counts or burn rate, so tokenText/etaText stay unset.
+        PopupRow {
+            visible: rootItem.museCurrentAvailable
+            label: "Current"
+            value: rootItem.museCurrentPct
+            barColor: rootItem.museBlue
+            countdownText: rootItem.museCurrentCountdown !== "" ? "in " + rootItem.museCurrentCountdown : ""
+            tooltipText: "Muse current usage window" + (rootItem.museCurrentCountdown !== "" ? "\nResets in " + rootItem.museCurrentCountdown : "")
+        }
+
+        PopupRow {
+            visible: rootItem.museWeeklyAvailable
+            label: "Weekly"
+            value: rootItem.museWeeklyPct
+            barColor: rootItem.museBlue
+            countdownText: rootItem.museWeeklyCountdown !== "" ? "in " + rootItem.museWeeklyCountdown : ""
+            tooltipText: "Muse weekly usage window" + (rootItem.museWeeklyCountdown !== "" ? "\nResets in " + rootItem.museWeeklyCountdown : "")
+        }
+    }
+
+    // Why the quota bars are missing, when the reason is worth acting on. A
+    // disabled switch or an absent login are the user's own doing and stay
+    // silent; a refused or unreachable endpoint is not.
+    RowLayout {
+        visible: !rootItem.museCurrentAvailable && !rootItem.museWeeklyAvailable && (rootItem.museQuotaError === "rejected" || rootItem.museQuotaError === "unreachable")
+        Layout.fillWidth: true
+        spacing: 5
+
+        Kirigami.Icon {
+            source: rootItem.museQuotaError === "rejected" ? "dialog-warning" : "network-disconnect"
+            width: 11
+            height: 11
+            isMask: true
+            color: Kirigami.Theme.neutralTextColor
+            opacity: 0.8
+            Layout.alignment: Qt.AlignVCenter
+        }
+
+        PlasmaComponents.Label {
+            text: rootItem.museQuotaError === "rejected" ? "Live quota refused — check the Muse login" : "Live quota unreachable — showing local statistics"
+            font.pixelSize: 10
+            opacity: 0.6
+            color: Kirigami.Theme.textColor
+            wrapMode: Text.WordWrap
+            Layout.fillWidth: true
         }
     }
 

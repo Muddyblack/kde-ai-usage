@@ -305,6 +305,10 @@ PlasmoidItem {
     property bool museHasOAuth: false
     property bool museHasApiKey: false
     property bool museKeyValid: false
+    // "" | "disabled" | "no-credential" | "rejected" | "unreachable" — why the
+    // quota is missing, so the tab can say "couldn't reach Meta" instead of
+    // letting a network timeout look like a bad credential.
+    property string museQuotaError: ""
     property string musePlanType: ""
     property string museEmail: ""
     property string museFullName: ""
@@ -1071,6 +1075,7 @@ PlasmoidItem {
         env += root.envAssign("WIDGET_DEEPSEEK_API_KEY", Plasmoid.configuration.deepseekApiKey);
         env += root.envAssign("WIDGET_MOONSHOT_API_KEY", Plasmoid.configuration.moonshotApiKey);
         env += root.envAssign("WIDGET_MUSE_API_KEY", Plasmoid.configuration.museApiKey);
+        env += "WIDGET_MUSE_QUOTA=" + (Plasmoid.configuration.museQuotaEnabled === true ? "1" : "0") + " ";
         var quota = parseInt(Plasmoid.configuration.copilotQuota || 300);
         if (isNaN(quota) || quota <= 0)
             quota = 300;
@@ -1443,6 +1448,7 @@ PlasmoidItem {
         root.museHasOAuth = d.hasOAuth === true;
         root.museHasApiKey = d.hasApiKey === true;
         root.museKeyValid = d.keyValid === true;
+        root.museQuotaError = d.quotaError || "";
         root.musePlanType = d.planType || "";
         root.museEmail = d.email || "";
         root.museFullName = d.fullName || "";

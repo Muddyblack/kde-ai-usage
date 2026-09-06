@@ -82,6 +82,22 @@ def apply_widget_env(cfg):
             quota = 300
         os.environ["WIDGET_COPILOT_QUOTA"] = str(quota)
 
+    if not os.environ.get("WIDGET_MUSE_QUOTA"):
+        os.environ["WIDGET_MUSE_QUOTA"] = "1" if cfg.get("museQuota", False) is True else "0"
+
+
+def muse_quota_enabled():
+    """Live quota costs one minimal model call per TTL, so it is OFF until the
+    user asks for it.
+
+    The provider contract says reading a statistic must not cost the user, and
+    Meta exposes this snapshot only on a billed Responses stream — there is no
+    free endpoint, no local copy, and the event arrives last so the stream
+    cannot be cut short. Opt-in is the only way to honour the contract by
+    default: out of the box the provider reads local session logs and spends
+    nothing."""
+    return os.environ.get("WIDGET_MUSE_QUOTA", "0").strip().lower() not in ("0", "false", "no", "off")
+
 
 def provider_enabled(cfg, provider_id):
     providers = cfg.get("providers") or {}

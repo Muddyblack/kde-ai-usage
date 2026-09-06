@@ -1,4 +1,5 @@
 from ..contract import (
+    compact_tokens,
     epoch_of,
     flat_window,
     monthly_window,
@@ -19,15 +20,13 @@ def _pct_text(pct):
     return f"{pct_clamp(num(pct)):g}%"
 
 
+# The panel pills want the shortest thing that still reads as a count ("30k",
+# not "30.00K"), and Muse reports output tokens only — no billions in sight.
+_MUSE_UNITS = (("M", 1000000), ("k", 1000))
+
+
 def _compact(v):
-    v = num(v)
-    if v >= 1000000:
-        s = v / 1000000
-        return f"{s:.1f}M".replace(".0M", "M")
-    if v >= 1000:
-        s = v / 1000
-        return f"{s:.1f}k".replace(".0k", "k")
-    return str(int(v))
+    return compact_tokens(v, units=_MUSE_UNITS)
 
 
 def _quota_section(quota):
@@ -74,23 +73,42 @@ def _quota_section(quota):
     return windows, charts, history
 
 
+def _blank_details():
+    """The details shape with nothing known — what an unusable `usage` yields."""
+    return {
+        "hasOAuth": False,
+        "hasApiKey": False,
+        "keyValid": False,
+        "quotaError": "",
+        "planType": "",
+        "email": "",
+        "fullName": "",
+        "current": {},
+        "weekly": {},
+    }
+
+
 def normalize_muse(raw):
     now = raw["now"]
     res = raw["inputs"].get("usage") or {}
+
+    # First statement on purpose: every res.get() below assumes a dict, so a
+    # list or a string reaching here would raise AttributeError rather than
+    # degrade to "no data".
+    if not isinstance(res, dict) or len(res) == 0:
+        return provider_error("muse", "Muse", _MUSE_ACCENT, now, "Muse: no data", _blank_details())
 
     details_base = {
         "hasOAuth": res.get("hasOAuth") is True,
         "hasApiKey": res.get("hasApiKey") is True,
         "keyValid": res.get("keyValid") is True,
+        "quotaError": str(res.get("quotaError") or ""),
         "planType": "",
         "email": str(res.get("email") or ""),
         "fullName": str(res.get("fullName") or ""),
         "current": {},
         "weekly": {},
     }
-
-    if not isinstance(res, dict) or len(res) == 0:
-        return provider_error("muse", "Muse", _MUSE_ACCENT, now, "Muse: no data", details_base)
     if res.get("error") is not None:
         details = dict(details_base)
         details["stats"] = {"available": False}
@@ -99,16 +117,17 @@ def normalize_muse(raw):
     quota = res.get("quota") or {}
     plan = str(quota.get("plan") or "")
     stats = muse_stats(res.get("stats") or {}, now)
-    if not stats.get("available"):
+    quota_windows, quota_charts, quota_history = _quota_section(quota)
+    if not stats.get("available") and not quota_windows:
         details = dict(details_base)
         details["stats"] = stats
         return provider_error("muse", "Muse", _MUSE_ACCENT, now, "Muse: no sessions found", details)
 
-    sessions = stats["totalSessions"]
-    model = stats["model"] or stats["favoriteModel"]
-    out = stats["totalOutputTokens"]
+    has_stats = stats.get("available") is True
+    sessions = stats.get("totalSessions", 0)
+    model = stats.get("model") or stats.get("favoriteModel") or ""
+    out = stats.get("totalOutputTokens", 0)
 
-    quota_windows, quota_charts, quota_history = _quota_section(quota)
     if quota_windows:
         headline_pct = quota_windows[0]["pct"]
         label = f"{quota_windows[0]['label']} {_pct_text(headline_pct)}"
@@ -118,7 +137,8 @@ def normalize_muse(raw):
         detail = f"{sessions} sessions · {model}" if model else f"{sessions} sessions"
 
     r = provider_base("muse", "Muse", _MUSE_ACCENT, now)
-    r["summary"] = {"pct": headline_pct, "text": _compact(out) + " out", "detail": detail, "hasChart": True}
+    summary_text = _compact(out) + " out" if has_stats else _pct_text(headline_pct)
+    r["summary"] = {"pct": headline_pct, "text": summary_text, "detail": detail, "hasChart": True}
     if quota_windows:
         r["quotaWindows"] = quota_windows
     else:
@@ -127,14 +147,14 @@ def normalize_muse(raw):
             flat_window("muse_output", "Output tokens", 0, 0, _compact(out), False),
             flat_window("muse_tools", "Tool calls", 0, 0, _compact(stats["totalToolCalls"]), False),
         ]
+    slot_text = _compact(out) if has_stats else _pct_text(headline_pct)
+    slot_tip = f"Muse output tokens: {_compact(out)} in {sessions} sessions" if has_stats else f"Muse quota · {plan}" if plan else "Muse quota"
     r["slots"] = [
         {
             "pct": headline_pct,
             "color": _MUSE_ACCENT,
-            "text": _compact(out),
-            "tooltip": f"Muse output tokens: {_compact(out)} in {sessions} sessions"
-            + (f"\n{plan}" if plan else "")
-            + (f"\nCurrent: {quota_windows[0]['detail']}" if quota_windows else ""),
+            "text": slot_text,
+            "tooltip": slot_tip + (f"\n{plan}" if plan and has_stats else "") + (f"\nCurrent: {quota_windows[0]['detail']}" if quota_windows else ""),
         }
     ]
     r["chartWindows"] = quota_charts if quota_charts else monthly_window("muse", "mu", True)

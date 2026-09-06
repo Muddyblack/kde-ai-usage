@@ -462,6 +462,27 @@ ColumnLayout {
             settingKey: "copilotQuota"
             secret: false
         }
+
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 6
+            Text {
+                text: "Muse live quota"
+                font.pixelSize: 11
+                color: "#f8fafc"
+                Layout.preferredWidth: 90
+            }
+            Toggle {
+                checked: page.shell.settings.museQuota === true
+                onToggled: page.shell.setSetting2("museQuota", checked)
+            }
+            Text {
+                text: "off by default · one tiny model call per 30 min"
+                font.pixelSize: 9
+                color: "#94a3b8"
+                Layout.fillWidth: true
+            }
+        }
         KeyField {
             shell: page.shell
             label: "DeepSeek"

@@ -489,6 +489,37 @@ ColumnLayout {
         }
         RowLayout {
             Layout.fillWidth: true
+            spacing: 6
+            visible: Plasmoid.configuration.museEnabled
+
+            PlasmaComponents.Label {
+                // Named for its provider like every other row here: "Live
+                // quota" alone read as a global setting. "Muse Live Quota"
+                // would elide in the 76px label column, and the hint on the
+                // right already says the quota is the live, billed one.
+                text: "Muse Quota"
+                font.pixelSize: 10
+                opacity: 0.6
+                color: Kirigami.Theme.textColor
+                Layout.preferredWidth: 76
+                elide: Text.ElideRight
+            }
+            QQC2.Switch {
+                implicitHeight: 20
+                checked: Plasmoid.configuration.museQuotaEnabled === true
+                onToggled: Plasmoid.configuration.museQuotaEnabled = checked
+            }
+            PlasmaComponents.Label {
+                text: "off by default · one tiny model call per 30 min"
+                font.pixelSize: 9
+                opacity: 0.45
+                color: Kirigami.Theme.textColor
+                elide: Text.ElideRight
+                Layout.fillWidth: true
+            }
+        }
+        RowLayout {
+            Layout.fillWidth: true
             spacing: 4
             visible: Plasmoid.configuration.copilotEnabled
 

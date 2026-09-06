@@ -196,6 +196,32 @@ def monthly_window(id_, key, raw):
     return [cw]
 
 
+_TOKEN_UNITS = (("B", 1000000000), ("M", 1000000), ("k", 1000))
+
+
+def compact_tokens(v, decimals=1, units=_TOKEN_UNITS, trim_zeros=True):
+    """Token counts run to eight digits; a table cell has room for a few.
+
+    Shared so the providers agree on the shape, parameterised because they
+    legitimately disagree on the details: z.ai prints two decimals and an
+    uppercase "K" to match the figure on the vendor's own dashboard — this
+    number exists to be checked against that page, and a differently rounded
+    one invites the reader to wonder which is wrong — while the panel pills
+    want the shortest thing that still reads as a count ("30k", not "30.00K").
+
+    `units` is ordered largest first; pass a shorter tuple to opt out of a
+    magnitude entirely.
+    """
+    n = num(v)
+    for suffix, limit in units:
+        if abs(n) >= limit:
+            s = f"{n / limit:.{decimals}f}"
+            if trim_zeros and "." in s:
+                s = s.rstrip("0").rstrip(".")
+            return s + suffix
+    return str(int(n))
+
+
 def money(v, currency):
     cents = jround(v * 100)
     sign = "-" if cents < 0 else ""

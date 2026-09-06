@@ -7,8 +7,8 @@ is NEVER printed — output is key shapes, HTTP statuses and quota numbers
 only. Inspect the output before pasting it anywhere.
 
 Usage:
-    python3 ./tmp/muse-quota-probe.py            # free calls only (models list)
-    python3 ./tmp/muse-quota-probe.py --spend    # + one minimal Responses call
+    python3 ./scripts/muse-quota-probe.py         # free calls only (models list)
+    python3 ./scripts/muse-quota-probe.py --spend # + one minimal Responses call
                                                  #   (a few tokens, finds the
                                                  #   response.subscription_usage
                                                  #   snapshot shape)
