@@ -165,7 +165,7 @@ def normalize_claude(raw):
             "tooltip": f"Claude 7-day: {jround(w['weekly']['pct'])}%" + (f"\n{w_detail}" if w_detail else ""),
         },
     ]
-    r["chartWindows"] = rolling_windows("session", "day", "weekly", "s", "w", w["session"], w["weekly"])
+    r["chartWindows"] = rolling_windows("session", "day", "weekly", "s", "w", w["session"], w["weekly"], monthly_id="monthly")
     r["historyValues"] = {
         **({"s": w["session"]["pct"]} if w["session"]["available"] else {}),
         **({"w": w["weekly"]["pct"]} if w["weekly"]["available"] else {}),

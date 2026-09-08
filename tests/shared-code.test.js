@@ -68,6 +68,27 @@ test("trims to the history limit", () => {
     assert.equal(merged[merged.length - 1].s, 99);
 });
 
+test("unions the mirror file with points recorded since startup", () => {
+    // Same timestamp, different series: the two frontends each saw one provider.
+    const file = [{ t: 1000, w: 40 }, { t: 2000, w: 50 }];
+    const live = [{ t: 2000, cp: 7 }, { t: 3000, w: 60 }];
+    assert.deepEqual(UsageHistory.union(file, live, 500), [
+        { t: 1000, w: 40 },
+        { t: 2000, w: 50, cp: 7 },
+        { t: 3000, w: 60 }
+    ]);
+});
+
+test("lets the overlay win on a shared key and drops junk points", () => {
+    const out = UsageHistory.union([{ t: 1, w: 1 }, null, { w: 9 }], [{ t: 1, w: 2 }], 500);
+    assert.deepEqual(out, [{ t: 1, w: 2 }]);
+});
+
+test("trims the union to the history limit, keeping the newest", () => {
+    const file = [{ t: 1, w: 1 }, { t: 2, w: 2 }, { t: 3, w: 3 }];
+    assert.deepEqual(UsageHistory.union(file, [{ t: 4, w: 4 }], 2), [{ t: 3, w: 3 }, { t: 4, w: 4 }]);
+});
+
 test("migrates legacy weekly-only points and drops junk", () => {
     assert.deepEqual(UsageHistory.normalize([
         { t: 1, v: 40 },

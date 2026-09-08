@@ -106,6 +106,7 @@ ShellRoot {
             keys: {},
             pollSec: 300,
             showChart: true,
+            antigravityChartFilter: "both",
             pillMode: "always",
             position: "top-right",
             monitor: "focused",
@@ -117,6 +118,7 @@ ShellRoot {
     // every output, hovering one screen's edge must not pop out the others, so
     // that state lives per PanelWindow instance (panel.hoverRevealed) instead.
     property bool trayPillRevealed: false
+    readonly property string antigravityChartFilter: root.settings.antigravityChartFilter || "both"
     readonly property string pillMode: root.settings.pillMode || "always"
     readonly property string windowPosition: root.settings.position || "top-right"
     readonly property bool positionTop: root.windowPosition.indexOf("top-") === 0
@@ -203,6 +205,7 @@ ShellRoot {
                         keys: d.keys || {},
                         pollSec: d.pollSec || 300,
                         showChart: d.showChart !== false,
+                        antigravityChartFilter: d.antigravityChartFilter || "both",
                         pillMode: d.pillMode || (d.floatingPill === false ? "tray" : "always"),
                         position: d.position || "top-right",
                         monitor: d.monitor || "focused",
@@ -293,6 +296,13 @@ ShellRoot {
     property string chartWindow: "weekly"
     property string chartGranularity: "7d"
 
+    // Inner sub-tab for providers with activity stats (claude, openai): "usage" vs "stats"
+    property string activeSubTab: "usage"
+    readonly property bool activeHasStats: {
+        var p = activeProvider();
+        return p && (p.id === "claude" || p.id === "openai");
+    }
+
     function activeProvider() {
         if (root.providers.length === 0)
             return null;
@@ -342,6 +352,7 @@ ShellRoot {
     }
 
     onActiveIdChanged: {
+        activeSubTab = "usage";
         var win = windowForProvider(root.activeId, root.chartGranularity);
         if (root.chartWindow !== win)
             root.chartWindow = win;
@@ -1057,9 +1068,65 @@ ShellRoot {
                             }
                         }
 
+                        // ── Usage / Stats sub-tab toggle ────────────────────────────
+                        Rectangle {
+                            visible: !root.showSettings && root.activeHasStats
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 26
+                            radius: 6
+                            color: Qt.rgba(1, 1, 1, 0.04)
+                            border.width: 1
+                            border.color: Qt.rgba(1, 1, 1, 0.07)
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.margins: 2
+                                spacing: 2
+
+                                Repeater {
+                                    model: [
+                                        {
+                                            id: "usage",
+                                            label: "Usage"
+                                        },
+                                        {
+                                            id: "stats",
+                                            label: "Stats"
+                                        }
+                                    ]
+
+                                    Rectangle {
+                                        required property var modelData
+                                        readonly property bool active: root.activeSubTab === modelData.id
+                                        Layout.fillWidth: true
+                                        Layout.fillHeight: true
+                                        radius: 5
+                                        color: active ? Qt.rgba(root.activeAccent.r, root.activeAccent.g, root.activeAccent.b, 0.20) : "transparent"
+                                        border.width: active ? 1 : 0
+                                        border.color: Qt.rgba(root.activeAccent.r, root.activeAccent.g, root.activeAccent.b, 0.35)
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: modelData.label
+                                            font.pixelSize: 11
+                                            font.bold: parent.active
+                                            color: parent.active ? root.activeAccent : "#f8fafc"
+                                            opacity: parent.active ? 1.0 : 0.6
+                                        }
+
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: root.activeSubTab = modelData.id
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         // ── Usage rows ──────────────────────────────────────────────
                         ColumnLayout {
-                            visible: !root.showSettings
+                            visible: !root.showSettings && (!root.activeHasStats || root.activeSubTab === "usage")
                             Layout.fillWidth: true
                             spacing: 12
 
@@ -1076,22 +1143,36 @@ ShellRoot {
                                     resetText: modelData.resetText || ""
                                     countdownText: root.countdownFor(modelData.resetAt || 0)
                                     detail: modelData.detail || ""
-                                    barColor: root.activeAccent
+                                    barColor: modelData.color || (root.activeId === "antigravity" && (modelData.key === "external" || modelData.key === "rest" || (modelData.label && modelData.label.indexOf("Claude") !== -1)) ? "#34a853" : root.activeAccent)
                                     showMeter: modelData.showMeter !== false
                                 }
                             }
                         }
 
+                        // ── Stats section ───────────────────────────────────────────
+                        StatsSection {
+                            visible: !root.showSettings && root.activeHasStats && root.activeSubTab === "stats"
+                            stats: root.activeProvider() ? (root.activeProvider().details.stats || ({})) : ({})
+                            providerId: root.activeId
+                            accent: root.activeAccent
+                            currency: root.activeProvider() ? (root.activeProvider().details.currency || "USD") : "USD"
+                        }
+
                         // ── Usage chart ─────────────────────────────────────────────
                         UsageChart {
-                            extraVisible: !root.showSettings && root.settings.showChart && root.activeProvider() && root.activeProvider().summary.hasChart !== false
+                            extraVisible: !root.showSettings && (!root.activeHasStats || root.activeSubTab === "usage") && root.settings.showChart && root.activeProvider() && (root.activeProvider().error || "") === "" && root.activeProvider().ok !== false && root.activeProvider().summary.hasChart !== false
                             usageHistory: root.usageHistory
                             windows: root.windowsForProvider(root.activeId)
                             chartWindow: root.chartWindow
                             accent: root.activeAccent
                             currency: root.activeProvider() ? (root.activeProvider().details.currency || "") : ""
+                            activeId: root.activeId
+                            antigravityFilter: root.antigravityChartFilter
                             onWindowSelected: function (id) {
                                 root.selectChartWindow(id);
+                            }
+                            onAntigravityFilterSelected: function (filter) {
+                                root.setSetting2("antigravityChartFilter", filter);
                             }
                         }
 

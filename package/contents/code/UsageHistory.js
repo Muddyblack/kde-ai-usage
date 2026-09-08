@@ -56,6 +56,57 @@ function merge(history, values, nowMs, limit) {
     return out;
 }
 
+// Combine two series that were recorded independently — the mirror file on disk
+// against whatever the running frontend already holds. Plasma keeps a second
+// copy of the history in its widget config, so on startup the file may carry
+// points the config never saw (recorded under Quickshell) and the config may
+// carry points the file never saw (a mirror write that failed). Points sharing a
+// timestamp are combined key by key, with `overlay` winning, so a point holding
+// only `w` and one holding only `cp` end up as one complete point.
+//
+// Returns a new array, ascending by t and trimmed to the cap.
+function union(base, overlay, limit) {
+    var byTime = {};
+    var i, key;
+
+    for (i = 0; i < (base || []).length; i++) {
+        var basePoint = base[i];
+        if (!basePoint || basePoint.t === undefined)
+            continue;
+
+        byTime[basePoint.t] = Object.assign({}, basePoint);
+    }
+
+    for (i = 0; i < (overlay || []).length; i++) {
+        var point = overlay[i];
+        if (!point || point.t === undefined)
+            continue;
+
+        if (!byTime[point.t]) {
+            byTime[point.t] = Object.assign({}, point);
+            continue;
+        }
+        for (key in point) {
+            if (point[key] !== undefined && point[key] !== null)
+                byTime[point.t][key] = point[key];
+        }
+    }
+
+    var out = [];
+    for (var t in byTime)
+        out.push(byTime[t]);
+
+    out.sort(function (p1, p2) {
+        return p1.t - p2.t;
+    });
+
+    var cap = limit || DEFAULT_LIMIT;
+    if (out.length > cap)
+        out = out.slice(out.length - cap);
+
+    return out;
+}
+
 // Accept both the current {t, <key>: v} points and the legacy weekly-only
 // {t, v} shape, and trim to the cap. Used when importing or restoring a file.
 function normalize(points, limit) {
@@ -151,6 +202,7 @@ if (typeof module !== "undefined" && module.exports) {
         MERGE_WINDOW_MS: MERGE_WINDOW_MS,
         collect: collect,
         merge: merge,
+        union: union,
         normalize: normalize,
         withResets: withResets
     };
