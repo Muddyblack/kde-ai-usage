@@ -64,6 +64,41 @@ def peak_hour(counts):
     return best_h
 
 
+def activity_base(s, now, daily_series, unit, tool_calls=None):
+    """The half of a stats blob that is identical for every local CLI: what was
+    done, when, and how consistently. Each provider adds its own token, model
+    and cost fields on top.
+
+    `tool_calls` overrides the top-level count for a blob that only records
+    tool calls per day (Claude's cache does).
+    """
+    dates = [(a.get("date") or "") for a in (s.get("dailyActivity") or []) if a is not None and (a.get("date") or "") != ""]
+    streaks = activity_streaks(dates, now)
+    longest = s.get("longestSession") or {}
+    first = s.get("firstSessionDate") or ""
+
+    return {
+        "available": True,
+        "totalSessions": num(s.get("totalSessions")),
+        "totalMessages": num(s.get("totalMessages")),
+        "totalToolCalls": num(s.get("totalToolCalls")) if tool_calls is None else tool_calls,
+        "firstDate": first,
+        "computedDate": s.get("lastComputedDate") or "",
+        "activeDays": len(set(dates)),
+        "spanDays": span_days_since(first, now),
+        "currentStreak": streaks["current"],
+        "longestStreak": streaks["longest"],
+        "longestSessionMs": num(longest.get("duration")),
+        "longestSessionMessages": num(longest.get("messageCount")),
+        "peakHour": peak_hour(s.get("hourCounts") or {}),
+        # The frontends draw one per-day sparkline for every provider. The
+        # series is named separately from the token totals because a provider
+        # can record activity without recording tokens (see copilot_stats).
+        "dailySeries": daily_series,
+        "dailyUnit": unit,
+    }
+
+
 def claude_stats(s, now):
     if s is None or not isinstance(s, dict) or len(s) == 0:
         return {"available": False}
@@ -98,9 +133,6 @@ def claude_stats(s, now):
         if model_total > favorite_total:
             favorite, favorite_total = key, model_total
 
-    dates = [(a.get("date") or "") for a in (s.get("dailyActivity") or []) if a is not None and (a.get("date") or "") != ""]
-    streaks = activity_streaks(dates, now)
-
     daily_tokens = [
         {
             "date": a.get("date") or "",
@@ -111,30 +143,20 @@ def claude_stats(s, now):
     daily_tokens.sort(key=lambda a: a["date"])
 
     total_tool_calls = sum(num(a.get("toolCallCount")) for a in (s.get("dailyActivity") or []))
-    longest = s.get("longestSession") or {}
 
-    return {
-        "available": True,
-        "version": num(s.get("version")),
-        "totalMessages": num(s.get("totalMessages")),
-        "totalSessions": num(s.get("totalSessions")),
-        "totalTokens": total,
-        "totalCostUSD": cost,
-        "totalWebSearches": searches,
-        "totalToolCalls": total_tool_calls,
-        "favoriteModel": favorite,
-        "firstDate": s.get("firstSessionDate") or "",
-        "computedDate": s.get("lastComputedDate") or "",
-        "activeDays": len(set(dates)),
-        "spanDays": span_days_since(s.get("firstSessionDate") or "", now),
-        "currentStreak": streaks["current"],
-        "longestStreak": streaks["longest"],
-        "longestSessionMs": num(longest.get("duration")),
-        "longestSessionMessages": num(longest.get("messageCount")),
-        "peakHour": peak_hour(s.get("hourCounts") or {}),
-        "models": models,
-        "dailyTokens": daily_tokens,
-    }
+    r = activity_base(s, now, daily_tokens, "tokens", tool_calls=total_tool_calls)
+    r.update(
+        {
+            "version": num(s.get("version")),
+            "totalTokens": total,
+            "totalCostUSD": cost,
+            "totalWebSearches": searches,
+            "favoriteModel": favorite,
+            "models": models,
+            "dailyTokens": daily_tokens,
+        }
+    )
+    return r
 
 
 def codex_stats(s, now):
@@ -160,32 +182,45 @@ def codex_stats(s, now):
         if model_total > favorite_total:
             favorite, favorite_total = key, model_total
 
-    dates = [(a.get("date") or "") for a in (s.get("dailyActivity") or []) if a is not None and (a.get("date") or "") != ""]
-    streaks = activity_streaks(dates, now)
-
     daily_tokens = [{"date": a.get("date") or "", "total": num(a.get("total"))} for a in (s.get("dailyModelTokens") or [])]
     daily_tokens.sort(key=lambda a: a["date"])
 
-    longest = s.get("longestSession") or {}
+    r = activity_base(s, now, daily_tokens, "tokens")
+    r.update(
+        {
+            "totalTokens": num(s.get("totalTokens")),
+            "favoriteModel": favorite,
+            "models": models,
+            "dailyTokens": daily_tokens,
+            "model": s.get("model") or "",
+            "effortLevel": s.get("effortLevel") or "",
+        }
+    )
+    return r
 
-    return {
-        "available": True,
-        "totalSessions": num(s.get("totalSessions")),
-        "totalMessages": num(s.get("totalMessages")),
-        "totalTokens": num(s.get("totalTokens")),
-        "totalToolCalls": num(s.get("totalToolCalls")),
-        "favoriteModel": favorite,
-        "firstDate": s.get("firstSessionDate") or "",
-        "computedDate": s.get("lastComputedDate") or "",
-        "activeDays": len(set(dates)),
-        "spanDays": span_days_since(s.get("firstSessionDate") or "", now),
-        "currentStreak": streaks["current"],
-        "longestStreak": streaks["longest"],
-        "longestSessionMs": num(longest.get("duration")),
-        "longestSessionMessages": num(longest.get("messageCount")),
-        "peakHour": peak_hour(s.get("hourCounts") or {}),
-        "models": models,
-        "dailyTokens": daily_tokens,
-        "model": s.get("model") or "",
-        "effortLevel": s.get("effortLevel") or "",
-    }
+
+def copilot_stats(s, now):
+    """The Copilot CLI records activity but no tokens, models or cost, so this
+    fills in the activity half of the same shape and leaves the token tiles
+    empty (see providers/copilot_stats.py)."""
+    if s is None or not isinstance(s, dict) or num(s.get("totalSessions")) == 0:
+        return {"available": False}
+
+    activity = [a for a in (s.get("dailyActivity") or []) if isinstance(a, dict)]
+    daily_messages = [{"date": a.get("date") or "", "total": num(a.get("messageCount"))} for a in activity]
+    daily_messages.sort(key=lambda a: a["date"])
+    repos = [r for r in (s.get("topRepositories") or []) if isinstance(r, dict)]
+
+    r = activity_base(s, now, daily_messages, "messages")
+    r.update(
+        {
+            "totalTokens": 0,
+            "totalFiles": num(s.get("totalFiles")),
+            "totalRepositories": num(s.get("totalRepositories")),
+            "topRepositories": [{"name": x.get("name") or "", "sessions": num(x.get("sessions"))} for x in repos],
+            "favoriteModel": "",
+            "models": {},
+            "dailyTokens": [],
+        }
+    )
+    return r

@@ -85,7 +85,7 @@ A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple serv
 | Mistral AI | Key status, available models, and local vibe CLI cost/token statistics | Supported |
 | OpenRouter | Spend, credit limit, usage percentage, and account label | Untested |
 | Z.AI | 5-hour token quota, monthly tools quota, reset countdowns, model details, and today's token consumption | Supported |
-| GitHub Copilot | Monthly premium request usage against a configurable quota | Personal billing supported; organization/enterprise billing not yet supported |
+| GitHub Copilot | Premium request usage against the plan's own entitlement, the real reset day, and local Copilot CLI activity stats | Personal billing supported; organization/enterprise billing not yet supported |
 | DeepSeek | Available balance with granted and topped-up breakdown | Supported |
 | Kimi / Moonshot AI | Available balance with voucher and cash breakdown | Supported |
 
@@ -117,7 +117,7 @@ Enable only the services you use. Each one has its own setup requirement:
 | Mistral AI | A Mistral API key; vibe CLI is optional and adds local session statistics |
 | OpenRouter | An OpenRouter API key entered in widget settings |
 | Z.AI | A Z.AI token from widget settings, `$ZAI_TOKEN`, `$Z_AI_API_KEY`, `~/.config/zai/token`, `~/.zai/token`, or the one `glm-acp-agent --setup` already stored |
-| GitHub Copilot | A GitHub token from widget settings, `$GITHUB_TOKEN`, or `~/.config/github-copilot/token`, with fine-grained **Plan: read** permission; personal billing only. The quota defaults to 300 and is configurable |
+| GitHub Copilot | Usually nothing to configure: the Copilot editor login (`~/.config/github-copilot/apps.json`), the Copilot CLI login, or `gh auth token` is picked up automatically. Widget settings, `$GITHUB_TOKEN` and `$GH_TOKEN` still win when set; a token with fine-grained **Plan: read** permission additionally unlocks the documented billing endpoint. Personal billing only |
 | DeepSeek | A DeepSeek API key from widget settings, `$DEEPSEEK_API_KEY`, or `~/.config/deepseek/api-key` |
 | Kimi / Moonshot AI | A Moonshot API key from widget settings, `$MOONSHOT_API_KEY`, `$KIMI_API_KEY`, or `~/.config/moonshot/api-key` |
 
@@ -340,7 +340,13 @@ The widget fetches credit usage and limit from the OpenRouter API using the conf
 The Z.AI tab calls the Z.AI usage quota endpoint with the configured token. It shows the 5-hour token quota, monthly tools quota, reset countdowns, and model details when the API response includes them. The token is resolved from widget settings → `$ZAI_TOKEN` → `$Z_AI_API_KEY` → `~/.config/zai/token` → `~/.zai/token`.
 
 ### GitHub Copilot
-The GitHub Copilot tab reads monthly premium request usage from GitHub's user billing API. It validates the token against the GitHub user endpoint, then fetches premium request usage and scales it against the configured quota, which defaults to 300. The token is resolved from widget settings → `$GITHUB_TOKEN` → `~/.config/github-copilot/token`, and a fine-grained token needs **Plan: read** permission. This user endpoint covers Copilot plans billed personally; usage billed through an organization or enterprise is not shown yet. A VS Code Copilot login is not imported automatically because VS Code keeps its session token in encrypted secret storage rather than a reusable plaintext config file.
+The GitHub Copilot tab has a **Usage** and a **Stats** sub-tab.
+
+Usage reads premium request consumption from `GET /copilot_internal/user` — the endpoint the Copilot editor plugins themselves call. It answers any Copilot login, and reports the plan's own entitlement, how much of it is left, the plan name, and the date the allowance actually resets, so neither the quota nor the reset day has to be guessed. If that endpoint does not answer (an account without a Copilot quota), the documented `GET /users/{user}/settings/billing/premium_request/usage` billing endpoint is used instead, scaled against the configured quota (default 300); a fine-grained token needs **Plan: read** permission for it. Personal billing only — usage billed through an organization or enterprise is not shown yet.
+
+The credential is resolved from widget settings → `$GITHUB_TOKEN` / `$GH_TOKEN` → `~/.config/github-copilot/token` → the Copilot plugin login in `apps.json` / `hosts.json` (under `$XDG_CONFIG_HOME/github-copilot`, `~/.config/github-copilot` or `~/.copilot`) → `gh auth token`. So a machine that is already signed in to the Copilot CLI, a JetBrains/Neovim Copilot plugin, or the GitHub CLI needs no token pasted at all. A VS Code Copilot login is still not imported: VS Code keeps its session token in encrypted secret storage rather than a reusable file.
+
+Stats aggregates the Copilot CLI's own history from `~/.copilot/session-store.db` — sessions, messages, tool calls, files touched, repositories, active days, streaks, peak hour, longest session and a messages-per-day sparkline. The CLI records no token counts, models or cost, so those tiles are absent rather than shown as zero.
 
 ### DeepSeek
 The DeepSeek tab calls `GET https://api.deepseek.com/user/balance` with the configured API key. It shows whether the account has sufficient balance for API calls, the primary total balance, and the granted / topped-up split. The key is resolved from widget settings → `$DEEPSEEK_API_KEY` → `~/.config/deepseek/api-key`.

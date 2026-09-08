@@ -115,6 +115,99 @@ mkdir -p "$tmp/home/.config/kimi"
 printf 'from-kimi-file\n' >"$tmp/home/.config/kimi/api-key"
 expect "reads ~/.config/kimi/api-key" "from-kimi-file" "moonshot:_moonshot_key"
 
+# ── GitHub Copilot ──────────────────────────────────────────────────────────
+#
+# Copilot is the one provider that borrows a login it did not write: the editor
+# plugins' apps.json, the Copilot CLI's directory, and `gh auth token`. A stub
+# gh on PATH stands in for the real one — the token it prints lives in the
+# system keyring on a real install, so there is no file to plant instead.
+
+fake_bin="$tmp/bin"
+mkdir -p "$fake_bin"
+
+# gh_stub <token>, or no argument for "gh is installed but not logged in".
+gh_stub() {
+    if [ $# -eq 0 ]; then
+        printf '#!/bin/sh\nexit 1\n' >"$fake_bin/gh"
+    else
+        printf '#!/bin/sh\nprintf %%s\\\\n "%s"\n' "$1" >"$fake_bin/gh"
+    fi
+    chmod +x "$fake_bin/gh"
+}
+
+# copilot_token — prints "<token>" or "<token>|<username>", so precedence and
+# the username a borrowed login carries are both visible.
+copilot_token() {
+    HOME="$tmp/home" XDG_CONFIG_HOME="$tmp/home/.config" PATH="$fake_bin:$PATH" \
+        PYTHONPATH="$repo/package/contents/tools" python3 -c "
+from aiusage.providers.copilot import _github_token
+token, user = _github_token()
+print(token + ('|' + user if user else ''))"
+}
+
+# expect_copilot <description> <expected>
+expect_copilot() {
+    local description="$1" expected="$2" got
+    checks=$((checks + 1))
+    got="$(copilot_token)"
+    if [ "$got" != "$expected" ]; then
+        printf 'FAIL %s\n  want: %s\n  got:  %s\n' "$description" "$expected" "$got" >&2
+        failures=$((failures + 1))
+    fi
+}
+
+fresh_home
+gh_stub
+expect_copilot "no GitHub login anywhere yields an empty token" ""
+
+fresh_home
+gh_stub "from-gh-cli"
+expect_copilot "falls back to the gh CLI" "from-gh-cli"
+
+# The Copilot CLI keeps its token in the keyring but its login in config.json,
+# which saves the /user request the billing endpoint would otherwise need.
+mkdir -p "$tmp/home/.copilot"
+cat >"$tmp/home/.copilot/config.json" <<'JSON'
+// User settings belong in settings.json.
+{"lastLoggedInUser": {"host": "https://github.com", "login": "octocat"}}
+JSON
+expect_copilot "picks up the Copilot CLI login next to the gh token" "from-gh-cli|octocat"
+
+fresh_home
+gh_stub "from-gh-cli"
+mkdir -p "$tmp/home/.config/github-copilot"
+cat >"$tmp/home/.config/github-copilot/apps.json" <<'JSON'
+{"github.com:Iv1.b507a08c87ecfe98": {"user": "octocat", "oauth_token": "from-apps-json"}}
+JSON
+expect_copilot "prefers the editor plugin login over the gh CLI" "from-apps-json|octocat"
+
+# Enterprise and dotcom logins sit side by side; the usage endpoints are
+# dotcom-only, so github.com has to win regardless of key order.
+fresh_home
+gh_stub
+mkdir -p "$tmp/home/.config/github-copilot"
+cat >"$tmp/home/.config/github-copilot/hosts.json" <<'JSON'
+{"ghe.example.com:Iv1.aaa": {"user": "ghe-user", "oauth_token": "from-enterprise"},
+ "github.com:Iv1.bbb": {"user": "octocat", "oauth_token": "from-dotcom"}}
+JSON
+expect_copilot "prefers the github.com login over an enterprise one" "from-dotcom|octocat"
+
+fresh_home
+gh_stub "from-gh-cli"
+mkdir -p "$tmp/home/.config/github-copilot"
+printf 'from-token-file\n' >"$tmp/home/.config/github-copilot/token"
+expect_copilot "an explicit token file outranks every borrowed login" "from-token-file"
+
+fresh_home
+gh_stub "from-gh-cli"
+GITHUB_TOKEN=from-env expect_copilot "the environment outranks the gh CLI" "from-env"
+
+fresh_home
+gh_stub
+mkdir -p "$tmp/home/.config/github-copilot"
+printf 'not json at all\n' >"$tmp/home/.config/github-copilot/apps.json"
+expect_copilot "a corrupt apps.json is empty, not an exception" ""
+
 if [ "$failures" -eq 0 ]; then
     printf 'ok — %d credential checks passed\n' "$checks"
 else

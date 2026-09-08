@@ -1,12 +1,15 @@
 import QtQuick
 import QtQuick.Layouts
-import QtQuick.Controls as QQC2
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
 
 ColumnLayout {
     id: copilotTabRoot
     property Item rootItem
+
+    // Inner sub-tab: "usage" (premium-request quota) vs "stats" (local Copilot
+    // CLI activity), same split as the Claude and OpenAI tabs.
+    property string subTab: "usage"
 
     visible: rootItem.enabledTabs[rootItem.activeTab] === "copilot" && !rootItem.showSettings
     Layout.fillWidth: true
@@ -52,7 +55,9 @@ ColumnLayout {
             PlasmaComponents.Label {
                 id: copilotBadgeLabel
                 anchors.centerIn: parent
-                text: "CONNECTED"
+                // The plan name is the more useful badge when the Copilot API
+                // reported one; "CONNECTED" is all the billing endpoint knows.
+                text: rootItem.copilotPlan !== "" ? rootItem.copilotPlan.toUpperCase() : "CONNECTED"
                 font.pixelSize: 9
                 font.bold: true
                 color: rootItem.copilotPurple
@@ -74,7 +79,7 @@ ColumnLayout {
         }
 
         PlasmaComponents.Label {
-            text: "Set a GitHub token in settings or via\n$GITHUB_TOKEN / ~/.config/github-copilot/token"
+            text: "No GitHub login found. Sign in with the Copilot\nCLI or `gh auth login`, or set a token in settings."
             font.pixelSize: 10
             opacity: 0.5
             color: Kirigami.Theme.textColor
@@ -105,8 +110,18 @@ ColumnLayout {
         }
     }
 
+    SubTabBar {
+        // Nothing to switch between until at least one of the two halves has
+        // something to show.
+        visible: rootItem.copilotKeyValid || rootItem.copilotStatsAvailable
+        accent: rootItem.copilotPurple
+        currentId: copilotTabRoot.subTab
+        onSelected: id => copilotTabRoot.subTab = id
+    }
+
+    // ── Premium requests ───────────────────────────────────────────────────────
     ColumnLayout {
-        visible: rootItem.copilotKeyValid
+        visible: copilotTabRoot.subTab === "usage" && rootItem.copilotKeyValid
         Layout.fillWidth: true
         spacing: 8
 
@@ -115,7 +130,7 @@ ColumnLayout {
             value: rootItem.copilotPct
             barColor: rootItem.copilotPurple
             countdownText: rootItem.copilotCountdown !== "" ? "in " + rootItem.copilotCountdown : ""
-            tokenText: copilotTabRoot.fmtRequests(rootItem.copilotUsed) + " / " + copilotTabRoot.fmtRequests(rootItem.copilotQuota)
+            tokenText: rootItem.copilotUnlimited ? copilotTabRoot.fmtRequests(rootItem.copilotUsed) + " · unlimited" : copilotTabRoot.fmtRequests(rootItem.copilotUsed) + " / " + copilotTabRoot.fmtRequests(rootItem.copilotQuota)
             tooltipText: "GitHub Copilot premium requests" + (rootItem.copilotCountdown !== "" ? "\nResets in " + rootItem.copilotCountdown : "")
         }
 
@@ -170,10 +185,10 @@ ColumnLayout {
                     }
 
                     PlasmaComponents.Label {
-                        text: copilotTabRoot.fmtRequests(copilotTabRoot.remaining)
+                        text: rootItem.copilotUnlimited ? "unlimited" : copilotTabRoot.fmtRequests(copilotTabRoot.remaining)
                         font.pixelSize: 12
                         font.bold: true
-                        color: rootItem.usageColor(rootItem.copilotPct)
+                        color: rootItem.copilotUnlimited ? Kirigami.Theme.textColor : rootItem.usageColor(rootItem.copilotPct)
                     }
                 }
 
@@ -198,5 +213,150 @@ ColumnLayout {
                 }
             }
         }
+    }
+
+    // ── No-stats placeholder ───────────────────────────────────────────────────
+    PlasmaComponents.Label {
+        visible: copilotTabRoot.subTab === "stats" && !rootItem.copilotStatsAvailable
+        Layout.fillWidth: true
+        Layout.topMargin: 8
+        horizontalAlignment: Text.AlignHCenter
+        text: "No local activity stats yet.\nRun the Copilot CLI to fill ~/.copilot/session-store.db"
+        font.pixelSize: 10
+        opacity: 0.5
+        color: Kirigami.Theme.textColor
+        wrapMode: Text.WordWrap
+    }
+
+    // ── Copilot CLI local activity ─────────────────────────────────────────────
+    ColumnLayout {
+        Layout.fillWidth: true
+        spacing: 8
+        visible: copilotTabRoot.subTab === "stats" && rootItem.copilotStatsAvailable
+
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 8
+            PlasmaComponents.Label {
+                text: "Activity Stats"
+                font.bold: true
+                font.pixelSize: 11
+                opacity: 0.7
+                color: Kirigami.Theme.textColor
+            }
+            Item {
+                Layout.fillWidth: true
+            }
+            PlasmaComponents.Label {
+                text: "Copilot CLI"
+                font.pixelSize: 9
+                opacity: 0.45
+                color: Kirigami.Theme.textColor
+            }
+        }
+
+        GridLayout {
+            Layout.fillWidth: true
+            columns: 3
+            rowSpacing: 6
+            columnSpacing: 6
+
+            StatTile {
+                tileValue: Math.round(rootItem.copilotStatsTotalSessions).toString()
+                tileLabel: "sessions"
+                tileTip: rootItem.formatTokens(rootItem.copilotStatsTotalMessages) + " messages total"
+            }
+            StatTile {
+                tileValue: rootItem.formatTokens(rootItem.copilotStatsTotalMessages)
+                tileLabel: "messages"
+                tileTip: "Prompts sent across all Copilot CLI sessions"
+            }
+            StatTile {
+                tileValue: Math.round(rootItem.copilotStatsActiveDays) + (rootItem.copilotStatsSpanDays > 0 ? "/" + Math.round(rootItem.copilotStatsSpanDays) : "")
+                tileLabel: "active days"
+                tileTip: rootItem.copilotStatsFirstDate ? "Since " + Qt.formatDate(new Date(rootItem.copilotStatsFirstDate), "MMM d, yyyy") : ""
+            }
+            StatTile {
+                tileValue: Math.round(rootItem.copilotStatsCurrentStreak) + "d"
+                tileLabel: "streak"
+                tileSub: "best " + Math.round(rootItem.copilotStatsLongestStreak) + "d"
+                tileTip: "Current consecutive-day streak\nLongest: " + Math.round(rootItem.copilotStatsLongestStreak) + " days"
+            }
+            StatTile {
+                tileValue: rootItem.formatDuration(rootItem.copilotStatsLongestSessionMs)
+                tileLabel: "longest session"
+                tileSub: rootItem.copilotStatsLongestSessionMessages > 0 ? Math.round(rootItem.copilotStatsLongestSessionMessages) + " msgs" : ""
+            }
+            StatTile {
+                visible: rootItem.copilotStatsPeakHour >= 0
+                tileValue: rootItem.copilotStatsPeakHour >= 0 ? (rootItem.copilotStatsPeakHour < 10 ? "0" : "") + rootItem.copilotStatsPeakHour + ":00" : "—"
+                tileLabel: "peak hour"
+                tileTip: "Hour of day with the most activity (UTC)"
+            }
+            StatTile {
+                visible: rootItem.copilotStatsTotalToolCalls > 0
+                tileValue: rootItem.formatTokens(rootItem.copilotStatsTotalToolCalls)
+                tileLabel: "tool calls"
+                tileTip: "Total tool invocations across all sessions"
+            }
+            StatTile {
+                visible: rootItem.copilotStatsTotalFiles > 0
+                tileValue: rootItem.formatTokens(rootItem.copilotStatsTotalFiles)
+                tileLabel: "files touched"
+                tileTip: "Distinct files read or edited across all sessions"
+            }
+            StatTile {
+                visible: rootItem.copilotStatsTotalRepositories > 0
+                tileValue: Math.round(rootItem.copilotStatsTotalRepositories).toString()
+                tileLabel: "repos"
+                tileTip: "Repositories the CLI has been run in"
+            }
+        }
+
+        StatsSparkline {
+            series: rootItem.copilotStatsDailyMessages
+            unit: "messages"
+            barColor: rootItem.copilotPurple
+            formatValue: rootItem.formatTokens
+        }
+
+        // ── Busiest repositories ───────────────────────────────────────────
+        ColumnLayout {
+            Layout.fillWidth: true
+            spacing: 3
+            visible: rootItem.copilotStatsTopRepositories.length > 0
+
+            PlasmaComponents.Label {
+                text: "Top repositories"
+                font.pixelSize: 9
+                opacity: 0.45
+                color: Kirigami.Theme.textColor
+            }
+            Repeater {
+                model: rootItem.copilotStatsTopRepositories
+                RowLayout {
+                    required property var modelData
+                    Layout.fillWidth: true
+                    spacing: 8
+                    PlasmaComponents.Label {
+                        text: modelData.name
+                        font.pixelSize: 10
+                        opacity: 0.75
+                        color: Kirigami.Theme.textColor
+                        elide: Text.ElideMiddle
+                        Layout.fillWidth: true
+                    }
+                    PlasmaComponents.Label {
+                        text: Math.round(modelData.sessions) + (modelData.sessions === 1 ? " session" : " sessions")
+                        font.pixelSize: 10
+                        color: rootItem.copilotPurple
+                    }
+                }
+            }
+        }
+    }
+
+    component StatTile: StatTileBase {
+        accentColor: rootItem.copilotPurple
     }
 }

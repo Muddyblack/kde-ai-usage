@@ -304,6 +304,31 @@ check copilot-error "passes the token error through" '
     (.ok | not) and (.error | startswith("Copilot: GitHub token cannot"))'
 check copilot-missing "reports an unconfigured token" '
     (.ok | not) and .error == "Copilot: no token configured"'
+# /copilot_internal/user reports the plan's own entitlement and the day it
+# actually resets, so neither the configured quota nor "the first of next
+# month" is guessed at.
+check copilot-plan-quota "takes the quota and reset day from the plan" '
+    .ok and .details.quota == 200 and .details.used == 19.8 and .details.plan == "individual"
+    and .quotaWindows[0].detail == "19.8 / 200 requests"
+    and .quotaWindows[0].resetAt == 1785542400'
+check copilot-plan-quota "reports the local Copilot CLI activity" '
+    .details.stats.available and .details.stats.totalSessions == 12
+    and .details.stats.totalMessages == 96 and .details.stats.totalToolCalls == 210
+    and .details.stats.totalFiles == 34 and .details.stats.totalRepositories == 2
+    and .details.stats.activeDays == 3 and .details.stats.longestStreak == 3
+    and .details.stats.peakHour == 14
+    and .details.stats.totalTokens == 0 and .details.stats.dailyUnit == "messages"
+    and (.details.stats.dailySeries | map(.total)) == [20, 36, 40]
+    and .details.stats.topRepositories[0].name == "octocat/hello"'
+# An unlimited plan has no bar to fill, so the meter is dropped rather than
+# rendered as a permanent 0%.
+check copilot-unlimited "renders an unlimited plan without a meter" '
+    .ok and .details.unlimited and .summary.text == "∞"
+    and (.quotaWindows[0].showMeter | not)
+    and .quotaWindows[0].detail == "412 requests · unlimited"'
+# The activity half stands on its own: no token, but the CLI history is local.
+check copilot-missing "still reports no stats when there is no CLI history" '
+    (.details.stats.available | not)'
 
 # ── DeepSeek ────────────────────────────────────────────────────────────────
 
@@ -351,6 +376,11 @@ cat >"$TEST_TMP/zai.json" <<'JSON'
 JSON
 printf '{"login":"octocat"}\n' >"$TEST_TMP/github-user.json"
 printf '[{"grossQuantity":125}]\n' >"$TEST_TMP/github-usage.json"
+# A 200 that carries no quota snapshot — an account GitHub answers without
+# Copilot quota — is what sends the provider to the billing endpoint.
+printf '{"login":"octocat"}\n' >"$TEST_TMP/copilot-internal-empty.json"
+printf '{"login":"octocat","copilot_plan":"individual","quota_reset_date":"2026-08-01","quota_snapshots":{"premium_interactions":{"has_quota":true,"unlimited":false,"entitlement":200,"quota_remaining":180.2,"percent_remaining":90.1}}}\n' \
+    >"$TEST_TMP/copilot-internal.json"
 cat >"$TEST_TMP/deepseek.json" <<'JSON'
 {"is_available":true,"balance_infos":[
   {"currency":"USD","total_balance":"12.50","granted_balance":"2.50","topped_up_balance":"10.00"}]}
@@ -363,6 +393,7 @@ run_backend() {
         ZAI_RESPONSE_FILE="$TEST_TMP/zai.json" \
         COPILOT_USER_RESPONSE_FILE="$TEST_TMP/github-user.json" \
         COPILOT_USAGE_RESPONSE_FILE="$TEST_TMP/github-usage.json" \
+        COPILOT_INTERNAL_RESPONSE_FILE="${COPILOT_INTERNAL_FILE:-$TEST_TMP/copilot-internal-empty.json}" \
         DEEPSEEK_BALANCE_RESPONSE_FILE="$TEST_TMP/deepseek.json" \
         "$BACKEND" "$@"
 }
@@ -388,6 +419,13 @@ assert_backend "--all honours the provider toggles and API keys" '
     and (.providers[] | select(.id == "copilot") | .quotaWindows[0].detail) == "125 / 500 requests"
     and (.providers[] | select(.id == "deepseek") | .details.currency) == "USD"
     and (tojson | test("zai-test|github-test|deepseek-test") | not)' --all
+
+COPILOT_INTERNAL_FILE="$TEST_TMP/copilot-internal.json"
+assert_backend "prefers the Copilot plan quota over the billing endpoint" '
+    (.providers[] | select(.id == "copilot") | .details.quota) == 200
+    and (.providers[] | select(.id == "copilot") | .details.used) == 19.8
+    and (.providers[] | select(.id == "copilot") | .details.resetAt) == 1785542400' --all
+unset COPILOT_INTERNAL_FILE
 
 assert_backend "--provider fetches exactly what was asked for" '
     (.providers | map(.id)) == ["deepseek", "zai"]' --provider deepseek,zai

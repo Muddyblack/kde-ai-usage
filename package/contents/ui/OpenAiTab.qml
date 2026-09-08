@@ -14,63 +14,12 @@ ColumnLayout {
     Layout.fillWidth: true
     spacing: 14
 
-    // ── Usage / Stats sub-tab toggle ───────────────────────────────────────────
-    Rectangle {
-        Layout.fillWidth: true
-        Layout.preferredHeight: 26
-        radius: 6
-        color: Qt.rgba(1, 1, 1, 0.04)
-        border.width: 1
-        border.color: Qt.rgba(1, 1, 1, 0.07)
+    SubTabBar {
         // Stats come from local rollouts, so they exist even without a login.
         visible: rootItem.openaiCodexLoggedIn || rootItem.openaiHasApiKey || rootItem.codexStatsAvailable
-
-        RowLayout {
-            anchors.fill: parent
-            anchors.margins: 2
-            spacing: 2
-
-            Repeater {
-                model: [
-                    {
-                        id: "usage",
-                        label: "Usage"
-                    },
-                    {
-                        id: "stats",
-                        label: "Stats"
-                    }
-                ]
-
-                Rectangle {
-                    required property var modelData
-                    readonly property bool active: openAiTabRoot.subTab === modelData.id
-
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    radius: 5
-                    color: active ? Qt.rgba(0.06, 0.64, 0.5, 0.2) : "transparent"
-                    border.width: active ? 1 : 0
-                    border.color: Qt.rgba(0.06, 0.64, 0.5, 0.35)
-
-                    PlasmaComponents.Label {
-                        anchors.centerIn: parent
-                        text: parent.modelData.label
-                        font.pixelSize: 11
-                        font.bold: parent.active
-                        opacity: parent.active ? 1 : 0.55
-                        color: Kirigami.Theme.textColor
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: openAiTabRoot.subTab = parent.modelData.id
-                    }
-                }
-            }
-        }
+        accent: rootItem.openaiGreen
+        currentId: openAiTabRoot.subTab
+        onSelected: id => openAiTabRoot.subTab = id
     }
 
     // Codex / ChatGPT user identity & limits (top section, clean style)

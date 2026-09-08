@@ -296,11 +296,12 @@ ShellRoot {
     property string chartWindow: "weekly"
     property string chartGranularity: "7d"
 
-    // Inner sub-tab for providers with activity stats (claude, openai): "usage" vs "stats"
+    // Inner sub-tab for providers with activity stats (claude, openai,
+    // copilot): "usage" vs "stats"
     property string activeSubTab: "usage"
     readonly property bool activeHasStats: {
         var p = activeProvider();
-        return p && (p.id === "claude" || p.id === "openai");
+        return p && (p.id === "claude" || p.id === "openai" || p.id === "copilot");
     }
 
     function activeProvider() {

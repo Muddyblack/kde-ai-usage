@@ -11,6 +11,10 @@ ColumnLayout {
     property string currency: "USD"
 
     readonly property bool hasStats: stats && stats.available === true
+    // Every provider draws one per-day sparkline, but not every provider
+    // counts tokens — the Copilot CLI records messages only (see stats.py).
+    readonly property var dailySeries: stats.dailySeries || stats.dailyTokens || []
+    readonly property string dailyUnit: stats.dailyUnit || "tokens"
 
     function formatTokens(n) {
         if (!n || n <= 0)
@@ -62,7 +66,13 @@ ColumnLayout {
             id: noStatsText
             anchors.centerIn: parent
             width: parent.width - 24
-            text: statsSectionRoot.providerId === "openai" ? "No Codex history yet.\nRun a Codex CLI session and stats will appear here." : "No local activity stats yet.\nRun Claude Code to generate ~/.claude/stats-cache.json"
+            text: {
+                if (statsSectionRoot.providerId === "openai")
+                    return "No Codex history yet.\nRun a Codex CLI session and stats will appear here.";
+                if (statsSectionRoot.providerId === "copilot")
+                    return "No local activity stats yet.\nRun the Copilot CLI to fill ~/.copilot/session-store.db";
+                return "No local activity stats yet.\nRun Claude Code to generate ~/.claude/stats-cache.json";
+            }
             font.pixelSize: 11
             horizontalAlignment: Text.AlignHCenter
             color: "#94a3b8"
@@ -122,6 +132,7 @@ ColumnLayout {
 
             // Tokens
             StatTile {
+                visible: (statsSectionRoot.stats.totalTokens || 0) > 0
                 tileValue: statsSectionRoot.formatTokens(statsSectionRoot.stats.totalTokens || 0)
                 tileLabel: "tokens"
                 tileTip: "Total tokens across all models (all time)"
@@ -196,16 +207,34 @@ ColumnLayout {
                 tileTip: "Total web search requests across all models"
                 accentColor: statsSectionRoot.accent
             }
+
+            // Files touched (Copilot)
+            StatTile {
+                visible: (statsSectionRoot.stats.totalFiles || 0) > 0
+                tileValue: statsSectionRoot.formatTokens(statsSectionRoot.stats.totalFiles || 0)
+                tileLabel: "files touched"
+                tileTip: "Distinct files read or edited across all sessions"
+                accentColor: statsSectionRoot.accent
+            }
+
+            // Repositories (Copilot)
+            StatTile {
+                visible: (statsSectionRoot.stats.totalRepositories || 0) > 0
+                tileValue: Math.round(statsSectionRoot.stats.totalRepositories || 0).toString()
+                tileLabel: "repos"
+                tileTip: "Repositories the CLI has been run in"
+                accentColor: statsSectionRoot.accent
+            }
         }
 
         // ── Tokens-per-day sparkline ───────────────────────────────────────────
         ColumnLayout {
             Layout.fillWidth: true
             spacing: 4
-            visible: (statsSectionRoot.stats.dailyTokens || []).length > 1
+            visible: statsSectionRoot.dailySeries.length > 1
 
             Text {
-                text: "Tokens / day"
+                text: statsSectionRoot.dailyUnit === "tokens" ? "Tokens / day" : "Messages / day"
                 font.pixelSize: 9
                 color: "#94a3b8"
                 opacity: 0.8
@@ -219,17 +248,17 @@ ColumnLayout {
 
                 readonly property real maxTok: {
                     var mx = 1;
-                    var arr = statsSectionRoot.stats.dailyTokens || [];
+                    var arr = statsSectionRoot.dailySeries;
                     for (var i = 0; i < arr.length; i++) {
                         if (arr[i].total > mx)
                             mx = arr[i].total;
                     }
                     return mx;
                 }
-                readonly property real barW: Math.max(1, (width - (Math.max(1, (statsSectionRoot.stats.dailyTokens || []).length) - 1)) / Math.max(1, (statsSectionRoot.stats.dailyTokens || []).length))
+                readonly property real barW: Math.max(1, (width - (Math.max(1, statsSectionRoot.dailySeries.length) - 1)) / Math.max(1, statsSectionRoot.dailySeries.length))
 
                 Repeater {
-                    model: statsSectionRoot.stats.dailyTokens || []
+                    model: statsSectionRoot.dailySeries
 
                     Rectangle {
                         required property var modelData
@@ -239,7 +268,7 @@ ColumnLayout {
 
                         QQC2.ToolTip.visible: sparkMA.containsMouse
                         QQC2.ToolTip.delay: 200
-                        QQC2.ToolTip.text: modelData.date + "\n" + statsSectionRoot.formatTokens(modelData.total) + " tokens"
+                        QQC2.ToolTip.text: modelData.date + "\n" + statsSectionRoot.formatTokens(modelData.total) + " " + statsSectionRoot.dailyUnit
 
                         MouseArea {
                             id: sparkMA
@@ -255,6 +284,45 @@ ColumnLayout {
                             color: statsSectionRoot.accent
                             opacity: sparkMA.containsMouse ? 1.0 : 0.65
                         }
+                    }
+                }
+            }
+        }
+
+        // ── Busiest repositories (Copilot) ─────────────────────────────────────
+        ColumnLayout {
+            Layout.fillWidth: true
+            spacing: 4
+            visible: (statsSectionRoot.stats.topRepositories || []).length > 0
+
+            Text {
+                text: "Top repositories"
+                font.pixelSize: 9
+                color: "#94a3b8"
+                opacity: 0.8
+            }
+
+            Repeater {
+                model: statsSectionRoot.stats.topRepositories || []
+
+                RowLayout {
+                    required property var modelData
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    Text {
+                        text: modelData.name
+                        font.pixelSize: 10
+                        color: "#f8fafc"
+                        opacity: 0.85
+                        elide: Text.ElideMiddle
+                        Layout.fillWidth: true
+                    }
+
+                    Text {
+                        text: Math.round(modelData.sessions) + (modelData.sessions === 1 ? " session" : " sessions")
+                        font.pixelSize: 10
+                        color: statsSectionRoot.accent
                     }
                 }
             }

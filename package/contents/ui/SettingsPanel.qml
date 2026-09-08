@@ -465,7 +465,7 @@ ColumnLayout {
         }
         KeyRow {
             label: "GitHub Token"
-            placeholder: "or $GITHUB_TOKEN"
+            placeholder: "optional — gh/Copilot login is used"
             configKey: "githubToken"
             rowVisible: Plasmoid.configuration.copilotEnabled
         }
@@ -512,7 +512,7 @@ ColumnLayout {
                 }
             }
             PlasmaComponents.Label {
-                text: "monthly premium requests"
+                text: "fallback if the plan reports none"
                 font.pixelSize: 9
                 opacity: 0.45
                 color: Kirigami.Theme.textColor
