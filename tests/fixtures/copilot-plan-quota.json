@@ -1,0 +1,41 @@
+{
+  "id": "copilot",
+  "now": 1785000000,
+  "inputs": {
+    "usage": {
+      "hasKey": true,
+      "keyValid": true,
+      "username": "octocat",
+      "used": 19.8,
+      "quota": 200,
+      "pct": 9.9,
+      "unlimited": false,
+      "resetDate": "2026-08-01",
+      "plan": "individual",
+      "source": "copilot"
+    },
+    "stats": {
+      "version": 1,
+      "source": "copilot-session-store",
+      "lastComputedDate": "2026-07-25T17:00:00Z",
+      "totalSessions": 12,
+      "totalMessages": 96,
+      "totalToolCalls": 210,
+      "totalFiles": 34,
+      "firstSessionDate": "2026-07-23",
+      "dailyActivity": [
+        {"date": "2026-07-23", "sessionCount": 3, "messageCount": 20, "toolCallCount": 40},
+        {"date": "2026-07-24", "sessionCount": 4, "messageCount": 36, "toolCallCount": 90},
+        {"date": "2026-07-25", "sessionCount": 5, "messageCount": 40, "toolCallCount": 80}
+      ],
+      "longestSession": {"duration": 5400000, "messageCount": 24},
+      "hourCounts": {"09": 3, "14": 7, "22": 2},
+      "totalRepositories": 2,
+      "topRepositories": [
+        {"name": "octocat/hello", "sessions": 8},
+        {"name": "octocat/spoon", "sessions": 4}
+      ]
+    },
+    "status": null
+  }
+}

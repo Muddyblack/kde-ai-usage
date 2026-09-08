@@ -236,7 +236,11 @@ call can fail the provider: the quota windows are the point, and a missing
 statistic must not cost them.
 
 **copilot** — `hasKey`, `keyValid`, `username`, `used`, `quota`, `pct`,
-`resetAt`.
+`unlimited`, `plan`, `resetAt`, `stats`. The quota and the reset day come from
+the plan itself when `/copilot_internal/user` answers (the endpoint the editors
+use, which any Copilot login can read); the documented billing endpoint is the
+fallback for a token that carries billing scope, and only there does the
+configured quota and a guessed first-of-next-month reset apply.
 
 **deepseek** — `hasKey`, `keyValid`, `isAvailable`, `balances`,
 `primaryCurrency`, `primaryTotal`, `primaryGranted`, `primaryToppedUp`,
@@ -244,12 +248,17 @@ statistic must not cost them.
 
 ### Shared sub-objects
 
-`stats` (Claude Code and Codex CLI): `available`, `totalMessages`,
-`totalSessions`, `totalTokens`, `totalToolCalls`, `favoriteModel`, `firstDate`,
-`computedDate`, `activeDays`, `spanDays`, `currentStreak`, `longestStreak`,
-`longestSessionMs`, `longestSessionMessages`, `peakHour`, `models`,
-`dailyTokens[]` (`date`, `total`). Claude adds `version`, `totalCostUSD` and
-`totalWebSearches`; Codex adds `model` and `effortLevel`.
+`stats` (Claude Code, Codex CLI and Copilot CLI): `available`,
+`totalMessages`, `totalSessions`, `totalTokens`, `totalToolCalls`,
+`favoriteModel`, `firstDate`, `computedDate`, `activeDays`, `spanDays`,
+`currentStreak`, `longestStreak`, `longestSessionMs`,
+`longestSessionMessages`, `peakHour`, `models`, `dailyTokens[]` (`date`,
+`total`), plus `dailySeries[]` and `dailyUnit` — the per-day series the
+frontends draw, named separately because not every CLI counts tokens. Claude
+adds `version`, `totalCostUSD` and `totalWebSearches`; Codex adds `model` and
+`effortLevel`; Copilot (which records no tokens, models or cost) adds
+`totalFiles`, `totalRepositories` and `topRepositories[]` (`name`, `sessions`)
+and reports `dailyUnit: "messages"`.
 
 `status` (Statuspage summary): `indicator`, `description`, `components[]`,
 `incidents[]`, `latestUpdate`. Status pages are cached on disk for

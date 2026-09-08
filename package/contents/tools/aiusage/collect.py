@@ -16,6 +16,7 @@ from .providers.claude_credentials import get_claude_credentials
 from .providers.codex_rate_limits import get_codex_rate_limits
 from .providers.codex_stats import get_codex_stats
 from .providers.copilot import get_copilot_usage
+from .providers.copilot_stats import get_copilot_stats
 from .providers.deepseek import get_deepseek_balance
 from .providers.grok import get_grok_usage
 from .providers.kiro import get_kiro_usage
@@ -182,6 +183,16 @@ def collect_openai(now):
     }
 
 
+def collect_copilot(now):
+    """Like Claude and Codex, Copilot pairs a remote quota with a local CLI
+    history — so it does not fit the _SIMPLE shape."""
+    return {
+        "id": "copilot",
+        "now": now,
+        "inputs": {"usage": get_copilot_usage() or {}, "stats": get_copilot_stats() or {}},
+    }
+
+
 _SIMPLE = {
     "antigravity": (get_antigravity_usage, None, None),
     "kiro": (get_kiro_usage, None, None),
@@ -189,7 +200,6 @@ _SIMPLE = {
     "openrouter": (get_openrouter_usage, "openrouter", "https://status.openrouter.ai/api/v2/summary.json"),
     "grok": (get_grok_usage, None, None),
     "zai": (get_zai_usage, None, None),
-    "copilot": (get_copilot_usage, None, None),
     "deepseek": (get_deepseek_balance, None, None),
     "kimi": (get_moonshot_balance, None, None),
 }
@@ -200,6 +210,8 @@ def collect(id_, now):
         return collect_claude(now)
     if id_ == "openai":
         return collect_openai(now)
+    if id_ == "copilot":
+        return collect_copilot(now)
     if id_ in _SIMPLE:
         fn, status_name, status_url = _SIMPLE[id_]
         usage = fn() or {}

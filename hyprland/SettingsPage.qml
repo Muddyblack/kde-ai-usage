@@ -452,13 +452,13 @@ ColumnLayout {
         KeyField {
             shell: page.shell
             label: "GitHub"
-            placeholder: "token with Plan (read)"
+            placeholder: "optional — gh/Copilot login is used"
             settingKey: "github"
         }
         KeyField {
             shell: page.shell
             label: "Copilot quota"
-            placeholder: "300"
+            placeholder: "only if the plan reports none"
             settingKey: "copilotQuota"
             secret: false
         }

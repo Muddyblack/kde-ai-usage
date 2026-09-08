@@ -140,56 +140,10 @@ ColumnLayout {
         }
     }
 
-    // ── Usage / Stats sub-tab toggle ───────────────────────────────────────────
-    Rectangle {
-        Layout.fillWidth: true
-        Layout.preferredHeight: 26
-        radius: 6
-        color: Qt.rgba(1, 1, 1, 0.04)
-        border.width: 1
-        border.color: Qt.rgba(1, 1, 1, 0.07)
-
-        RowLayout {
-            anchors.fill: parent
-            anchors.margins: 2
-            spacing: 2
-
-            Repeater {
-                model: [
-                    {
-                        id: "usage",
-                        label: "Usage"
-                    },
-                    {
-                        id: "stats",
-                        label: "Stats"
-                    }
-                ]
-                Rectangle {
-                    required property var modelData
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    radius: 5
-                    readonly property bool active: claudeTabRoot.subTab === modelData.id
-                    color: active ? Qt.rgba(0.8, 0.47, 0.36, 0.20) : "transparent"
-                    border.width: active ? 1 : 0
-                    border.color: Qt.rgba(0.8, 0.47, 0.36, 0.35)
-                    PlasmaComponents.Label {
-                        anchors.centerIn: parent
-                        text: modelData.label
-                        font.pixelSize: 11
-                        font.bold: parent.active
-                        color: parent.active ? rootItem.claudeOrange : Kirigami.Theme.textColor
-                        opacity: parent.active ? 1.0 : 0.6
-                    }
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: claudeTabRoot.subTab = modelData.id
-                    }
-                }
-            }
-        }
+    SubTabBar {
+        accent: rootItem.claudeOrange
+        currentId: claudeTabRoot.subTab
+        onSelected: id => claudeTabRoot.subTab = id
     }
 
     PopupRow {
@@ -634,58 +588,11 @@ ColumnLayout {
             }
         }
 
-        // ── Tokens-per-day sparkline ───────────────────────────────────────
-        ColumnLayout {
-            Layout.fillWidth: true
-            spacing: 3
-            visible: rootItem.claudeStatsDailyTokens.length > 1
-
-            PlasmaComponents.Label {
-                text: "Tokens / day"
-                font.pixelSize: 9
-                opacity: 0.45
-                color: Kirigami.Theme.textColor
-            }
-            Row {
-                id: sparkRow
-                Layout.fillWidth: true
-                height: 34
-                spacing: 1
-                readonly property real maxTok: {
-                    var mx = 1;
-                    var arr = rootItem.claudeStatsDailyTokens;
-                    for (var i = 0; i < arr.length; i++)
-                        if (arr[i].total > mx)
-                            mx = arr[i].total;
-                    return mx;
-                }
-                readonly property real barW: Math.max(1, (width - (rootItem.claudeStatsDailyTokens.length - 1)) / rootItem.claudeStatsDailyTokens.length)
-                Repeater {
-                    model: rootItem.claudeStatsDailyTokens
-                    Rectangle {
-                        required property var modelData
-                        width: sparkRow.barW
-                        height: sparkRow.height
-                        color: "transparent"
-                        QQC2.ToolTip.visible: barMA.containsMouse
-                        QQC2.ToolTip.delay: 300
-                        QQC2.ToolTip.text: modelData.date + "\n" + rootItem.formatTokens(modelData.total) + " tokens"
-                        MouseArea {
-                            id: barMA
-                            anchors.fill: parent
-                            hoverEnabled: true
-                        }
-                        Rectangle {
-                            anchors.bottom: parent.bottom
-                            width: parent.width
-                            radius: 1
-                            height: Math.max(2, parent.height * (modelData.total / sparkRow.maxTok))
-                            color: rootItem.claudeOrange
-                            opacity: barMA.containsMouse ? 1.0 : 0.6
-                        }
-                    }
-                }
-            }
+        StatsSparkline {
+            series: rootItem.claudeStatsDailyTokens
+            unit: "tokens"
+            barColor: rootItem.claudeOrange
+            formatValue: rootItem.formatTokens
         }
 
         // ── Per-model token usage (all time) ───────────────────────────────

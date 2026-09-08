@@ -284,6 +284,26 @@ PlasmoidItem {
     property var copilotResetDate: null
     property string copilotCountdown: ""
     property string copilotError: ""
+    property bool copilotUnlimited: false
+    property string copilotPlan: ""
+    // Copilot CLI local activity, from ~/.copilot/session-store.db. The CLI
+    // records no tokens or models, so this is the activity half only.
+    property bool copilotStatsAvailable: false
+    property real copilotStatsTotalSessions: 0
+    property real copilotStatsTotalMessages: 0
+    property real copilotStatsTotalToolCalls: 0
+    property real copilotStatsTotalFiles: 0
+    property real copilotStatsTotalRepositories: 0
+    property var copilotStatsTopRepositories: []
+    property string copilotStatsFirstDate: ""
+    property real copilotStatsActiveDays: 0
+    property real copilotStatsSpanDays: 0
+    property real copilotStatsCurrentStreak: 0
+    property real copilotStatsLongestStreak: 0
+    property real copilotStatsLongestSessionMs: 0
+    property real copilotStatsLongestSessionMessages: 0
+    property real copilotStatsPeakHour: -1
+    property var copilotStatsDailyMessages: []
     // ── DeepSeek data ────────────────────────────────────────────────────────
     property bool deepseekHasKey: false
     property bool deepseekKeyValid: false
@@ -1426,7 +1446,26 @@ PlasmoidItem {
         root.copilotQuota = d.quota === undefined ? (Plasmoid.configuration.copilotQuota || 300) : d.quota;
         root.copilotPct = d.pct || 0;
         root.copilotResetDate = root.dateFromEpoch(d.resetAt);
+        root.copilotUnlimited = d.unlimited === true;
+        root.copilotPlan = d.plan || "";
         root.copilotError = error;
+        var cstats = d.stats || {};
+        root.copilotStatsAvailable = cstats.available === true;
+        root.copilotStatsTotalSessions = cstats.totalSessions || 0;
+        root.copilotStatsTotalMessages = cstats.totalMessages || 0;
+        root.copilotStatsTotalToolCalls = cstats.totalToolCalls || 0;
+        root.copilotStatsTotalFiles = cstats.totalFiles || 0;
+        root.copilotStatsTotalRepositories = cstats.totalRepositories || 0;
+        root.copilotStatsTopRepositories = cstats.topRepositories || [];
+        root.copilotStatsFirstDate = cstats.firstDate || "";
+        root.copilotStatsActiveDays = cstats.activeDays || 0;
+        root.copilotStatsSpanDays = cstats.spanDays || 0;
+        root.copilotStatsCurrentStreak = cstats.currentStreak || 0;
+        root.copilotStatsLongestStreak = cstats.longestStreak || 0;
+        root.copilotStatsLongestSessionMs = cstats.longestSessionMs || 0;
+        root.copilotStatsLongestSessionMessages = cstats.longestSessionMessages || 0;
+        root.copilotStatsPeakHour = cstats.peakHour === undefined ? -1 : cstats.peakHour;
+        root.copilotStatsDailyMessages = cstats.dailySeries || [];
     }
 
     function applyDeepSeek(d, error) {
