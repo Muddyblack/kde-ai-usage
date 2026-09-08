@@ -128,7 +128,7 @@ ColumnLayout {
                 if (rootItem.museCostUSD > 0)
                     out.push({
                         label: "Spend (est.)",
-                        value: "$" + rootItem.museCostUSD.toFixed(2)
+                        value: rootItem.formatMoney(rootItem.museCostUSD, rootItem.museCurrency)
                     });
                 out.push({
                     label: "Model calls",
@@ -223,7 +223,7 @@ ColumnLayout {
             }
             StatTile {
                 visible: rootItem.museCostUSD > 0
-                tileValue: "$" + rootItem.museCostUSD.toFixed(2)
+                tileValue: rootItem.formatMoney(rootItem.museCostUSD, rootItem.museCurrency)
                 tileLabel: "spend (est.)"
                 tileTip: "Tokens priced with the model catalog Muse caches locally"
             }

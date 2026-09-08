@@ -457,6 +457,25 @@ def _session_record(path, date, subagent, root):
     }
 
 
+def _input_mtimes(root, files):
+    """Every file the cached blob is derived from, not just the session logs.
+
+    Pricing, currency and the context window come from the catalog, the model
+    from the CLI's settings, and the counted-once per-session totals from the
+    `.msp-view-v1` snapshots. A snapshot or a re-fetched catalog lands without
+    any session.jsonl being touched, so keying staleness on the logs alone
+    served stale cost and token figures until the next session wrote."""
+    for path, _date, _sub in files:
+        yield os.path.getmtime(path)
+    for path in glob.glob(os.path.join(_catalog_dir(), "*.json")):
+        yield os.path.getmtime(path)
+    for path in glob.glob(os.path.join(root, _VIEW_DIR, "*", "snapshot-*.json")):
+        yield os.path.getmtime(path)
+    settings = _settings_path()
+    if os.path.isfile(settings):
+        yield os.path.getmtime(settings)
+
+
 def get_muse_stats():
     """The lifetime activity blob, or {} when Muse has never run here."""
     root = sessions_root()
@@ -473,7 +492,7 @@ def get_muse_stats():
     if os.path.isfile(cache_path):
         try:
             cache_mtime = os.path.getmtime(cache_path)
-            stale = any(os.path.getmtime(f) > cache_mtime for f, _d, _s in files)
+            stale = any(mt > cache_mtime for mt in _input_mtimes(root, files))
         except OSError:
             stale = True
         if not stale:

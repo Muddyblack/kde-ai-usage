@@ -199,7 +199,19 @@ ColumnLayout {
             // Spend (Claude)
             StatTile {
                 visible: (statsSectionRoot.stats.totalCostUSD || 0) > 0
-                tileValue: "$" + (statsSectionRoot.stats.totalCostUSD || 0).toFixed(2)
+                // Muse states its catalog's own currency; every other provider
+                // reporting spend here is USD and sends no currency field.
+                tileValue: {
+                    var amount = (statsSectionRoot.stats.totalCostUSD || 0).toFixed(2);
+                    var cur = statsSectionRoot.stats.currency || "USD";
+                    if (cur === "USD")
+                        return "$" + amount;
+
+                    if (cur === "CNY")
+                        return "¥" + amount;
+
+                    return amount + " " + cur;
+                }
                 tileLabel: "spend"
                 tileTip: "Total cost across all models (all time)"
                 accentColor: statsSectionRoot.accent

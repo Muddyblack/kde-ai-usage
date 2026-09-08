@@ -588,6 +588,30 @@ assert_backend "prefers the view snapshot's counted-once totals" '
     (.providers[0].details.stats.totalTokens) == 1750
     and (.providers[0].details.stats.totalOutputTokens) == 350' --provider muse
 
+# The cached blob is derived from the catalog and the view snapshots too, not
+# only from the session logs. Both land without any session.jsonl being
+# touched, so neither may be allowed to leave a stale total on screen — hence
+# no `rm` of the cache here, unlike the assertion above.
+cat >"$TEST_TMP/muse-sessions/.msp-view-v1/aaa/snapshot-1.json" <<'JSON'
+{"view_materialization": {"current_state": {"tokenUsage": {"promptTokens": 900, "outputTokens": 450, "totalTokens": 1350}, "turnCount": 1}}}
+JSON
+touch -d "@$(($(date +%s) + 5))" "$TEST_TMP/muse-sessions/.msp-view-v1/aaa/snapshot-1.json"
+assert_backend "a new view snapshot invalidates the stats cache" '
+    (.providers[0].details.stats.totalTokens) == 1950
+    and (.providers[0].details.stats.totalOutputTokens) == 550' --provider muse
+
+# Same for a re-fetched catalog: the price list moves, the cost has to move.
+# The catalog is shared with the assertions further down, so it is put back
+# exactly as it was — with a fresh mtime, so the restored prices invalidate the
+# cache in their turn.
+cp "$TEST_TMP/muse-catalog/6d657461__p746268.json" "$TEST_TMP/muse-catalog.orig"
+sed 's/"input": "1.00"/"input": "2.00"/' "$TEST_TMP/muse-catalog.orig" >"$TEST_TMP/muse-catalog/6d657461__p746268.json"
+touch -d "@$(($(date +%s) + 10))" "$TEST_TMP/muse-catalog/6d657461__p746268.json"
+assert_backend "a re-priced catalog invalidates the stats cache" '
+    (.providers[0].details.stats.totalCostUSD) > 0.005' --provider muse
+mv "$TEST_TMP/muse-catalog.orig" "$TEST_TMP/muse-catalog/6d657461__p746268.json"
+touch -d "@$(($(date +%s) + 15))" "$TEST_TMP/muse-catalog/6d657461__p746268.json"
+
 # The billed quota is opt-in: an untouched install makes no call at all.
 assert_backend "the billed quota stays off until it is switched on" '
     .providers[0].details.quotaError == "disabled"

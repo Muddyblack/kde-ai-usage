@@ -332,6 +332,9 @@ PlasmoidItem {
     property real museInputTokens: 0
     property real museOutputTokens: 0
     property real museCostUSD: 0
+    // The catalog states its own currency, so the estimate is not USD by
+    // definition — keep what the backend reported rather than assuming.
+    property string museCurrency: "USD"
     property real museModelCalls: 0
     property string museError: ""
     // Plan windows: only present when the user switched the billed call on.
@@ -1585,6 +1588,7 @@ PlasmoidItem {
         root.museInputTokens = stats.totalInputTokens || 0;
         root.museOutputTokens = stats.totalOutputTokens || 0;
         root.museCostUSD = stats.totalCostUSD || 0;
+        root.museCurrency = stats.currency || "USD";
         root.museModelCalls = stats.totalModelCalls || 0;
         root.museStatsTotalSessions = stats.totalSessions || 0;
         root.museStatsSubagentSessions = stats.subagentSessions || 0;
@@ -1774,7 +1778,7 @@ PlasmoidItem {
             if (root.museTotalTokens > 0)
                 lines.push(root.formatTokens(root.museTotalTokens) + " tokens · " + root.museStatsTotalSessions + " sessions");
             if (root.museCostUSD > 0)
-                lines.push("Spend (est.): " + root.formatMoney(root.museCostUSD, "USD"));
+                lines.push("Spend (est.): " + root.formatMoney(root.museCostUSD, root.museCurrency));
             if (root.museError)
                 lines.push("⚠ " + root.museError);
         }
@@ -2217,7 +2221,7 @@ PlasmoidItem {
                 // the pill carries the lifetime total instead of an empty bar.
                 showCost: !root.museCurrentAvailable
                 costText: root.museTotalTokens > 0 ? root.formatTokens(root.museTotalTokens) : "—"
-                tooltipText: "Muse" + (root.museCurrentAvailable ? "\nCurrent: " + Math.round(root.museCurrentPct) + "%" + (root.museCurrentCountdown ? " (" + root.museCurrentCountdown + ")" : "") : "") + (root.museWeeklyAvailable ? "\nWeekly: " + Math.round(root.museWeeklyPct) + "%" : "") + (root.museModel ? "\n" + root.museModel : "") + (root.museTotalTokens > 0 ? "\n" + root.formatTokens(root.museTotalTokens) + " tokens · " + root.museStatsTotalSessions + " sessions" : "\nNo local sessions yet") + (root.museCostUSD > 0 ? "\nSpend (est.): " + root.formatMoney(root.museCostUSD, "USD") : "")
+                tooltipText: "Muse" + (root.museCurrentAvailable ? "\nCurrent: " + Math.round(root.museCurrentPct) + "%" + (root.museCurrentCountdown ? " (" + root.museCurrentCountdown + ")" : "") : "") + (root.museWeeklyAvailable ? "\nWeekly: " + Math.round(root.museWeeklyPct) + "%" : "") + (root.museModel ? "\n" + root.museModel : "") + (root.museTotalTokens > 0 ? "\n" + root.formatTokens(root.museTotalTokens) + " tokens · " + root.museStatsTotalSessions + " sessions" : "\nNo local sessions yet") + (root.museCostUSD > 0 ? "\nSpend (est.): " + root.formatMoney(root.museCostUSD, root.museCurrency) : "")
             }
         }
     }
