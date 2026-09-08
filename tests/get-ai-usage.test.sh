@@ -352,6 +352,35 @@ check kimi-success "reports the Moonshot balance split" '
 check kimi-missing "reports a missing Moonshot API key" '
     (.ok | not) and .error == "Kimi: no Moonshot API key configured"'
 
+# ── Muse ────────────────────────────────────────────────────────────────────
+
+check muse-success "reports local session statistics" '
+    .ok and .details.hasOAuth and (.details.hasApiKey | not)
+    and .details.stats.totalSessions == 3 and .details.stats.totalOutputTokens == 30000
+    and .details.stats.model == "muse-spark-1.3-contributor"
+    and .summary.text == "30k out" and .historyValues == {mu: 30000}
+    and (.quotaWindows | length) == 3'
+check muse-error "passes the missing-sessions error through" '
+    (.ok | not) and .error == "Muse: No Muse sessions found — run muse once"'
+check muse-missing "reports empty input as no data" '
+    (.ok | not) and .error == "Muse: no data"'
+check muse-quota-only "renders quota bars with no local sessions" '
+    .ok and (.quotaWindows | length) == 2
+    and .summary.text == "26%" and .historyValues == {mu: 0, mc: 26, mw: 9}'
+check muse-quota-success "renders live quota windows with rolling charts" '
+    .ok and .details.keyValid
+    and .details.email == "user@example.com" and .details.fullName == "Test User"
+    and (.quotaWindows | length) == 2
+    and (.quotaWindows[0] | .key == "muse_current" and .pct == 26 and .resetAt == 1788528365)
+    and (.quotaWindows[1] | .key == "muse_weekly" and .pct == 9 and .resetAt == 1788739200)
+    and .quotaWindows[0].detail == "26% used · resets Sep 4, 15:26"
+    and .summary.pct == 26 and .summary.text == "30k out"
+    and .historyValues == {mu: 30000, mc: 26, mw: 9}
+    and ([.chartWindows[].key] | sort) == ["mc", "mc", "mw"]'
+check muse-malformed "degrades to no data when usage is not an object" '
+    (.ok | not) and .error == "Muse: no data"
+    and (.details.keyValid | not) and .details.quotaError == ""'
+
 # ── End-to-end: settings toggles, key plumbing and the outer envelope ───────
 
 TEST_TMP="$(mktemp -d)"
@@ -361,7 +390,7 @@ cat >"$TEST_TMP/config.json" <<'JSON'
 {
   "providers": {
     "claude": false, "antigravity": false, "openai": false, "kiro": false,
-    "mistral": false, "openrouter": false, "grok": false,
+    "mistral": false, "openrouter": false, "grok": false, "muse": false,
     "zai": true, "copilot": true, "deepseek": true
   },
   "keys": { "zai": "zai-test", "github": "github-test", "deepseek": "deepseek-test" },
@@ -395,6 +424,9 @@ run_backend() {
         COPILOT_USAGE_RESPONSE_FILE="$TEST_TMP/github-usage.json" \
         COPILOT_INTERNAL_RESPONSE_FILE="${COPILOT_INTERNAL_FILE:-$TEST_TMP/copilot-internal-empty.json}" \
         DEEPSEEK_BALANCE_RESPONSE_FILE="$TEST_TMP/deepseek.json" \
+        MUSE_SESSIONS_DIR="$TEST_TMP/muse-sessions" \
+        MUSE_AUTH_PATH="$TEST_TMP/muse-auth.json" \
+        MUSE_QUOTA_RESPONSE_FILE="${MUSE_QUOTA_RESPONSE_FILE:-$TEST_TMP/muse-quota.json}" \
         "$BACKEND" "$@"
 }
 
@@ -407,6 +439,21 @@ assert_backend() {
         printf 'FAIL %s\n  got: %s\n' "$description" "$output" >&2
         failures=$((failures + 1))
     fi
+}
+
+# check_prog <label> <expected stdout> <python program, aiusage importable>
+check_prog() {
+    local label="$1" expected="$2" prog="$3" got
+    checks=$((checks + 1))
+    if ! got="$(python3 -c "import sys; sys.path.insert(0, '$ROOT/package/contents/tools')
+$prog" 2>&1)"; then
+        got="raised: $got"
+    fi
+    if [ "$got" = "$expected" ]; then
+        return 0
+    fi
+    failures=$((failures + 1))
+    printf 'FAIL %s\n  expected: %s\n  got: %s\n' "$label" "$expected" "$got"
 }
 
 assert_backend "--all honours the provider toggles and API keys" '
@@ -433,6 +480,155 @@ assert_backend "--provider fetches exactly what was asked for" '
 assert_backend "--provider ignores the enabled toggles" '
     (.providers | length) == 1 and .providers[0].id == "kiro"' --provider kiro
 
+mkdir -p "$TEST_TMP/muse-sessions/2026/09/04/aaa" "$TEST_TMP/muse-sessions/2026/09/04/aaa/subagent/bbb"
+cat >"$TEST_TMP/muse-auth.json" <<'JSON'
+{"providers": {"meta": {"mechanism": "oauth", "access_token": "muse-secret-token", "user_email": "test@example.com", "user_full_name": "Test User"}}}
+JSON
+cp "$FIXTURES/muse-quota.json" "$TEST_TMP/muse-quota.json"
+cat >"$TEST_TMP/muse-sessions/2026/09/04/aaa/session.jsonl" <<'JSON'
+{"schema_version":1,"id":"1","stream":{"kind":"session","id":"aaa"},"sequence":1,"recorded_at":1785000000000000,"record_type":"event","durability":"durable","causation_id":null,"payload_type":"runtime.session.metadata","payload_schema_version":1,"payload":{"kind":"metadata","record":{"workspace_root":"/tmp/secret-project"}}}
+{"schema_version":1,"id":"2","stream":{"kind":"session","id":"aaa"},"sequence":2,"recorded_at":1785000001000000,"record_type":"event","durability":"durable","causation_id":null,"payload_type":"run.model.configured","payload_schema_version":1,"payload":{"kind":"run_model","record":{"model_id":"test-model","provider_id":"meta"}}}
+{"schema_version":1,"id":"3","stream":{"kind":"session","id":"aaa"},"sequence":3,"recorded_at":1785000002000000,"record_type":"event","durability":"durable","causation_id":null,"payload_type":"runtime.session","payload_schema_version":1,"payload":{"kind":"run","run_id":"r1","event":{"kind":"user_prompt_display"}}}
+{"schema_version":1,"id":"4","stream":{"kind":"session","id":"aaa"},"sequence":4,"recorded_at":1785000003000000,"record_type":"event","durability":"durable","causation_id":null,"payload_type":"runtime.session","payload_schema_version":1,"payload":{"kind":"run","run_id":"r1","event":{"kind":"model_completed","model":"test-model","usage":{"input_tokens":1000,"output_tokens":200,"cached_tokens":50,"reasoning_tokens":10}}}}
+{"schema_version":1,"id":"5","stream":{"kind":"session","id":"aaa"},"sequence":5,"recorded_at":1785000004000000,"record_type":"event","durability":"durable","causation_id":null,"payload_type":"runtime.session","payload_schema_version":1,"payload":{"kind":"run","run_id":"r1","event":{"kind":"assistant_tool_calls_committed","tool_calls":[{"name":"bash"},{"name":"read"}]}}}
+{"schema_version":1,"id":"6","stream":{"kind":"session","id":"aaa"},"sequence":6,"recorded_at":1785000005000000,"record_type":"event","durability":"durable","causation_id":null,"payload_type":"runtime.session","payload_schema_version":1,"payload":{"kind":"run","run_id":"r1","event":{"kind":"assistant_message_committed"}}}
+{"schema_version":1,"id":"7","stream":{"kind":"session","id":"aaa"},"sequence":7,"recorded_at":1785000006000000,"record_type":"event","durability":"durable","causation_id":null,"payload_type":"runtime.session","payload_schema_version":1,"payload":{"kind":"run","run_id":"r1","event":{"kind":"terminal"}}}
+JSON
+printf '{"schema_version":1,"id":"8","stream":{"kind":"session","id":"bbb"},"sequence":1,"recorded_at":1785000007000000,"record_type":"event","durability":"durable","causation_id":null,"payload_type":"runtime.session","payload_schema_version":1,"payload":{"kind":"run","run_id":"r2","event":{"kind":"model_completed","model":"test-model","usage":{"input_tokens":500,"output_tokens":100,"cached_tokens":0,"reasoning_tokens":5}}}}\n' >"$TEST_TMP/muse-sessions/2026/09/04/aaa/subagent/bbb/session.jsonl"
+
+WIDGET_MUSE_QUOTA=1 assert_backend "reads local Muse sessions with OAuth presence and no secret leaks" '
+    (.providers | length) == 1 and .providers[0].id == "muse"
+    and .providers[0].ok
+    and .providers[0].details.hasOAuth
+    and (.providers[0].details.hasApiKey | not)
+    and .providers[0].details.stats.totalSessions == 1
+    and .providers[0].details.stats.subagentSessions == 1
+    and .providers[0].details.stats.totalOutputTokens == 300
+    and .providers[0].details.stats.totalToolCalls == 2
+    and .providers[0].details.stats.totalMessages == 2
+    and .providers[0].details.stats.model == "test-model"
+    and .providers[0].details.stats.workspaceCount == 1
+    and .providers[0].details.email == "test@example.com"
+    and .providers[0].details.fullName == "Test User"
+    and .providers[0].historyValues.mu == 300
+    and (.providers[0].quotaWindows | length) == 2
+    and .providers[0].quotaWindows[0].pct == 26
+    and .providers[0].details.keyValid
+    and .providers[0].historyValues.mc == 26
+    and (tojson | test("muse-secret-token|secret-project") | not)' --provider muse
+
+assert_backend "live quota is off until asked for, so a default install spends nothing" '
+    (.providers | length) == 1 and .providers[0].id == "muse"
+    and .providers[0].ok
+    and .providers[0].details.quotaError == "disabled"
+    and (.providers[0].details.keyValid | not)
+    and (.providers[0].historyValues | has("mc") | not)' --provider muse
+
+check_prog "an unset switch reads as off" "False" '
+import os
+os.environ.pop("WIDGET_MUSE_QUOTA", None)
+from aiusage.config import muse_quota_enabled
+print(muse_quota_enabled())'
+check_prog "an explicit opt-in turns it on" "True" '
+import os
+os.environ["WIDGET_MUSE_QUOTA"] = "1"
+from aiusage.config import muse_quota_enabled
+print(muse_quota_enabled())'
+
+WIDGET_MUSE_QUOTA=0 assert_backend "a disabled quota switch renders free stats only" '
+    (.providers | length) == 1 and .providers[0].id == "muse"
+    and .providers[0].ok
+    and (.providers[0].details.keyValid | not)
+    and .providers[0].details.quotaError == "disabled"
+    and (.providers[0].quotaWindows | length) == 3
+    and (.providers[0].historyValues | has("mc") | not)' --provider muse
+
+# SSE frames arrive CRLF-terminated often enough that splitting on "\n\n"
+# alone would silently yield no quota at all. Replay a real-shaped CRLF stream.
+printf 'event: response.created\r\ndata: {"type":"response.created"}\r\n\r\nevent: response.subscription_usage\r\ndata: {"type":"response.subscription_usage","subscription":{"tier":"1","window":{"used_percent":26,"resets_at":1788528365,"window_duration_mins":300},"weekly":{"used_percent":9,"resets_at":1788739200}}}\r\n\r\n' >"$TEST_TMP/muse-quota-crlf.sse"
+
+MUSE_QUOTA_RESPONSE_FILE="$TEST_TMP/muse-quota-crlf.sse" WIDGET_MUSE_QUOTA=1 \
+    assert_backend "parses a CRLF-terminated SSE quota stream" '
+    (.providers | length) == 1 and .providers[0].id == "muse"
+    and .providers[0].details.keyValid
+    and .providers[0].details.quotaError == ""
+    and (.providers[0].quotaWindows | length) == 2
+    and .providers[0].quotaWindows[0].pct == 26
+    and .providers[0].quotaWindows[1].pct == 9' --provider muse
+
+muse_py() {
+    MUSE_MODELS_RESPONSE_FILE="${MUSE_MODELS_RESPONSE_FILE:-}" \
+        python3 -c "import sys; sys.path.insert(0, '$ROOT/package/contents/tools'); $1"
+}
+
+check_py() {
+    name="$1"
+    label="$2"
+    expected="$3"
+    got="$(muse_py "from aiusage.providers.muse import $4; print($4$5)")"
+    checks=$((checks + 1))
+    if [ "$got" = "$expected" ]; then
+        return 0
+    fi
+    failures=$((failures + 1))
+    printf 'FAIL %s %s\n  expected: %s\n  got: %s\n' "$name" "$label" "$expected" "$got"
+}
+
+cat >"$TEST_TMP/muse-models.json" <<'JSON'
+{"data": [{"id": "muse-voice-transcribe-1.0"}, {"id": "fixture-spark-2"}]}
+JSON
+
+check_py muse "prefers the model from local logs" \
+    "muse-spark-9.9" "_quota_model" "('muse-spark-9.9', '')"
+check_py muse "falls back to the last-known default offline" \
+    "muse-spark-1.3" "_quota_model" "('test-model', '')"
+MUSE_MODELS_RESPONSE_FILE="$TEST_TMP/muse-models.json" check_py muse "picks chat models from the account list" \
+    "fixture-spark-2" "_quota_model" "('test-model', '')"
+
+
+# A timeout must not be reported as a rejected credential.
+check_prog "an HTTP 401 is a rejected credential" "rejected" '
+from urllib.error import HTTPError
+from aiusage.providers.muse import _quota_error_code
+print(_quota_error_code(HTTPError("u", 401, "x", {}, None)))'
+check_prog "an HTTP 403 is a rejected credential" "rejected" '
+from urllib.error import HTTPError
+from aiusage.providers.muse import _quota_error_code
+print(_quota_error_code(HTTPError("u", 403, "x", {}, None)))'
+check_prog "a timeout is unreachable, not invalid" "unreachable" '
+from aiusage.providers.muse import _quota_error_code
+print(_quota_error_code(TimeoutError()))'
+check_prog "a DNS failure is unreachable" "unreachable" '
+from urllib.error import URLError
+from aiusage.providers.muse import _quota_error_code
+print(_quota_error_code(URLError("name resolution failed")))'
+check_prog "a 500 is unreachable, not a bad key" "unreachable" '
+from urllib.error import HTTPError
+from aiusage.providers.muse import _quota_error_code
+print(_quota_error_code(HTTPError("u", 500, "x", {}, None)))'
+check_prog "no credential is reported as such" "{} no-credential" '
+import os
+os.environ["WIDGET_MUSE_QUOTA"] = "1"
+os.environ.pop("MUSE_QUOTA_RESPONSE_FILE", None)
+os.environ["MUSE_AUTH_PATH"] = "/nonexistent/auth.json"
+os.environ["META_API_KEY"] = ""
+from aiusage.providers.muse import get_muse_quota
+q, e = get_muse_quota("")
+print(q, e)'
+
+# CRLF frames must parse exactly like LF ones (see _parse_subscription_event).
+check_prog "CRLF and LF frames parse identically" "True" '
+from aiusage.providers.muse import _parse_subscription_event
+body = ("event: response.subscription_usage\r\n"
+        "data: {\"type\": \"response.subscription_usage\", \"subscription\": {\"window\": {\"used_percent\": 7}}}\r\n\r\n")
+print(_parse_subscription_event(body) == _parse_subscription_event(body.replace("\r\n", "\n")))'
+
+# The shared formatter must not have drifted either vendor'"'"'s printed strings.
+check_prog "the shared formatter keeps both vendors byte-identical" "41.18M 1.00K 500 30k 1.5k 2M 500" '
+from aiusage.normalize.zai import _compact as z
+from aiusage.normalize.muse import _compact as m
+print(z(41180000), z(1000), z(500), m(30000), m(1500), m(2000000), m(500))'
+
 checks=$((checks + 1))
 if run_backend --provider nonsense >/dev/null 2>&1; then
     printf 'FAIL: an unknown provider id should be rejected\n' >&2
@@ -441,7 +637,7 @@ fi
 
 cat >"$TEST_TMP/defaults.json" <<'JSON'
 {"providers": {"claude": false, "antigravity": false, "openai": false, "kiro": false,
-               "mistral": false, "openrouter": false, "grok": false}}
+               "mistral": false, "openrouter": false, "grok": false, "muse": false}}
 JSON
 checks=$((checks + 1))
 defaults="$(HOME="$TEST_TMP/home" AI_USAGE_CONFIG="$TEST_TMP/defaults.json" \

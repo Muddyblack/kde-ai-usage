@@ -321,6 +321,35 @@ PlasmoidItem {
     property real kimiVoucherBalance: 0
     property real kimiCashBalance: 0
     property string kimiError: ""
+    // ── Muse data ───────────────────────────────────────────────────────────
+    property bool museHasOAuth: false
+    property bool museHasApiKey: false
+    property bool museKeyValid: false
+    // "" | "disabled" | "no-credential" | "rejected" | "unreachable" — why the
+    // quota is missing, so the tab can say "couldn't reach Meta" instead of
+    // letting a network timeout look like a bad credential.
+    property string museQuotaError: ""
+    property string musePlanType: ""
+    property string museEmail: ""
+    property string museFullName: ""
+    property bool museCurrentAvailable: false
+    property real museCurrentPct: 0
+    property var museCurrentResetDate: null
+    property string museCurrentCountdown: ""
+    property bool museWeeklyAvailable: false
+    property real museWeeklyPct: 0
+    property var museWeeklyResetDate: null
+    property string museWeeklyCountdown: ""
+    property real museSessions: 0
+    property real museSubagentSessions: 0
+    property real museTotalMessages: 0
+    property real museTotalOutputTokens: 0
+    property real museTotalReasoningTokens: 0
+    property real museTotalToolCalls: 0
+    property real museTotalTurns: 0
+    property real museTotalModelCalls: 0
+    property string museActiveModel: ""
+    property string museError: ""
     // ── Common ────────────────────────────────────────────────────────────────
     property string errorMsg: ""
     property bool stale: false
@@ -429,6 +458,7 @@ PlasmoidItem {
     readonly property color copilotPurple: "#8b5cf6"
     readonly property color deepseekBlue: "#4f8cff"
     readonly property color kimiBlue: "#1e3a8a"
+    readonly property color museBlue: "#0064e0"
     readonly property color sessionColor: "#e05252"
     readonly property color weeklyColor: "#f5a623"
     readonly property color warningColor: "#ffa64d"
@@ -507,6 +537,12 @@ PlasmoidItem {
             label: "Kimi",
             color: root.kimiBlue,
             icon: "kimi.svg"
+        },
+        {
+            id: "muse",
+            label: "Muse",
+            color: root.museBlue,
+            icon: "muse-color.svg"
         }
     ]
 
@@ -1031,6 +1067,8 @@ PlasmoidItem {
         root.zaiTokenCountdown = root.formatCountdown(root.zaiTokenResetDate);
         root.zaiToolsCountdown = root.formatCountdown(root.zaiToolsResetDate);
         root.copilotCountdown = root.formatCountdown(root.copilotResetDate);
+        root.museCurrentCountdown = root.formatCountdown(root.museCurrentResetDate);
+        root.museWeeklyCountdown = root.formatCountdown(root.museWeeklyResetDate);
     }
 
     function usageColor(pct) {
@@ -1104,6 +1142,8 @@ PlasmoidItem {
         env += root.envAssign("WIDGET_GITHUB_TOKEN", Plasmoid.configuration.githubToken);
         env += root.envAssign("WIDGET_DEEPSEEK_API_KEY", Plasmoid.configuration.deepseekApiKey);
         env += root.envAssign("WIDGET_MOONSHOT_API_KEY", Plasmoid.configuration.moonshotApiKey);
+        env += root.envAssign("WIDGET_MUSE_API_KEY", Plasmoid.configuration.museApiKey);
+        env += "WIDGET_MUSE_QUOTA=" + (Plasmoid.configuration.museQuotaEnabled === true ? "1" : "0") + " ";
         var quota = parseInt(Plasmoid.configuration.copilotQuota || 300);
         if (isNaN(quota) || quota <= 0)
             quota = 300;
@@ -1188,6 +1228,8 @@ PlasmoidItem {
             root.applyDeepSeek(details, provider.error || "");
         else if (provider.id === "kimi")
             root.applyKimi(details, provider.error || "");
+        else if (provider.id === "muse")
+            root.applyMuse(details, provider.error || "");
     }
 
     function applyClaude(d) {
@@ -1489,6 +1531,35 @@ PlasmoidItem {
         root.kimiError = error;
     }
 
+    function applyMuse(d, error) {
+        root.museHasOAuth = d.hasOAuth === true;
+        root.museHasApiKey = d.hasApiKey === true;
+        root.museKeyValid = d.keyValid === true;
+        root.museQuotaError = d.quotaError || "";
+        root.musePlanType = d.planType || "";
+        root.museEmail = d.email || "";
+        root.museFullName = d.fullName || "";
+        var current = d.current || {};
+        var weekly = d.weekly || {};
+        root.museCurrentAvailable = current.available === true;
+        root.museCurrentPct = current.pct || 0;
+        root.museCurrentResetDate = root.dateFromEpoch(current.resetAt);
+        root.museWeeklyAvailable = weekly.available === true;
+        root.museWeeklyPct = weekly.pct || 0;
+        root.museWeeklyResetDate = root.dateFromEpoch(weekly.resetAt);
+        var stats = d.stats || {};
+        root.museSessions = stats.totalSessions || 0;
+        root.museSubagentSessions = stats.subagentSessions || 0;
+        root.museTotalMessages = stats.totalMessages || 0;
+        root.museTotalOutputTokens = stats.totalOutputTokens || 0;
+        root.museTotalReasoningTokens = stats.totalReasoningTokens || 0;
+        root.museTotalToolCalls = stats.totalToolCalls || 0;
+        root.museTotalTurns = stats.totalTurns || 0;
+        root.museTotalModelCalls = stats.totalModelCalls || 0;
+        root.museActiveModel = stats.model || stats.favoriteModel || "";
+        root.museError = error;
+    }
+
     function refresh() {
         if (root.enabledTabs.length === 0)
             return;
@@ -1651,6 +1722,21 @@ PlasmoidItem {
             }
             if (root.deepseekError)
                 lines.push("⚠ " + root.deepseekError);
+        } else if (tab === "muse") {
+            if (root.museEmail)
+                lines.push(root.museEmail);
+            if (root.musePlanType)
+                lines.push("Plan: " + root.musePlanType);
+            if (root.museCurrentAvailable)
+                lines.push("Current: " + Math.round(root.museCurrentPct) + "%" + (root.museCurrentCountdown ? " (" + root.museCurrentCountdown + ")" : ""));
+            if (root.museWeeklyAvailable)
+                lines.push("Weekly: " + Math.round(root.museWeeklyPct) + "%" + (root.museWeeklyCountdown ? " (" + root.museWeeklyCountdown + ")" : ""));
+            if (root.museSessions > 0 || root.museTotalOutputTokens > 0)
+                lines.push(root.museSessions + " sessions · " + root.formatTokens(root.museTotalOutputTokens) + " out");
+            if (root.museActiveModel)
+                lines.push(root.museActiveModel);
+            if (root.museError)
+                lines.push("⚠ " + root.museError);
         }
         if (root.errorMsg !== "")
             lines.push("⚠ " + root.errorMsg);
@@ -2078,6 +2164,35 @@ PlasmoidItem {
                 showCost: true
                 costText: root.kimiKeyValid ? root.formatMoney(root.kimiAvailableBalance, "USD") : "—"
                 tooltipText: "Kimi / Moonshot" + (root.kimiKeyValid ? "\nBalance: " + root.formatMoney(root.kimiAvailableBalance, "USD") + "\nVoucher: " + root.formatMoney(root.kimiVoucherBalance, "USD") + "\nCash: " + root.formatMoney(root.kimiCashBalance, "USD") : "\nNo Moonshot API key set")
+            }
+
+            PanelSlot {
+                pct: root.museCurrentPct
+                iconColor: root.sessionColor
+                iconSource: Qt.resolvedUrl("../icons/muse-color.svg")
+                iconText: "Mu"
+                stale: root.stale && root.panelShows("muse")
+                visible: root.panelShows("muse") && root.museCurrentAvailable
+                tooltipText: "Muse Current: " + Math.round(root.museCurrentPct) + "%" + (root.museEmail ? "\n" + root.museEmail : "") + (root.museActiveModel ? "\n" + root.museActiveModel : "") + (root.museCurrentCountdown ? "\nResets: " + root.museCurrentCountdown : "") + (root.museSessions > 0 ? "\n" + root.museSessions + " sessions · " + root.formatTokens(root.museTotalOutputTokens) + " out" : "")
+            }
+
+            Rectangle {
+                visible: root.panelShows("muse") && root.museCurrentAvailable && root.museWeeklyAvailable
+                width: 1
+                height: 14
+                color: Qt.rgba(1, 1, 1, 0.16)
+                Layout.alignment: Qt.AlignVCenter
+            }
+
+            PanelSlot {
+                pct: root.museWeeklyPct
+                iconColor: root.weeklyColor
+                iconSource: Qt.resolvedUrl("../icons/muse-color.svg")
+                iconTint: root.weeklyColor
+                iconText: "7D"
+                stale: root.stale && root.panelShows("muse")
+                visible: root.panelShows("muse") && root.museWeeklyAvailable
+                tooltipText: "Muse Weekly: " + Math.round(root.museWeeklyPct) + "%" + (root.museWeeklyCountdown ? "\nResets: " + root.museWeeklyCountdown : "")
             }
         }
     }
@@ -2588,6 +2703,10 @@ PlasmoidItem {
             }
 
             KimiTab {
+                rootItem: root
+            }
+
+            MuseTab {
                 rootItem: root
             }
 

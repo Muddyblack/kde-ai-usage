@@ -219,6 +219,44 @@ mkdir -p "$tmp/home/.config/github-copilot"
 printf 'not json at all\n' >"$tmp/home/.config/github-copilot/apps.json"
 expect_copilot "a corrupt apps.json is empty, not an exception" ""
 
+# ── Muse ────────────────────────────────────────────────────────────────────
+
+fresh_home
+expect "no Muse credential yields an empty key" "" "muse:_muse_key"
+
+fresh_home
+META_API_KEY=from-meta-env expect "reads the vendor META_API_KEY" \
+    "from-meta-env" "muse:_muse_key"
+
+fresh_home
+WIDGET_MUSE_API_KEY=from-widget META_API_KEY=from-meta-env \
+    expect "prefers the widget field over META_API_KEY" \
+    "from-widget" "muse:_muse_key"
+
+fresh_home
+MUSE_AUTH_PATH="$tmp/nope.json" expect "a missing auth store means no OAuth login" \
+    "False" "muse:auth_presence"
+
+fresh_home
+printf '{"providers": {"meta": {"mechanism": "oauth"}}}' >"$tmp/muse-auth.json"
+MUSE_AUTH_PATH="$tmp/muse-auth.json" expect "detects the meta OAuth login" \
+    "True" "muse:auth_presence"
+
+fresh_home
+printf 'not json' >"$tmp/muse-auth.json"
+MUSE_AUTH_PATH="$tmp/muse-auth.json" expect "a corrupt auth store is no login, not an exception" \
+    "False" "muse:auth_presence"
+
+fresh_home
+printf '{"providers": {}}' >"$tmp/muse-auth.json"
+MUSE_AUTH_PATH="$tmp/muse-auth.json" expect "an auth store without meta is no login" \
+    "False" "muse:auth_presence"
+
+fresh_home
+printf '{"providers": {"meta": {"mechanism": "oauth", "api_key": "test-muse-key"}}}' >"$tmp/muse-auth.json"
+MUSE_AUTH_PATH="$tmp/muse-auth.json" expect "reads the login api_key for Model-API calls" \
+    "test-muse-key" "muse:_auth_api_key"
+
 if [ "$failures" -eq 0 ]; then
     printf 'ok — %d credential checks passed\n' "$checks"
 else

@@ -1,0 +1,20 @@
+{
+  "id": "muse",
+  "now": 1785000000,
+  "inputs": {
+    "usage": {
+      "hasOAuth": true,
+      "hasApiKey": true,
+      "keyValid": true,
+      "email": "user@example.com",
+      "fullName": "Test User",
+      "quota": {
+        "plan": "",
+        "current": {"pct": 26, "resetAt": 1788528365},
+        "weekly": {"pct": 9, "resetAt": 1788739200}
+      },
+      "stats": {"available": false}
+    },
+    "status": null
+  }
+}
