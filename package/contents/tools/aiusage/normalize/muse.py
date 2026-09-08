@@ -30,21 +30,13 @@ def _error(now, message, details):
     return provider_error("muse", "Muse", _MUSE_ACCENT, now, message, details)
 
 
-def _quota_sections(quota):
-    """(current, weekly) in the shared window shape, both unavailable until the
-    user switches the billed call on and the account actually has a plan.
-
-    Availability gates on resetAt rather than on pct, which is why this cannot
-    call window_value() alone: a snapshot without a reset time is not a window,
-    while a window at 0% used is simply a fresh one."""
-    if not isinstance(quota, dict):
-        return unavailable_window(), unavailable_window()
-    out = []
-    for key in ("current", "weekly"):
-        w = quota.get(key)
-        has_reset = isinstance(w, dict) and epoch_of(w.get("resetAt")) > 0
-        out.append(window_value(num(w.get("pct")), w.get("resetAt"), True) if has_reset else unavailable_window())
-    return out[0], out[1]
+def _window(section):
+    """One plan window in the shared shape. The muse-specific rule is that a
+    snapshot without a reset time is not a window at all (0% *with* a reset is
+    simply a fresh one); every other shape rule belongs to window_value."""
+    if not isinstance(section, dict) or epoch_of(section.get("resetAt")) <= 0:
+        return unavailable_window()
+    return window_value(section.get("pct"), section.get("resetAt"), True)
 
 
 def normalize_muse(raw):
@@ -53,12 +45,13 @@ def normalize_muse(raw):
     # Guard before any res.get(): the raw envelope is replayed from disk in
     # --normalize, so a non-dict here has to be a rendered error, not a
     # traceback.
-    if not isinstance(res, dict) or len(res) == 0:
+    if not isinstance(res, dict) or not res:
         return _error(now, "Muse: not installed", {"hasLogin": False, "stats": {"available": False}})
 
     stats = muse_stats(res.get("stats"), now)
     has_login = res.get("hasLogin") is True
-    current, weekly = _quota_sections(res.get("quota"))
+    quota = res.get("quota") if isinstance(res.get("quota"), dict) else {}
+    current, weekly = _window(quota.get("current")), _window(quota.get("weekly"))
     quota_error = res.get("quotaError") or ""
 
     # A paid-for quota must render on its own: someone with a live plan but no
@@ -77,15 +70,14 @@ def normalize_muse(raw):
     currency = stats.get("currency") or "USD"
     model = stats.get("model") or ""
     calls = num(stats.get("totalModelCalls"))
-    sessions = num(stats.get("totalSessions"))
+    tokens = _compact(total)
 
     # Plan windows only exist here when the user opted into the billed call
     # (providers/muse_quota.py); everything else on this tab is free and local.
     windows = []
-    if current["available"]:
-        windows.append(quota_window("muse_current", "Current", current, f"{jround(current['pct'])}% used"))
-    if weekly["available"]:
-        windows.append(quota_window("muse_weekly", "Weekly", weekly, f"{jround(weekly['pct'])}% used"))
+    for key, label, w in (("muse_current", "Current", current), ("muse_weekly", "Weekly", weekly)):
+        if w["available"]:
+            windows.append(quota_window(key, label, w, f"{jround(w['pct'])}% used"))
 
     if stats.get("available"):
         windows.append(
@@ -94,7 +86,7 @@ def normalize_muse(raw):
                 "Tokens",
                 0,
                 0,
-                _compact(total),
+                tokens,
                 False,
                 note=f"{_compact(output)} out · {int(calls)} calls" if calls else _compact(output) + " out",
             )
@@ -102,30 +94,27 @@ def normalize_muse(raw):
     if cost > 0:
         windows.append(flat_window("muse_spend", "Spend (est.)", 0, 0, money(cost, currency), False, note=model))
 
+    # The headline is the plan window when there is one to show, and the
+    # lifetime total otherwise — Muse is the only provider that can be in
+    # either state depending on a setting.
     headline = current if current["available"] else weekly
-    r = provider_base("muse", "Muse", _MUSE_ACCENT, now)
-    r["summary"] = {
-        "pct": headline["pct"] if headline["available"] else 0,
-        "text": f"{jround(headline['pct'])}%" if headline["available"] else _compact(total),
-        "detail": model if model else f"{int(sessions)} sessions",
-        "hasChart": True,
-    }
+    pct = headline["pct"] if headline["available"] else 0
 
-    tooltip = f"Muse tokens: {_compact(total)}"
+    tooltip = f"Muse tokens: {tokens}"
     if cost > 0:
         tooltip += f"\nSpend (est.): {money(cost, currency)}"
-    if current["available"]:
-        tooltip = f"Muse Current: {jround(current['pct'])}% used\n" + tooltip
+    if headline["available"]:
+        tooltip = f"Muse {'Current' if current['available'] else 'Weekly'}: {jround(pct)}% used\n" + tooltip
 
+    r = provider_base("muse", "Muse", _MUSE_ACCENT, now)
+    r["summary"] = {
+        "pct": pct,
+        "text": f"{jround(pct)}%" if headline["available"] else tokens,
+        "detail": model if model else f"{int(num(stats.get('totalSessions')))} sessions",
+        "hasChart": True,
+    }
     r["quotaWindows"] = windows
-    r["slots"] = [
-        {
-            "pct": headline["pct"] if headline["available"] else 0,
-            "color": _MUSE_ACCENT,
-            "text": None if headline["available"] else _compact(total),
-            "tooltip": tooltip,
-        }
-    ]
+    r["slots"] = [{"pct": pct, "color": _MUSE_ACCENT, "text": None if headline["available"] else tokens, "tooltip": tooltip}]
     r["chartWindows"] = monthly_window("muse", "mu", True)
     r["historyValues"] = {"mu": total}
     if current["available"] or weekly["available"]:
@@ -134,20 +123,13 @@ def normalize_muse(raw):
             r["historyValues"]["mc"] = current["pct"]
         if weekly["available"]:
             r["historyValues"]["mw"] = weekly["pct"]
+    # Only what is not already in `stats`: the totals, the model and the
+    # currency are read from there by the frontends rather than restated here,
+    # so one number never appears twice in an envelope.
     r["details"] = {
         "hasLogin": has_login,
         "email": res.get("email") or "",
         "fullName": res.get("fullName") or "",
-        "model": model,
-        "currency": currency,
-        "totalTokens": total,
-        "totalInputTokens": num(stats.get("totalInputTokens")),
-        "totalOutputTokens": output,
-        "totalCachedTokens": num(stats.get("totalCachedTokens")),
-        "totalReasoningTokens": num(stats.get("totalReasoningTokens")),
-        "totalCostUSD": cost,
-        "totalModelCalls": calls,
-        "contextWindow": num(stats.get("contextWindow")),
         "current": current,
         "weekly": weekly,
         "quotaError": quota_error,

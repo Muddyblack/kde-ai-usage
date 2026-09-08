@@ -17,6 +17,11 @@ class HttpResult:
         self.body = body
 
 
+def clean_credential(value):
+    """Strip whitespace that cannot be part of an HTTP credential."""
+    return str(value or "").translate(str.maketrans("", "", "\n\r ")).strip()
+
+
 def resolve_key(widget_var, env_var, *files):
     """Credential precedence, identical for every provider: the value the
     widget passed in, then a conventional environment variable, then the
@@ -30,33 +35,33 @@ def resolve_key(widget_var, env_var, *files):
     leaves this package. This only covers whitespace/CR/LF; a credential
     containing other control characters would still reach urllib as-is.
 
-    `env_var` accepts either a single name or a sequence of them, tried in
-    order. Several vendors ship two spellings of the same variable — Moonshot
-    is read as both MOONSHOT_API_KEY and KIMI_API_KEY, Z.AI documents
-    Z_AI_API_KEY while this package reads ZAI_TOKEN — and a provider that
-    knows only one of them reports "no token configured" at a user who did
-    set the key, which is the least debuggable failure we can produce.
+    `widget_var` and `env_var` each accept either a single name or a sequence
+    of them, tried in order. Several vendors ship two spellings of the same
+    variable — Moonshot is read as both MOONSHOT_API_KEY and KIMI_API_KEY,
+    Z.AI documents Z_AI_API_KEY while this package reads ZAI_TOKEN — and a
+    provider that knows only one of them reports "no token configured" at a
+    user who did set the key, which is the least debuggable failure we can
+    produce.
     """
 
-    def _clean(s):
-        return s.translate(str.maketrans("", "", "\n\r ")).strip()
-
-    value = _clean(os.environ.get(widget_var, "")) if widget_var else ""
-    if not value and env_var:
-        names = (env_var,) if isinstance(env_var, str) else env_var
-        for name in names:
+    value = ""
+    for source in (widget_var, env_var):
+        names = (source,) if isinstance(source, str) else source
+        for name in names or ():
             if not name:
                 continue
-            value = _clean(os.environ.get(name, ""))
+            value = clean_credential(os.environ.get(name, ""))
             if value:
                 break
+        if value:
+            break
     if not value:
         for path in files:
             if not path or not os.path.isfile(path):
                 continue
             try:
                 with open(path) as f:
-                    value = _clean(f.read())
+                    value = clean_credential(f.read())
             except OSError:
                 value = ""
             if value:

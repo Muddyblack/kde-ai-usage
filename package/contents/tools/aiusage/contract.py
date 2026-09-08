@@ -63,10 +63,6 @@ def jround(x):
     return math.ceil(x - 0.5)
 
 
-def round_pct(x):
-    return jround(x * 100) / 100
-
-
 _TZ_SUFFIX_RE = re.compile(r"(Z|[+-]\d{2}:?\d{2})$")
 _FRACTIONAL_SECONDS_RE = re.compile(r"\.\d+")
 
@@ -204,17 +200,13 @@ def rolling_windows(session_id, day_id, weekly_id, session_key, weekly_key, sess
     return out
 
 
-def fixed_windows(id_prefix, key, raw):
+def monthly_window(id_prefix, key, raw):
     return [
         {**chart_window(f"{id_prefix}_5h", key, "5H", 18000000, "5h"), "raw": raw},
         {**chart_window(f"{id_prefix}_24h", key, "24H", 86400000, "24h"), "raw": raw},
         {**chart_window(f"{id_prefix}_7d", key, "7D", 604800000, "7d"), "raw": raw},
         {**chart_window(f"{id_prefix}_30d", key, "30D", 2592000000, "30d"), "raw": raw},
     ]
-
-
-def monthly_window(id_, key, raw):
-    return fixed_windows(id_, key, raw)
 
 
 _TOKEN_UNITS = (("B", 1000000000), ("M", 1000000), ("k", 1000))
@@ -268,7 +260,7 @@ def empty_status():
 
 
 def status_summary(d):
-    if d is None or not isinstance(d, dict) or "status" not in d:
+    if not isinstance(d, dict) or "status" not in d:
         return empty_status()
     incidents = d.get("incidents") or []
     body = ""

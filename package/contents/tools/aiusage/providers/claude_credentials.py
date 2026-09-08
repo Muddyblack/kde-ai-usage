@@ -1,6 +1,6 @@
 import os
 
-from ..http import as_json
+from ..http import as_json, resolve_key
 
 
 def get_claude_credentials():
@@ -13,22 +13,12 @@ def get_claude_credentials():
         except OSError:
             oauth_creds = None
 
-    admin_key = os.environ.get("WIDGET_CLAUDE_ADMIN_KEY", "")
-    if not admin_key:
-        admin_key = os.environ.get("CLAUDE_ADMIN_API_KEY", "")
-    if not admin_key:
-        for candidate in (
-            os.path.expanduser("~/.config/claude-admin-api-key"),
-            os.path.expanduser("~/.claude/admin-api-key"),
-        ):
-            if os.path.isfile(candidate):
-                try:
-                    with open(candidate) as f:
-                        admin_key = f.read().translate(str.maketrans("", "", "\n\r ")).strip()
-                except OSError:
-                    admin_key = ""
-                if admin_key:
-                    break
+    admin_key = resolve_key(
+        "WIDGET_CLAUDE_ADMIN_KEY",
+        "CLAUDE_ADMIN_API_KEY",
+        os.path.expanduser("~/.config/claude-admin-api-key"),
+        os.path.expanduser("~/.claude/admin-api-key"),
+    )
 
     if isinstance(oauth_creds, dict):
         if admin_key:

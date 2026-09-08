@@ -11,6 +11,8 @@ import json
 import os
 import sqlite3
 
+from ..contract import num
+
 _MARKER_KEY = "kiro.resourceNotifications.usageState"
 
 
@@ -82,13 +84,6 @@ def _brace_match_scan(db_path):
         return None
 
 
-def _n(v, default=0):
-    try:
-        return float(v) if v is not None else default
-    except (TypeError, ValueError):
-        return default
-
-
 def get_kiro_usage():
     db_path = os.path.expanduser("~/.config/Kiro/User/globalStorage/state.vscdb")
     if not os.path.isfile(db_path):
@@ -107,7 +102,7 @@ def get_kiro_usage():
     if not isinstance(breakdown, dict):
         breakdown = {}
 
-    limit = _n(breakdown.get("usageLimit"))
+    limit = num(breakdown.get("usageLimit"))
     if limit == 50:
         plan = "free"
     elif limit == 1000:
@@ -119,8 +114,8 @@ def get_kiro_usage():
     else:
         plan = "custom"
 
-    current = _n(breakdown.get("currentUsage"))
-    percentage = _n(breakdown.get("percentageUsed"))
+    current = num(breakdown.get("currentUsage"))
+    percentage = num(breakdown.get("percentageUsed"))
     if percentage == 0 and limit > 0 and current > 0:
         percentage = (current / limit) * 100.0
     remaining = (limit - current) if limit > 0 else 0
@@ -141,13 +136,13 @@ def get_kiro_usage():
         "usageLimit": limit,
         "percentageUsed": percentage,
         "remaining": remaining,
-        "currentOverages": _n(breakdown.get("currentOverages")),
-        "overageCap": _n(breakdown.get("overageCap")),
-        "overageCharges": _n(breakdown.get("overageCharges")),
-        "overageRate": _n(breakdown.get("overageRate")),
+        "currentOverages": num(breakdown.get("currentOverages")),
+        "overageCap": num(breakdown.get("overageCap")),
+        "overageCharges": num(breakdown.get("overageCharges")),
+        "overageRate": num(breakdown.get("overageRate")),
         "resetDate": breakdown.get("resetDate") or "",
         "currencyCode": currency.get("code") or "USD",
         "currencySymbol": currency.get("symbol") or "$",
-        "timestamp": _n(usage_state.get("timestamp")),
+        "timestamp": num(usage_state.get("timestamp")),
         "source": db_path,
     }

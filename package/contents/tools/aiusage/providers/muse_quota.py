@@ -29,6 +29,8 @@ import json
 import os
 
 from .. import config as _config
+from ..contract import num
+from ..http import clean_credential, resolve_key
 from .muse import auth_meta, configured_model, model_catalog
 
 _QUOTA_URL = "https://api.meta.ai/v1/responses"
@@ -37,19 +39,6 @@ _QUOTA_TIMEOUT = 15
 # the warning the settings panel shows. Tokens, not dollars — the rate comes
 # from the user's own model catalog.
 QUOTA_CALL_TOKENS = {"input": 12, "output": 120}
-
-
-def _n(v):
-    if isinstance(v, bool) or v is None:
-        return 0
-    try:
-        return float(v)
-    except (TypeError, ValueError):
-        return 0
-
-
-def _clean(s):
-    return s.translate(str.maketrans("", "", "\n\r ")).strip()
 
 
 def _ttl():
@@ -63,10 +52,10 @@ def _api_key():
     """An explicit META_API_KEY (widget field or environment) wins over the
     login store's own api_key, mirroring the CLI's precedence. The OIDC
     access_token in that store is not valid on the Model API and is never used."""
-    key = _clean(os.environ.get("WIDGET_MUSE_API_KEY", "")) or _clean(os.environ.get("META_API_KEY", ""))
+    key = resolve_key("WIDGET_MUSE_API_KEY", "META_API_KEY")
     if key:
         return key
-    return _clean(str((auth_meta() or {}).get("api_key") or ""))
+    return clean_credential((auth_meta() or {}).get("api_key"))
 
 
 def quota_model():
@@ -92,7 +81,7 @@ def refresh_cost(model=""):
     tokens = QUOTA_CALL_TOKENS["input"] + QUOTA_CALL_TOKENS["output"]
     if not row.get("input$") and not row.get("output$"):
         return {"tokens": tokens, "usd": None, "currency": row.get("currency") or "USD"}
-    usd = QUOTA_CALL_TOKENS["input"] / 1000000 * _n(row.get("input$")) + QUOTA_CALL_TOKENS["output"] / 1000000 * _n(row.get("output$"))
+    usd = QUOTA_CALL_TOKENS["input"] / 1000000 * num(row.get("input$")) + QUOTA_CALL_TOKENS["output"] / 1000000 * num(row.get("output$"))
     return {"tokens": tokens, "usd": usd, "currency": row.get("currency") or "USD"}
 
 
@@ -159,12 +148,12 @@ def subscription_to_quota(sub):
     window = sub.get("window") if isinstance(sub.get("window"), dict) else {}
     weekly = sub.get("weekly") if isinstance(sub.get("weekly"), dict) else {}
     quota = {"current": {}, "weekly": {}}
-    cur_reset = int(_n(window.get("resets_at")))
-    wk_reset = int(_n(weekly.get("resets_at")))
+    cur_reset = int(num(window.get("resets_at")))
+    wk_reset = int(num(weekly.get("resets_at")))
     if cur_reset > 0:
-        quota["current"] = {"pct": _n(window.get("used_percent")), "resetAt": cur_reset}
+        quota["current"] = {"pct": num(window.get("used_percent")), "resetAt": cur_reset}
     if wk_reset > 0:
-        quota["weekly"] = {"pct": _n(weekly.get("used_percent")), "resetAt": wk_reset}
+        quota["weekly"] = {"pct": num(weekly.get("used_percent")), "resetAt": wk_reset}
     if not quota["current"] and not quota["weekly"]:
         return {}
     return quota

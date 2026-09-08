@@ -360,14 +360,14 @@ check kimi-missing "reports a missing Moonshot API key" '
 
 check muse-success "reports lifetime totals from local sessions" '
     .ok and .details.hasLogin
-    and .details.totalTokens == 150000 and .details.totalOutputTokens == 30000
-    and .details.model == "muse-spark-1.3-contributor"
+    and .details.stats.totalTokens == 150000 and .details.stats.totalOutputTokens == 30000
+    and .details.stats.model == "muse-spark-1.3-contributor"
     and .summary.text == "150k" and .summary.detail == "muse-spark-1.3-contributor"
     and .historyValues == {mu: 150000}'
 # The catalog Muse caches locally carries its own price list, so spend is
 # computed offline — the one provider here that can price itself.
 check muse-success "prices the tokens from the local catalog" '
-    .details.totalCostUSD == 0.009
+    .details.stats.totalCostUSD == 0.009
     and (.quotaWindows | map(.key)) == ["muse_tokens", "muse_spend"]
     and (.quotaWindows[] | select(.key == "muse_spend") | .detail) == "$0.01"
     and .details.stats.totalCostUSD == 0.009'
@@ -386,7 +386,7 @@ check muse-success "carries the shared activity block" '
 # Muse 1.0.3 does not always record token counters; the tab still has to be
 # worth opening when it does not.
 check muse-unpriced "stays usable when the logs carry no token counters" '
-    .ok and .details.totalTokens == 0 and .details.totalCostUSD == 0
+    .ok and .details.stats.totalTokens == 0 and .details.stats.totalCostUSD == 0
     and (.quotaWindows | map(.key)) == ["muse_tokens"]
     and .details.stats.available and .details.stats.totalSessions == 2
     and .details.stats.totalToolCalls == 3'
@@ -559,11 +559,11 @@ assert_backend "reads Muse from local files only, priced by the local catalog" '
     (.providers | length) == 1 and .providers[0].id == "muse"
     and .providers[0].ok
     and .providers[0].details.hasLogin
-    and .providers[0].details.model == "fixture-spark-9.9"
-    and .providers[0].details.totalOutputTokens == 300
-    and .providers[0].details.totalTokens == 1800
-    and ((.providers[0].details.totalCostUSD * 100000 | round) == 414)
-    and .providers[0].details.contextWindow == 1007997
+    and .providers[0].details.stats.model == "fixture-spark-9.9"
+    and .providers[0].details.stats.totalOutputTokens == 300
+    and .providers[0].details.stats.totalTokens == 1800
+    and ((.providers[0].details.stats.totalCostUSD * 100000 | round) == 414)
+    and .providers[0].details.stats.contextWindow == 1007997
     and .providers[0].details.stats.totalSessions == 1
     and .providers[0].details.stats.subagentSessions == 1
     and .providers[0].details.stats.totalToolCalls == 2
@@ -585,8 +585,8 @@ cat >"$TEST_TMP/muse-sessions/.msp-view-v1/aaa/snapshot-1.json" <<'JSON'
 JSON
 rm -f "$TEST_TMP/cache/muse-stats.json"
 assert_backend "prefers the view snapshot's counted-once totals" '
-    (.providers[0].details.totalTokens) == 1750
-    and (.providers[0].details.totalOutputTokens) == 350' --provider muse
+    (.providers[0].details.stats.totalTokens) == 1750
+    and (.providers[0].details.stats.totalOutputTokens) == 350' --provider muse
 
 # The billed quota is opt-in: an untouched install makes no call at all.
 assert_backend "the billed quota stays off until it is switched on" '

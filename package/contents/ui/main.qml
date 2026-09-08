@@ -1546,12 +1546,6 @@ PlasmoidItem {
         root.museHasLogin = d.hasLogin === true;
         root.museEmail = d.email || "";
         root.museFullName = d.fullName || "";
-        root.museModel = d.model || "";
-        root.museTotalTokens = d.totalTokens || 0;
-        root.museInputTokens = d.totalInputTokens || 0;
-        root.museOutputTokens = d.totalOutputTokens || 0;
-        root.museCostUSD = d.totalCostUSD || 0;
-        root.museModelCalls = d.totalModelCalls || 0;
         root.museError = error;
         var current = d.current || {};
         var weekly = d.weekly || {};
@@ -1563,6 +1557,12 @@ PlasmoidItem {
         root.museWeeklyPct = weekly.pct || 0;
         root.museWeeklyResetDate = root.dateFromEpoch(weekly.resetAt);
         var stats = d.stats || {};
+        root.museModel = stats.model || "";
+        root.museTotalTokens = stats.totalTokens || 0;
+        root.museInputTokens = stats.totalInputTokens || 0;
+        root.museOutputTokens = stats.totalOutputTokens || 0;
+        root.museCostUSD = stats.totalCostUSD || 0;
+        root.museModelCalls = stats.totalModelCalls || 0;
         root.museStatsTotalSessions = stats.totalSessions || 0;
         root.museStatsSubagentSessions = stats.subagentSessions || 0;
         root.museStatsTotalMessages = stats.totalMessages || 0;

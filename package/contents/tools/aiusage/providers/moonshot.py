@@ -2,16 +2,8 @@
 
 import os
 
+from ..contract import num
 from ..http import as_json, error_json, fetch_json, http_error_json, resolve_key
-
-
-def _number(value):
-    if isinstance(value, bool) or value is None:
-        return 0
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return 0
 
 
 def _moonshot_key():
@@ -51,7 +43,7 @@ def get_moonshot_balance():
     return {
         "hasKey": True,
         "keyValid": True,
-        "availableBalance": _number(data.get("available_balance")),
-        "voucherBalance": _number(data.get("voucher_balance")),
-        "cashBalance": _number(data.get("cash_balance")),
+        "availableBalance": num(data.get("available_balance")),
+        "voucherBalance": num(data.get("voucher_balance")),
+        "cashBalance": num(data.get("cash_balance")),
     }

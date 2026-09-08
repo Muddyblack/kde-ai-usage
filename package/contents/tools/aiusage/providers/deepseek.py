@@ -5,16 +5,8 @@ Ported from tools/sh/get-deepseek-balance.
 
 import os
 
+from ..contract import num
 from ..http import as_json, error_json, fetch_json, http_error_json, resolve_key
-
-
-def _num(v):
-    if v is None:
-        return 0
-    try:
-        return float(v)
-    except (TypeError, ValueError):
-        return 0
 
 
 def get_deepseek_balance():
@@ -50,7 +42,7 @@ def get_deepseek_balance():
         "isAvailable": body.get("is_available") is True,
         "balances": balances,
         "primaryCurrency": primary.get("currency") or "",
-        "primaryTotal": _num(primary.get("total_balance", "0")),
-        "primaryGranted": _num(primary.get("granted_balance", "0")),
-        "primaryToppedUp": _num(primary.get("topped_up_balance", "0")),
+        "primaryTotal": num(primary.get("total_balance", "0")),
+        "primaryGranted": num(primary.get("granted_balance", "0")),
+        "primaryToppedUp": num(primary.get("topped_up_balance", "0")),
     }

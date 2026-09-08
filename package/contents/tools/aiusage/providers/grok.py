@@ -13,7 +13,7 @@ import time
 from collections import deque
 
 from ..contract import epoch_of
-from ..http import as_json, fetch_json
+from ..http import as_json, fetch_json, resolve_key
 
 CLIENT_VER = "0.2.106"
 
@@ -44,32 +44,14 @@ def _first_present(*vals):
     return None
 
 
-def _read_key_file(path):
-    if not os.path.isfile(path):
-        return ""
-    try:
-        with open(path) as f:
-            return f.read().translate(str.maketrans("", "", "\n\r ")).strip()
-    except OSError:
-        return ""
-
-
 def _resolve_api_key():
-    key = os.environ.get("WIDGET_XAI_API_KEY") or os.environ.get("WIDGET_GROK_API_KEY") or ""
-    if not key:
-        key = os.environ.get("XAI_API_KEY", "")
-    if not key:
-        key = os.environ.get("GROK_API_KEY", "")
-    if not key:
-        for p in (
-            os.path.expanduser("~/.config/xai/api-key"),
-            os.path.expanduser("~/.xai/api-key"),
-            os.path.expanduser("~/.config/grok/api-key"),
-        ):
-            key = _read_key_file(p)
-            if key:
-                break
-    return key
+    return resolve_key(
+        ("WIDGET_XAI_API_KEY", "WIDGET_GROK_API_KEY"),
+        ("XAI_API_KEY", "GROK_API_KEY"),
+        os.path.expanduser("~/.config/xai/api-key"),
+        os.path.expanduser("~/.xai/api-key"),
+        os.path.expanduser("~/.config/grok/api-key"),
+    )
 
 
 def _read_grok_auth(auth_file):

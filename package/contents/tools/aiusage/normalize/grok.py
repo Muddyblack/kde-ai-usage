@@ -5,7 +5,7 @@ def normalize_grok(raw):
     now = raw["now"]
     res = raw["inputs"].get("usage") or {}
 
-    if not isinstance(res, dict) or len(res) == 0:
+    if not isinstance(res, dict) or not res:
         return provider_error(
             "grok",
             "Grok",

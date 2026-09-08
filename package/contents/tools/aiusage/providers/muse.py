@@ -10,9 +10,13 @@ from the MSP wire schema (`muse schema generate-json-schema`), from the view
 fold, from `session-index.db` and from the feature-config cache, and the CLI
 exposes no `usage`/`status`/`quota` subcommand. Reading them would mean paying
 for a model call to be told how much you have spent, which
-docs/provider-contract.md forbids. So the widget does not show them, and this
-module has no HTTP client at all — there is nothing here to accidentally
-re-enable.
+docs/provider-contract.md says a statistic must not do.
+
+The widget can still show them, but only because the user asked for it: that
+half lives in providers/muse_quota.py, off unless WIDGET_MUSE_QUOTA is set.
+Keeping it in a separate module is the point — *this* module has no HTTP client
+and no credential read at all, so the default path cannot start costing anybody
+money by accident. A test asserts it against this module's import graph.
 
 What it reads instead, all written by Muse itself:
 
@@ -42,19 +46,11 @@ import re
 
 from .. import config as _config
 from ..billing import price_models
+from ..contract import num
 
 _DATE_RE = re.compile(r"/(\d{4})/(\d{2})/(\d{2})/[^/]+/")
 _MAX_FILE_BYTES = 64 * 1024 * 1024
 _VIEW_DIR = ".msp-view-v1"
-
-
-def _n(v):
-    if isinstance(v, bool) or v is None:
-        return 0
-    try:
-        return float(v)
-    except (TypeError, ValueError):
-        return 0
 
 
 def _data_home():
@@ -149,11 +145,11 @@ def model_catalog():
             cost = row.get("cost") if isinstance(row.get("cost"), dict) else {}
             catalog[model_id] = {
                 "label": row.get("display_label") if isinstance(row.get("display_label"), str) else model_id,
-                "context": _n(row.get("context_limit")),
-                "output": _n(row.get("output_limit")),
-                "input$": _n(cost.get("input")),
-                "output$": _n(cost.get("output")),
-                "cached$": _n(cost.get("cached")) if cost.get("cached") is not None else None,
+                "context": num(row.get("context_limit")),
+                "output": num(row.get("output_limit")),
+                "input$": num(cost.get("input")),
+                "output$": num(cost.get("output")),
+                "cached$": num(cost.get("cached")) if cost.get("cached") is not None else None,
                 "currency": cost.get("currency") if isinstance(cost.get("currency"), str) else "USD",
                 "current": row.get("is_current") is True,
                 "default": row.get("is_default") is True,
@@ -217,7 +213,7 @@ def _scan_file(path):
                 continue
             if not isinstance(rec, dict):
                 continue
-            ts = _n(rec.get("recorded_at"))
+            ts = num(rec.get("recorded_at"))
             if ts > 0:
                 ts = ts / 1000000
                 if first_ts == 0 or ts < first_ts:
@@ -251,10 +247,10 @@ def _scan_file(path):
                     {
                         "model": str(event.get("model") or ""),
                         "run": str(payload.get("run_id") or ""),
-                        "in": _n(usage.get("input_tokens")),
-                        "out": _n(usage.get("output_tokens")),
-                        "cached": _n(usage.get("cached_tokens")),
-                        "reasoning": _n(usage.get("reasoning_tokens")),
+                        "in": num(usage.get("input_tokens")),
+                        "out": num(usage.get("output_tokens")),
+                        "cached": num(usage.get("cached_tokens")),
+                        "reasoning": num(usage.get("reasoning_tokens")),
                     }
                 )
             elif kind == "assistant_tool_calls_committed":
@@ -305,9 +301,9 @@ def _snapshot_tokens(root, session_id):
     usage = state.get("tokenUsage")
     if not isinstance(usage, dict):
         return None
-    total = _n(usage.get("totalTokens"))
-    prompt = _n(usage.get("promptTokens"))
-    output = _n(usage.get("outputTokens"))
+    total = num(usage.get("totalTokens"))
+    prompt = num(usage.get("promptTokens"))
+    output = num(usage.get("outputTokens"))
     if total <= 0 and prompt <= 0 and output <= 0:
         return None
     return {"in": prompt, "out": output, "total": total or (prompt + output)}

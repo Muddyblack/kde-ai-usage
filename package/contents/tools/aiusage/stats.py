@@ -100,7 +100,7 @@ def activity_base(s, now, daily_series, unit, tool_calls=None):
 
 
 def claude_stats(s, now):
-    if s is None or not isinstance(s, dict) or len(s) == 0:
+    if not isinstance(s, dict) or not s:
         return {"available": False}
 
     usage = s.get("modelUsage") or {}
@@ -222,7 +222,7 @@ def muse_stats(s, now):
 
 
 def codex_stats(s, now):
-    if s is None or not isinstance(s, dict) or num(s.get("totalSessions")) == 0:
+    if not isinstance(s, dict) or num(s.get("totalSessions")) == 0:
         return {"available": False}
 
     usage = s.get("modelUsage") or {}
@@ -265,7 +265,7 @@ def copilot_stats(s, now):
     """The Copilot CLI records activity but no tokens, models or cost, so this
     fills in the activity half of the same shape and leaves the token tiles
     empty (see providers/copilot_stats.py)."""
-    if s is None or not isinstance(s, dict) or num(s.get("totalSessions")) == 0:
+    if not isinstance(s, dict) or num(s.get("totalSessions")) == 0:
         return {"available": False}
 
     activity = [a for a in (s.get("dailyActivity") or []) if isinstance(a, dict)]

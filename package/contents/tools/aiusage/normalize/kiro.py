@@ -5,7 +5,7 @@ def normalize_kiro(raw):
     now = raw["now"]
     res = raw["inputs"].get("usage") or {}
 
-    if not isinstance(res, dict) or len(res) == 0:
+    if not isinstance(res, dict) or not res:
         return provider_error("kiro", "Kiro", "#8b5cf6", now, "Kiro: no local usage data found", {"available": False})
     if res.get("error") is not None:
         return provider_error("kiro", "Kiro", "#8b5cf6", now, f"Kiro: {res['error']}", {"available": False})

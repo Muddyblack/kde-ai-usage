@@ -25,7 +25,7 @@ for b in basename dirname env bash date tr; do ln -sf "$(command -v "$b")" "$bas
 # Runs py_resolve in a pristine environment and prints the basename of $PY
 # ("" when nothing resolved).
 resolve() { # <path> [PYTHON3 override]
-    env -i HOME="$HOME" PATH="$1" ${2:+PYTHON3="$2"} "$bash_bin" -c \
+    env -i HOME="$HOME" PATH="$1" ${2:+PYTHON3="$2"} "$bash_bin" --noprofile --norc -c \
         '. "$0"/python-interp.sh; py_resolve || true; printf "%s" "$(basename "${PY:-}")"' \
         "$sh_dir"
 }
@@ -79,7 +79,7 @@ assert_resolves "broken PYTHON3 override" "" "$(resolve "$base:$d" /nonexistent/
 # so an absolute default has to resolve as-is, without a PATH lookup.
 printf '%s' "$(sed "s|^PY_DEFAULT=\"python3\"|PY_DEFAULT=\"$real_py\"|" \
     "$sh_dir/python-interp.sh")" >"$tmp/pinned.sh"
-pinned="$(env -i HOME="$HOME" PATH="$base" "$bash_bin" -c \
+pinned="$(env -i HOME="$HOME" PATH="$base" "$bash_bin" --noprofile --norc -c \
     '. "$0"; py_resolve || true; printf "%s" "${PY:-}"' "$tmp/pinned.sh")"
 assert_resolves "pinned absolute default" "$real_py" "$pinned"
 

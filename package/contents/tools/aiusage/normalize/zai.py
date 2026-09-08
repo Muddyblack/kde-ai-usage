@@ -58,7 +58,7 @@ def normalize_zai(raw):
     now = raw["now"]
     res = raw["inputs"].get("usage") or {}
 
-    if not isinstance(res, dict) or len(res) == 0:
+    if not isinstance(res, dict) or not res:
         return provider_error("zai", "Z.AI", "#126ef4", now, "Z.AI: no token configured", {"hasKey": False, "keyValid": False})
     if res.get("error") is not None:
         return provider_error(

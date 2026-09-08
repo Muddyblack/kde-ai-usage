@@ -252,10 +252,10 @@ configured quota and a guessed first-of-next-month reset apply.
 `currency`, `symbol`.
 
 **muse** — `hasLogin`, `email`, `fullName` (display identity from the CLI
-login store), `model`, `currency`, `totalTokens`, `totalInputTokens`,
-`totalOutputTokens`, `totalCachedTokens`, `totalReasoningTokens`,
-`totalCostUSD`, `totalModelCalls`, `contextWindow`, `current` / `weekly`
-(`available`, `pct`, `resetAt`), `quotaError`, `stats`.
+login store), `current` / `weekly` (`available`, `pct`, `resetAt`),
+`quotaError`, `stats`. Deliberately thin: every total, the model and the
+currency live in `stats` and are read from there, so no number appears twice in
+one envelope.
 
 Muse is the only provider whose quota cannot be read for free, and the only one
 that can price itself. Both follow from the same fact: Meta publishes the
