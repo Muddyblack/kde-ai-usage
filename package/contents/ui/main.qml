@@ -367,6 +367,9 @@ PlasmoidItem {
     property string lastUpdate: ""
     property int backoffMs: 0
     property bool showSettings: false
+    // Which settings section is on screen. Session-only on purpose: the panel
+    // always opens on Providers, the section people come here for.
+    property string settingsTab: "providers"
     property bool showUsageChart: Plasmoid.configuration.showUsageChart
     // Unified usage history: array of {t, s, w, cp, cw}.
     // s=Claude session%, w=Claude weekly%, cp=Codex 5h%, cw=Codex weekly%.
@@ -487,7 +490,9 @@ PlasmoidItem {
             id: "claude",
             label: "Claude",
             color: root.claudeOrange,
-            icon: "claude-color.svg"
+            icon: "claude-color.svg",
+            keyConfig: "claudeAdminApiKey",
+            keyPlaceholder: "sk-ant-api03-…"
         },
         {
             id: "antigravity",
@@ -499,7 +504,9 @@ PlasmoidItem {
             id: "openai",
             label: "OpenAI",
             color: root.openaiGreen,
-            icon: "openai.svg"
+            icon: "openai.svg",
+            keyConfig: "openaiApiKey",
+            keyPlaceholder: "sk-proj-…"
         },
         {
             id: "kiro",
@@ -511,49 +518,65 @@ PlasmoidItem {
             id: "mistral",
             label: "Mistral",
             color: root.mistralOrange,
-            icon: "mistral-color.svg"
+            icon: "mistral-color.svg",
+            keyConfig: "mistralApiKey",
+            keyPlaceholder: "or $MISTRAL_API_KEY"
         },
         {
             id: "openrouter",
             label: "OpenRouter",
             color: root.openrouterPurple,
-            icon: "openrouter.svg"
+            icon: "openrouter.svg",
+            keyConfig: "openrouterApiKey",
+            keyPlaceholder: "or $OPENROUTER_API_KEY"
         },
         {
             id: "grok",
             label: "Grok",
             color: root.grokWhite,
-            icon: "grok.svg"
+            icon: "grok.svg",
+            keyConfig: "grokApiKey",
+            keyPlaceholder: "or $GROK_API_KEY"
         },
         {
             id: "zai",
             label: "Z.AI",
             color: root.zaiBlue,
-            icon: "zai.svg"
+            icon: "zai.svg",
+            keyConfig: "zaiToken",
+            keyPlaceholder: "or $ZAI_TOKEN"
         },
         {
             id: "copilot",
             label: "Copilot",
             color: root.copilotPurple,
-            icon: "copilot-color.svg"
+            icon: "copilot-color.svg",
+            keyConfig: "githubToken",
+            keyPlaceholder: "optional — gh/Copilot login is used"
         },
         {
             id: "deepseek",
             label: "DeepSeek",
             color: root.deepseekBlue,
-            icon: "deepseek-color.svg"
+            icon: "deepseek-color.svg",
+            keyConfig: "deepseekApiKey",
+            keyPlaceholder: "or $DEEPSEEK_API_KEY"
         },
         {
             id: "kimi",
             label: "Kimi",
             color: root.kimiBlue,
-            icon: "kimi.svg"
+            icon: "kimi.svg",
+            keyConfig: "moonshotApiKey",
+            keyPlaceholder: "or $MOONSHOT_API_KEY"
         },
         {
             id: "muse",
             label: "Muse",
             color: root.museBlue,
-            icon: "muse-color.svg"
+            icon: "muse-color.svg",
+            keyConfig: "museApiKey",
+            keyPlaceholder: "optional — the CLI login is used"
         }
     ]
 
@@ -2227,6 +2250,12 @@ PlasmoidItem {
                 relayoutTimer.restart();
             }
 
+            // A settings section swap changes the panel's height the same way a
+            // tab swap does, and the dialog needs the same nudge to shrink back.
+            function onSettingsTabChanged() {
+                relayoutTimer.restart();
+            }
+
             target: root
         }
 
@@ -2445,7 +2474,20 @@ PlasmoidItem {
 
                     PlasmaComponents.Label {
                         visible: root.showSettings
-                        text: "Configure API keys and providers"
+                        // Names the section on screen, so the header says where
+                        // you are rather than repeating what the page is.
+                        text: {
+                            if (root.settingsTab === "appearance")
+                                return "Colors, chart and popup style";
+
+                            if (root.settingsTab === "data")
+                                return "Refresh interval and usage history";
+
+                            if (root.settingsTab === "advanced")
+                                return "Python interpreter and terminal tool";
+
+                            return "Turn providers on and set their keys";
+                        }
                         font.pixelSize: 10
                         opacity: 0.5
                         color: Kirigami.Theme.textColor

@@ -144,7 +144,7 @@ ColumnLayout {
         PlasmaComponents.Label {
             Layout.fillWidth: true
             visible: !rootItem.museQuotaOn
-            text: "Plan quota is off: Meta reports it only on a billed model call.\nEverything above is read from Muse's own local files."
+            text: "Plan quota is off: Meta reports it only on a billed model call.\nEverything above is read from Muse's own local files.\nSettings › Providers › Muse › Live turns it on."
             font.pixelSize: 9
             opacity: 0.45
             color: Kirigami.Theme.textColor

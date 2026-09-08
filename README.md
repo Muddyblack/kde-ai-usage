@@ -41,7 +41,7 @@
 
 <p align="center">
   <b>Settings</b><br/><br/>
-  <img src="./readme/settings.svg?v=10" alt="Settings panel" width="340" valign="top"/>
+  <img src="./readme/settings.svg?v=11" alt="Settings panel" width="340" valign="top"/>
 </p>
 
 A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple services. Monitor your **Claude** subscription windows and local activity stats, **Antigravity/Google AI Studio**, **OpenAI API and Codex plan limits**, **Grok CLI**, **Kiro**, **Mistral AI**, **OpenRouter**, **Z.AI**, **GitHub Copilot**, **DeepSeek**, **Kimi / Moonshot AI**, and **Muse** usage or balance at a glance with animated segmented bars, live countdown timers, account status, and per-model breakdowns.
