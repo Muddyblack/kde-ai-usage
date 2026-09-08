@@ -192,6 +192,17 @@ cat >"$tmp/home/.config/github-copilot/hosts.json" <<'JSON'
 JSON
 expect_copilot "prefers the github.com login over an enterprise one" "from-dotcom|octocat"
 
+# "github.company.com" starts with the ten characters of "github.com", so the
+# host has to be compared whole and not as a prefix.
+fresh_home
+gh_stub
+mkdir -p "$tmp/home/.config/github-copilot"
+cat >"$tmp/home/.config/github-copilot/hosts.json" <<'JSON'
+{"github.company.com:Iv1.aaa": {"user": "ghe-user", "oauth_token": "from-lookalike-host"},
+ "github.com:Iv1.bbb": {"user": "octocat", "oauth_token": "from-dotcom"}}
+JSON
+expect_copilot "does not mistake github.company.com for github.com" "from-dotcom|octocat"
+
 fresh_home
 gh_stub "from-gh-cli"
 mkdir -p "$tmp/home/.config/github-copilot"

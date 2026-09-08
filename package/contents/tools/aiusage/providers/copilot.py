@@ -61,7 +61,9 @@ def _oauth_from_apps_json(path):
                                              "oauth_token": "gho_..."}}
 
     Enterprise hosts appear under the same shape, so github.com wins when both
-    are present — the usage endpoints here are dotcom-only.
+    are present — the usage endpoints here are dotcom-only. The host is the
+    segment before the first colon and is compared whole: a prefix test would
+    accept github.company.com, whose first ten characters are "github.com".
     """
     try:
         with open(path) as f:
@@ -79,7 +81,7 @@ def _oauth_from_apps_json(path):
         if not isinstance(token, str) or token == "":
             continue
         user = entry.get("user") if isinstance(entry.get("user"), str) else ""
-        if isinstance(key, str) and key.startswith("github.com"):
+        if isinstance(key, str) and key.split(":", 1)[0] == "github.com":
             return token, user
         if fallback == ("", ""):
             fallback = (token, user)
