@@ -322,16 +322,21 @@ PlasmoidItem {
     property real kimiCashBalance: 0
     property string kimiError: ""
     // ── Muse data ───────────────────────────────────────────────────────────
-    property bool museHasOAuth: false
-    property bool museHasApiKey: false
-    property bool museKeyValid: false
-    // "" | "disabled" | "no-credential" | "rejected" | "unreachable" — why the
-    // quota is missing, so the tab can say "couldn't reach Meta" instead of
-    // letting a network timeout look like a bad credential.
-    property string museQuotaError: ""
-    property string musePlanType: ""
+    // Muse Code. No quota properties: Meta reports the plan windows only on a
+    // billed model call, so the widget never asks (see providers/muse.py).
+    property bool museHasLogin: false
     property string museEmail: ""
     property string museFullName: ""
+    property string museModel: ""
+    property real museTotalTokens: 0
+    property real museInputTokens: 0
+    property real museOutputTokens: 0
+    property real museCostUSD: 0
+    property real museModelCalls: 0
+    property string museError: ""
+    // Plan windows: only present when the user switched the billed call on.
+    property bool museQuotaOn: Plasmoid.configuration.museQuotaEnabled === true
+    property string museQuotaError: ""
     property bool museCurrentAvailable: false
     property real museCurrentPct: 0
     property var museCurrentResetDate: null
@@ -340,16 +345,22 @@ PlasmoidItem {
     property real museWeeklyPct: 0
     property var museWeeklyResetDate: null
     property string museWeeklyCountdown: ""
-    property real museSessions: 0
-    property real museSubagentSessions: 0
-    property real museTotalMessages: 0
-    property real museTotalOutputTokens: 0
-    property real museTotalReasoningTokens: 0
-    property real museTotalToolCalls: 0
-    property real museTotalTurns: 0
-    property real museTotalModelCalls: 0
-    property string museActiveModel: ""
-    property string museError: ""
+    // Muse CLI local activity.
+    property real museStatsTotalSessions: 0
+    property real museStatsSubagentSessions: 0
+    property real museStatsTotalMessages: 0
+    property real museStatsTotalToolCalls: 0
+    property real museStatsActiveDays: 0
+    property real museStatsSpanDays: 0
+    property real museStatsCurrentStreak: 0
+    property real museStatsLongestStreak: 0
+    property real museStatsLongestSessionMs: 0
+    property real museStatsLongestSessionMessages: 0
+    property real museStatsPeakHour: -1
+    property string museStatsFirstDate: ""
+    property var museStatsModels: ({})
+    property var museStatsDailyTokens: []
+    property var museStatsTopWorkspaces: []
     // ── Common ────────────────────────────────────────────────────────────────
     property string errorMsg: ""
     property bool stale: false
@@ -1140,10 +1151,10 @@ PlasmoidItem {
         env += root.envAssign("WIDGET_GROK_API_KEY", Plasmoid.configuration.grokApiKey);
         env += root.envAssign("WIDGET_ZAI_TOKEN", Plasmoid.configuration.zaiToken);
         env += root.envAssign("WIDGET_GITHUB_TOKEN", Plasmoid.configuration.githubToken);
-        env += root.envAssign("WIDGET_DEEPSEEK_API_KEY", Plasmoid.configuration.deepseekApiKey);
-        env += root.envAssign("WIDGET_MOONSHOT_API_KEY", Plasmoid.configuration.moonshotApiKey);
         env += root.envAssign("WIDGET_MUSE_API_KEY", Plasmoid.configuration.museApiKey);
         env += "WIDGET_MUSE_QUOTA=" + (Plasmoid.configuration.museQuotaEnabled === true ? "1" : "0") + " ";
+        env += root.envAssign("WIDGET_DEEPSEEK_API_KEY", Plasmoid.configuration.deepseekApiKey);
+        env += root.envAssign("WIDGET_MOONSHOT_API_KEY", Plasmoid.configuration.moonshotApiKey);
         var quota = parseInt(Plasmoid.configuration.copilotQuota || 300);
         if (isNaN(quota) || quota <= 0)
             quota = 300;
@@ -1532,15 +1543,19 @@ PlasmoidItem {
     }
 
     function applyMuse(d, error) {
-        root.museHasOAuth = d.hasOAuth === true;
-        root.museHasApiKey = d.hasApiKey === true;
-        root.museKeyValid = d.keyValid === true;
-        root.museQuotaError = d.quotaError || "";
-        root.musePlanType = d.planType || "";
+        root.museHasLogin = d.hasLogin === true;
         root.museEmail = d.email || "";
         root.museFullName = d.fullName || "";
+        root.museModel = d.model || "";
+        root.museTotalTokens = d.totalTokens || 0;
+        root.museInputTokens = d.totalInputTokens || 0;
+        root.museOutputTokens = d.totalOutputTokens || 0;
+        root.museCostUSD = d.totalCostUSD || 0;
+        root.museModelCalls = d.totalModelCalls || 0;
+        root.museError = error;
         var current = d.current || {};
         var weekly = d.weekly || {};
+        root.museQuotaError = d.quotaError || "";
         root.museCurrentAvailable = current.available === true;
         root.museCurrentPct = current.pct || 0;
         root.museCurrentResetDate = root.dateFromEpoch(current.resetAt);
@@ -1548,16 +1563,21 @@ PlasmoidItem {
         root.museWeeklyPct = weekly.pct || 0;
         root.museWeeklyResetDate = root.dateFromEpoch(weekly.resetAt);
         var stats = d.stats || {};
-        root.museSessions = stats.totalSessions || 0;
-        root.museSubagentSessions = stats.subagentSessions || 0;
-        root.museTotalMessages = stats.totalMessages || 0;
-        root.museTotalOutputTokens = stats.totalOutputTokens || 0;
-        root.museTotalReasoningTokens = stats.totalReasoningTokens || 0;
-        root.museTotalToolCalls = stats.totalToolCalls || 0;
-        root.museTotalTurns = stats.totalTurns || 0;
-        root.museTotalModelCalls = stats.totalModelCalls || 0;
-        root.museActiveModel = stats.model || stats.favoriteModel || "";
-        root.museError = error;
+        root.museStatsTotalSessions = stats.totalSessions || 0;
+        root.museStatsSubagentSessions = stats.subagentSessions || 0;
+        root.museStatsTotalMessages = stats.totalMessages || 0;
+        root.museStatsTotalToolCalls = stats.totalToolCalls || 0;
+        root.museStatsActiveDays = stats.activeDays || 0;
+        root.museStatsSpanDays = stats.spanDays || 0;
+        root.museStatsCurrentStreak = stats.currentStreak || 0;
+        root.museStatsLongestStreak = stats.longestStreak || 0;
+        root.museStatsLongestSessionMs = stats.longestSessionMs || 0;
+        root.museStatsLongestSessionMessages = stats.longestSessionMessages || 0;
+        root.museStatsPeakHour = stats.peakHour === undefined ? -1 : stats.peakHour;
+        root.museStatsFirstDate = stats.firstDate || "";
+        root.museStatsModels = stats.models || ({});
+        root.museStatsDailyTokens = stats.dailySeries || [];
+        root.museStatsTopWorkspaces = stats.topWorkspaces || [];
     }
 
     function refresh() {
@@ -1723,18 +1743,15 @@ PlasmoidItem {
             if (root.deepseekError)
                 lines.push("⚠ " + root.deepseekError);
         } else if (tab === "muse") {
-            if (root.museEmail)
-                lines.push(root.museEmail);
-            if (root.musePlanType)
-                lines.push("Plan: " + root.musePlanType);
+            lines.push("Muse" + (root.museModel ? " · " + root.museModel : ""));
             if (root.museCurrentAvailable)
                 lines.push("Current: " + Math.round(root.museCurrentPct) + "%" + (root.museCurrentCountdown ? " (" + root.museCurrentCountdown + ")" : ""));
             if (root.museWeeklyAvailable)
-                lines.push("Weekly: " + Math.round(root.museWeeklyPct) + "%" + (root.museWeeklyCountdown ? " (" + root.museWeeklyCountdown + ")" : ""));
-            if (root.museSessions > 0 || root.museTotalOutputTokens > 0)
-                lines.push(root.museSessions + " sessions · " + root.formatTokens(root.museTotalOutputTokens) + " out");
-            if (root.museActiveModel)
-                lines.push(root.museActiveModel);
+                lines.push("Weekly: " + Math.round(root.museWeeklyPct) + "%");
+            if (root.museTotalTokens > 0)
+                lines.push(root.formatTokens(root.museTotalTokens) + " tokens · " + root.museStatsTotalSessions + " sessions");
+            if (root.museCostUSD > 0)
+                lines.push("Spend (est.): " + root.formatMoney(root.museCostUSD, "USD"));
             if (root.museError)
                 lines.push("⚠ " + root.museError);
         }
@@ -2167,32 +2184,17 @@ PlasmoidItem {
             }
 
             PanelSlot {
-                pct: root.museCurrentPct
-                iconColor: root.sessionColor
+                pct: root.museCurrentAvailable ? root.museCurrentPct : 0
+                iconColor: root.museBlue
                 iconSource: Qt.resolvedUrl("../icons/muse-color.svg")
                 iconText: "Mu"
                 stale: root.stale && root.panelShows("muse")
-                visible: root.panelShows("muse") && root.museCurrentAvailable
-                tooltipText: "Muse Current: " + Math.round(root.museCurrentPct) + "%" + (root.museEmail ? "\n" + root.museEmail : "") + (root.museActiveModel ? "\n" + root.museActiveModel : "") + (root.museCurrentCountdown ? "\nResets: " + root.museCurrentCountdown : "") + (root.museSessions > 0 ? "\n" + root.museSessions + " sessions · " + root.formatTokens(root.museTotalOutputTokens) + " out" : "")
-            }
-
-            Rectangle {
-                visible: root.panelShows("muse") && root.museCurrentAvailable && root.museWeeklyAvailable
-                width: 1
-                height: 14
-                color: Qt.rgba(1, 1, 1, 0.16)
-                Layout.alignment: Qt.AlignVCenter
-            }
-
-            PanelSlot {
-                pct: root.museWeeklyPct
-                iconColor: root.weeklyColor
-                iconSource: Qt.resolvedUrl("../icons/muse-color.svg")
-                iconTint: root.weeklyColor
-                iconText: "7D"
-                stale: root.stale && root.panelShows("muse")
-                visible: root.panelShows("muse") && root.museWeeklyAvailable
-                tooltipText: "Muse Weekly: " + Math.round(root.museWeeklyPct) + "%" + (root.museWeeklyCountdown ? "\nResets: " + root.museWeeklyCountdown : "")
+                visible: root.panelShows("muse")
+                // With the billed quota off there is no percentage to fill, so
+                // the pill carries the lifetime total instead of an empty bar.
+                showCost: !root.museCurrentAvailable
+                costText: root.museTotalTokens > 0 ? root.formatTokens(root.museTotalTokens) : "—"
+                tooltipText: "Muse" + (root.museCurrentAvailable ? "\nCurrent: " + Math.round(root.museCurrentPct) + "%" + (root.museCurrentCountdown ? " (" + root.museCurrentCountdown + ")" : "") : "") + (root.museWeeklyAvailable ? "\nWeekly: " + Math.round(root.museWeeklyPct) + "%" : "") + (root.museModel ? "\n" + root.museModel : "") + (root.museTotalTokens > 0 ? "\n" + root.formatTokens(root.museTotalTokens) + " tokens · " + root.museStatsTotalSessions + " sessions" : "\nNo local sessions yet") + (root.museCostUSD > 0 ? "\nSpend (est.): " + root.formatMoney(root.museCostUSD, "USD") : "")
             }
         }
     }

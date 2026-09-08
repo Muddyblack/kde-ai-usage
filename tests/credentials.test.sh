@@ -220,26 +220,19 @@ printf 'not json at all\n' >"$tmp/home/.config/github-copilot/apps.json"
 expect_copilot "a corrupt apps.json is empty, not an exception" ""
 
 # ── Muse ────────────────────────────────────────────────────────────────────
+#
+# Muse has no credential to resolve: the provider makes no request, so it reads
+# presence and identity only and never touches the stored tokens. What must
+# hold is that a missing or broken store is "not logged in" rather than a
+# traceback, and that the model comes from the CLI's settings.
 
 fresh_home
-expect "no Muse credential yields an empty key" "" "muse:_muse_key"
-
-fresh_home
-META_API_KEY=from-meta-env expect "reads the vendor META_API_KEY" \
-    "from-meta-env" "muse:_muse_key"
-
-fresh_home
-WIDGET_MUSE_API_KEY=from-widget META_API_KEY=from-meta-env \
-    expect "prefers the widget field over META_API_KEY" \
-    "from-widget" "muse:_muse_key"
-
-fresh_home
-MUSE_AUTH_PATH="$tmp/nope.json" expect "a missing auth store means no OAuth login" \
+MUSE_AUTH_PATH="$tmp/nope.json" expect "a missing auth store means no login" \
     "False" "muse:auth_presence"
 
 fresh_home
 printf '{"providers": {"meta": {"mechanism": "oauth"}}}' >"$tmp/muse-auth.json"
-MUSE_AUTH_PATH="$tmp/muse-auth.json" expect "detects the meta OAuth login" \
+MUSE_AUTH_PATH="$tmp/muse-auth.json" expect "detects the meta login" \
     "True" "muse:auth_presence"
 
 fresh_home
@@ -252,10 +245,15 @@ printf '{"providers": {}}' >"$tmp/muse-auth.json"
 MUSE_AUTH_PATH="$tmp/muse-auth.json" expect "an auth store without meta is no login" \
     "False" "muse:auth_presence"
 
+# The model is whatever the CLI is set to — never a name pinned in our source.
 fresh_home
-printf '{"providers": {"meta": {"mechanism": "oauth", "api_key": "test-muse-key"}}}' >"$tmp/muse-auth.json"
-MUSE_AUTH_PATH="$tmp/muse-auth.json" expect "reads the login api_key for Model-API calls" \
-    "test-muse-key" "muse:_auth_api_key"
+printf '{"schema_version": 1, "provider": "meta", "model": "muse-spark-9.9"}' >"$tmp/muse-settings.json"
+MUSE_SETTINGS_PATH="$tmp/muse-settings.json" expect "reads the model from the CLI settings" \
+    "muse-spark-9.9" "muse:configured_model"
+
+fresh_home
+MUSE_SETTINGS_PATH="$tmp/nope.json" expect "no settings file means no model claim" \
+    "" "muse:configured_model"
 
 if [ "$failures" -eq 0 ]; then
     printf 'ok — %d credential checks passed\n' "$checks"

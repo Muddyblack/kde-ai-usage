@@ -58,9 +58,11 @@ variables, then the first readable config file. Where a vendor documents a diffe
 variable name than the one this package grew up with, both are accepted —
 `Z_AI_API_KEY` alongside `ZAI_TOKEN`, `KIMI_API_KEY` alongside `MOONSHOT_API_KEY` —
 because a provider that knows only one spelling reports "no token configured" at
-somebody who did set the key. Two providers additionally borrow the credential another tool already stores
-(`~/.config/glm-acp-agent/credentials.json` for Z.AI, `~/.vibe/config.toml` for
-Mistral); a borrowed key always ranks last, so an explicit one wins.
+somebody who did set the key. Several providers additionally borrow a credential another tool already stores:
+`~/.config/glm-acp-agent/credentials.json` for Z.AI, `~/.vibe/config.toml` for
+Mistral, the Copilot editor/CLI logins and `gh auth token` for Copilot, and —
+only on its opt-in quota path — the Muse login store for Muse. A borrowed
+credential always ranks last, so an explicit one wins.
 `tests/credentials.test.sh` pins the order.
 
 ## Envelope
@@ -160,16 +162,17 @@ after wake-up (`UsageHistory.withResets`).
 | `za` | Z.AI tokens |
 | `gh` | Copilot premium requests |
 | `ds` | DeepSeek balance (absolute) |
-| `mu` | Muse output tokens (absolute) |
-| `mc` / `mw` | Muse Current / Weekly quota pct (phase 2) |
+| `mu` | Muse tokens (absolute) |
+| `mc` / `mw` | Muse Current / Weekly plan pct — only present when the opt-in quota is switched on |
 
 ### Credentials
 
 Credentials and access tokens are **never** part of a result. The backend
 exposes presence only: `details.hasKey` and `details.keyValid` for
-single-credential providers, and the specific `details.hasOAuth` /
+single-credential providers, the specific `details.hasOAuth` /
 `details.hasAdminKey` / `details.hasApiKey` / `details.codexLoggedIn` for the
-two that accept more than one. A contract test asserts that no fixture secret
+two that accept more than one, and `details.hasLogin` for Muse, whose default
+path needs no credential at all. A contract test asserts that no fixture secret
 can appear anywhere in a result.
 
 Most helpers now report presence rather than echoing the credential back, so a
@@ -248,21 +251,45 @@ configured quota and a guessed first-of-next-month reset apply.
 `primaryCurrency`, `primaryTotal`, `primaryGranted`, `primaryToppedUp`,
 `currency`, `symbol`.
 
-**muse** — `hasOAuth`, `hasApiKey`, `keyValid`, `planType`, `email`,
-`fullName` (display identity from the CLI login store), `current` /
-`weekly` (`available`, `pct`, `resetAt`; empty when no credential or when
-the quota fetch fails — see `get_muse_quota`), `stats` (`available`,
-`totalSessions`, `subagentSessions`, `totalMessages`, `totalTokens`,
-`totalInputTokens`, `totalOutputTokens`, `totalCachedTokens`,
-`totalReasoningTokens`, `totalToolCalls`, `totalTurns`, `totalModelCalls`,
-`maxContextTokens`, `workspaceCount`, `favoriteModel`, `firstDate`,
-`computedDate`, `activeDays`, `spanDays`, `currentStreak`, `longestStreak`,
-`longestSessionMs`, `longestSessionMessages`, `peakHour`, `models`,
-`dailyTokens`, `model`).
+**muse** — `hasLogin`, `email`, `fullName` (display identity from the CLI
+login store), `model`, `currency`, `totalTokens`, `totalInputTokens`,
+`totalOutputTokens`, `totalCachedTokens`, `totalReasoningTokens`,
+`totalCostUSD`, `totalModelCalls`, `contextWindow`, `current` / `weekly`
+(`available`, `pct`, `resetAt`), `quotaError`, `stats`.
+
+Muse is the only provider whose quota cannot be read for free, and the only one
+that can price itself. Both follow from the same fact: Meta publishes the
+Current/Weekly plan windows solely as a `response.subscription_usage` frame on a
+live model call — they are in neither the MSP wire schema, the view fold,
+`session-index.db` nor the feature-config cache, and the CLI has no
+`usage`/`status`/`quota` subcommand.
+
+The provider is therefore split in two, and the rule above decides which half
+runs by default:
+
+- `providers/muse.py` is the default path and imports no networking module at
+  all — a test asserts that against its import graph, not its text. It reads
+  what Muse writes to disk anyway: session logs, the folded counted-once totals
+  under `.msp-view-v1/`, the login store (presence and display name only), the
+  selected model in `settings.json`, and the model catalog cache. That
+  catalog's own `cost` rows are what make the offline spend estimate possible,
+  and they are why no model id, context window or price is hardcoded anywhere.
+- `providers/muse_quota.py` is the opt-in half: one minimal streaming call per
+  `MUSE_QUOTA_TTL_SECONDS` (default 1800), gated on `WIDGET_MUSE_QUOTA`, which
+  `config.muse_quota_enabled()` defaults to off. Separate module so the free
+  path cannot reach a credential or a socket; its `refresh_cost()` prices one
+  refresh from the user's own catalog so both frontends can state the cost
+  beside the switch.
+
+`quotaError` distinguishes `disabled`, `no-credential`, `no-model`, `rejected`
+and `unreachable` — a flaky network must never be reported as a bad key — and
+any quota failure degrades to the free local numbers rather than failing the
+provider. A quota that did come back renders even when the local logs are
+empty: paying for a window and then discarding it would be the worst of both.
 
 ### Shared sub-objects
 
-`stats` (Claude Code, Codex CLI and Copilot CLI): `available`,
+`stats` (Claude Code, Codex CLI, Copilot CLI and Muse Code): `available`,
 `totalMessages`, `totalSessions`, `totalTokens`, `totalToolCalls`,
 `favoriteModel`, `firstDate`, `computedDate`, `activeDays`, `spanDays`,
 `currentStreak`, `longestStreak`, `longestSessionMs`,
@@ -272,7 +299,11 @@ frontends draw, named separately because not every CLI counts tokens. Claude
 adds `version`, `totalCostUSD` and `totalWebSearches`; Codex adds `model` and
 `effortLevel`; Copilot (which records no tokens, models or cost) adds
 `totalFiles`, `totalRepositories` and `topRepositories[]` (`name`, `sessions`)
-and reports `dailyUnit: "messages"`.
+and reports `dailyUnit: "messages"`; Muse adds `subagentSessions`,
+`totalInputTokens`, `totalOutputTokens`, `totalCachedTokens`,
+`totalReasoningTokens`, `totalCostUSD` (priced offline from the local
+catalog), `totalModelCalls`, `contextWindow`, `workspaceCount`,
+`topWorkspaces[]` (`name`, `sessions`), `model` and `currency`.
 
 `status` (Statuspage summary): `indicator`, `description`, `components[]`,
 `incidents[]`, `latestUpdate`. Status pages are cached on disk for

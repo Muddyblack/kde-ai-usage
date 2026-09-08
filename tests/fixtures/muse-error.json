@@ -3,11 +3,10 @@
   "now": 1785000000,
   "inputs": {
     "usage": {
-      "hasOAuth": false,
-      "hasApiKey": false,
-      "keyValid": false,
-      "quota": {},
-      "error": "No Muse sessions found — run muse once"
+      "hasLogin": true,
+      "email": "user@example.com",
+      "fullName": "Test User",
+      "stats": {}
     },
     "status": null
   }

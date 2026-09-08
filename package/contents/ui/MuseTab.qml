@@ -1,12 +1,15 @@
 import QtQuick
 import QtQuick.Layouts
-import QtQuick.Controls as QQC2
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
 
 ColumnLayout {
     id: museTabRoot
     property Item rootItem
+
+    // Inner sub-tab: "usage" (lifetime totals and spend) vs "stats" (local
+    // activity), same split as the Claude, OpenAI and Copilot tabs.
+    property string subTab: "usage"
 
     visible: rootItem.enabledTabs[rootItem.activeTab] === "muse" && !rootItem.showSettings
     Layout.fillWidth: true
@@ -15,39 +18,16 @@ ColumnLayout {
     RowLayout {
         Layout.fillWidth: true
         spacing: 8
-        visible: rootItem.museSessions > 0 || rootItem.museCurrentAvailable
+        visible: rootItem.museHasLogin
 
-        // Brand mark, with the generic symbolic icon as the only fallback —
-        // same Image/status === Image.Error pattern the panel slots use.
-        Item {
+        Kirigami.Icon {
+            source: Qt.resolvedUrl("../icons/muse-color.svg")
             width: 14
             height: 14
-            Layout.alignment: Qt.AlignVCenter
-
-            Image {
-                id: museHeaderIcon
-                anchors.fill: parent
-                source: Qt.resolvedUrl("../icons/muse-color.svg")
-                sourceSize.width: 28
-                sourceSize.height: 28
-                fillMode: Image.PreserveAspectFit
-                smooth: true
-                opacity: 0.9
-                visible: status !== Image.Error
-            }
-
-            Kirigami.Icon {
-                anchors.fill: parent
-                source: "code-context"
-                color: rootItem.museBlue
-                isMask: true
-                opacity: 0.75
-                visible: museHeaderIcon.status === Image.Error
-            }
         }
 
         PlasmaComponents.Label {
-            text: rootItem.museEmail || rootItem.museFullName || "Muse"
+            text: rootItem.museFullName !== "" ? "Muse Code · " + rootItem.museFullName : "Muse Code"
             font.pixelSize: 10
             opacity: 0.65
             color: Kirigami.Theme.textColor
@@ -55,28 +35,21 @@ ColumnLayout {
             Layout.fillWidth: true
         }
 
-        PlasmaComponents.Label {
-            visible: rootItem.museActiveModel !== ""
-            text: rootItem.museActiveModel
-            font.pixelSize: 10
-            opacity: 0.5
-            color: Kirigami.Theme.textColor
-            elide: Text.ElideRight
-            Layout.fillWidth: true
-        }
-
+        // The model the CLI will actually use next, read from its own
+        // settings — never a name pinned in our source.
         Rectangle {
-            visible: rootItem.musePlanType !== ""
-            height: 18
-            width: musePlanBadgeLabel.implicitWidth + 12
+            visible: rootItem.museModel !== ""
+            implicitHeight: 18
+            implicitWidth: museModelLabel.implicitWidth + 12
             radius: 4
             color: Qt.rgba(rootItem.museBlue.r, rootItem.museBlue.g, rootItem.museBlue.b, 0.18)
             border.width: 1
             border.color: Qt.rgba(rootItem.museBlue.r, rootItem.museBlue.g, rootItem.museBlue.b, 0.35)
+
             PlasmaComponents.Label {
-                id: musePlanBadgeLabel
+                id: museModelLabel
                 anchors.centerIn: parent
-                text: rootItem.musePlanType
+                text: rootItem.shortenModelName(rootItem.museModel)
                 font.pixelSize: 9
                 font.bold: true
                 color: rootItem.museBlue
@@ -85,18 +58,20 @@ ColumnLayout {
     }
 
     ColumnLayout {
-        visible: rootItem.museSessions === 0 && !rootItem.museCurrentAvailable && rootItem.museError === ""
+        visible: rootItem.museError !== ""
         Layout.fillWidth: true
         spacing: 6
+
         PlasmaComponents.Label {
-            text: "Not connected"
+            text: rootItem.museHasLogin ? "No Muse activity yet" : "Not connected"
             font.pixelSize: 12
             font.bold: true
             color: Kirigami.Theme.textColor
             opacity: 0.7
         }
+
         PlasmaComponents.Label {
-            text: "Run muse once and log in with\n`muse login`"
+            text: rootItem.museHasLogin ? "Run a Muse Code session and its local logs\nwill appear here." : "Sign in with `muse login`. Nothing to paste:\nthis tab only reads Muse's own local files."
             font.pixelSize: 10
             opacity: 0.5
             color: Kirigami.Theme.textColor
@@ -105,40 +80,26 @@ ColumnLayout {
         }
     }
 
-    ColumnLayout {
-        visible: rootItem.museError !== "" && rootItem.museSessions === 0 && !rootItem.museCurrentAvailable
-        Layout.fillWidth: true
-        spacing: 6
-        PlasmaComponents.Label {
-            text: "Muse error"
-            font.pixelSize: 12
-            font.bold: true
-            color: Kirigami.Theme.negativeTextColor
-        }
-        PlasmaComponents.Label {
-            text: rootItem.museError
-            font.pixelSize: 10
-            opacity: 0.7
-            color: Kirigami.Theme.textColor
-            wrapMode: Text.WordWrap
-            Layout.fillWidth: true
-        }
+    SubTabBar {
+        visible: rootItem.museError === ""
+        accent: rootItem.museBlue
+        currentId: museTabRoot.subTab
+        onSelected: id => museTabRoot.subTab = id
     }
 
+    // ── Lifetime totals ────────────────────────────────────────────────────────
     ColumnLayout {
-        visible: rootItem.museCurrentAvailable || rootItem.museWeeklyAvailable
+        visible: museTabRoot.subTab === "usage" && rootItem.museError === ""
         Layout.fillWidth: true
         spacing: 8
 
-        // Shared segmented bar, same as every other quota tab. Muse exposes no
-        // token counts or burn rate, so tokenText/etaText stay unset.
         PopupRow {
             visible: rootItem.museCurrentAvailable
             label: "Current"
             value: rootItem.museCurrentPct
             barColor: rootItem.museBlue
             countdownText: rootItem.museCurrentCountdown !== "" ? "in " + rootItem.museCurrentCountdown : ""
-            tooltipText: "Muse current usage window" + (rootItem.museCurrentCountdown !== "" ? "\nResets in " + rootItem.museCurrentCountdown : "")
+            tooltipText: "Muse current window" + (rootItem.museCurrentCountdown !== "" ? "\nResets in " + rootItem.museCurrentCountdown : "")
         }
 
         PopupRow {
@@ -147,45 +108,220 @@ ColumnLayout {
             value: rootItem.museWeeklyPct
             barColor: rootItem.museBlue
             countdownText: rootItem.museWeeklyCountdown !== "" ? "in " + rootItem.museWeeklyCountdown : ""
-            tooltipText: "Muse weekly usage window" + (rootItem.museWeeklyCountdown !== "" ? "\nResets in " + rootItem.museWeeklyCountdown : "")
+            tooltipText: "Muse weekly window" + (rootItem.museWeeklyCountdown !== "" ? "\nResets in " + rootItem.museWeeklyCountdown : "")
         }
-    }
 
-    // Why the quota bars are missing, when the reason is worth acting on. A
-    // disabled switch or an absent login are the user's own doing and stay
-    // silent; a refused or unreachable endpoint is not.
-    RowLayout {
-        visible: !rootItem.museCurrentAvailable && !rootItem.museWeeklyAvailable && (rootItem.museQuotaError === "rejected" || rootItem.museQuotaError === "unreachable")
-        Layout.fillWidth: true
-        spacing: 5
+        StatValueCard {
+            accent: rootItem.museBlue
+            rows: {
+                var out = [
+                    {
+                        label: "Tokens",
+                        value: rootItem.formatTokens(rootItem.museTotalTokens),
+                        strong: true
+                    },
+                    {
+                        label: "Output",
+                        value: rootItem.formatTokens(rootItem.museOutputTokens)
+                    }
+                ];
+                if (rootItem.museCostUSD > 0)
+                    out.push({
+                        label: "Spend (est.)",
+                        value: "$" + rootItem.museCostUSD.toFixed(2)
+                    });
+                out.push({
+                    label: "Model calls",
+                    value: Math.round(rootItem.museModelCalls).toString()
+                });
+                return out;
+            }
+        }
 
-        Kirigami.Icon {
-            source: rootItem.museQuotaError === "rejected" ? "dialog-warning" : "network-disconnect"
-            width: 11
-            height: 11
-            isMask: true
-            color: Kirigami.Theme.neutralTextColor
-            opacity: 0.8
-            Layout.alignment: Qt.AlignVCenter
+        // Muse is the only provider whose plan quota cannot be read for free,
+        // so the tab says why the bars are missing — and, when they are on,
+        // that they are the one thing here that is not free.
+        PlasmaComponents.Label {
+            Layout.fillWidth: true
+            visible: !rootItem.museQuotaOn
+            text: "Plan quota is off: Meta reports it only on a billed model call.\nEverything above is read from Muse's own local files."
+            font.pixelSize: 9
+            opacity: 0.45
+            color: Kirigami.Theme.textColor
+            wrapMode: Text.WordWrap
         }
 
         PlasmaComponents.Label {
-            text: rootItem.museQuotaError === "rejected" ? "Live quota refused — check the Muse login" : "Live quota unreachable — showing local statistics"
-            font.pixelSize: 10
-            opacity: 0.6
+            Layout.fillWidth: true
+            visible: rootItem.museQuotaOn && rootItem.museQuotaError !== ""
+            text: {
+                if (rootItem.museQuotaError === "rejected")
+                    return "Plan quota: Meta refused the credential.";
+                if (rootItem.museQuotaError === "unreachable")
+                    return "Plan quota: could not reach Meta — the local numbers above are unaffected.";
+                if (rootItem.museQuotaError === "no-credential")
+                    return "Plan quota needs a Meta API key, or a `muse login` that stored one.";
+                if (rootItem.museQuotaError === "no-model")
+                    return "Plan quota needs a model: run Muse once so it caches its catalog.";
+                return "";
+            }
+            font.pixelSize: 9
+            opacity: 0.55
             color: Kirigami.Theme.textColor
             wrapMode: Text.WordWrap
+        }
+
+        PlasmaComponents.Label {
             Layout.fillWidth: true
+            visible: rootItem.museQuotaOn && rootItem.museQuotaError === "" && !rootItem.museCurrentAvailable && !rootItem.museWeeklyAvailable
+            text: "No plan windows on this account — pay-as-you-go has none."
+            font.pixelSize: 9
+            opacity: 0.45
+            color: Kirigami.Theme.textColor
+            wrapMode: Text.WordWrap
         }
     }
 
-    PlasmaComponents.Label {
-        visible: !rootItem.museCurrentAvailable && !rootItem.museWeeklyAvailable && (rootItem.museSessions > 0 || rootItem.museTotalOutputTokens > 0)
-        text: rootItem.museSessions + " sessions · " + rootItem.formatTokens(rootItem.museTotalOutputTokens) + " out"
-        font.pixelSize: 10
-        opacity: 0.5
-        color: Kirigami.Theme.textColor
-        wrapMode: Text.WordWrap
+    // ── Local activity ─────────────────────────────────────────────────────────
+    ColumnLayout {
         Layout.fillWidth: true
+        spacing: 8
+        visible: museTabRoot.subTab === "stats" && rootItem.museError === ""
+
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 8
+            PlasmaComponents.Label {
+                text: "Activity Stats"
+                font.bold: true
+                font.pixelSize: 11
+                opacity: 0.7
+                color: Kirigami.Theme.textColor
+            }
+            Item {
+                Layout.fillWidth: true
+            }
+            PlasmaComponents.Label {
+                text: "Muse Code CLI"
+                font.pixelSize: 9
+                opacity: 0.45
+                color: Kirigami.Theme.textColor
+            }
+        }
+
+        GridLayout {
+            Layout.fillWidth: true
+            columns: 3
+            rowSpacing: 6
+            columnSpacing: 6
+
+            StatTile {
+                visible: rootItem.museTotalTokens > 0
+                tileValue: rootItem.formatTokens(rootItem.museTotalTokens)
+                tileLabel: "tokens"
+                tileTip: rootItem.formatTokens(rootItem.museOutputTokens) + " output · " + rootItem.formatTokens(rootItem.museInputTokens) + " input (context is resent each call)"
+            }
+            StatTile {
+                visible: rootItem.museCostUSD > 0
+                tileValue: "$" + rootItem.museCostUSD.toFixed(2)
+                tileLabel: "spend (est.)"
+                tileTip: "Tokens priced with the model catalog Muse caches locally"
+            }
+            StatTile {
+                tileValue: Math.round(rootItem.museStatsTotalSessions).toString()
+                tileLabel: "sessions"
+                tileTip: rootItem.formatTokens(rootItem.museStatsTotalMessages) + " messages total"
+            }
+            StatTile {
+                tileValue: Math.round(rootItem.museStatsActiveDays) + (rootItem.museStatsSpanDays > 0 ? "/" + Math.round(rootItem.museStatsSpanDays) : "")
+                tileLabel: "active days"
+                tileTip: rootItem.museStatsFirstDate ? "Since " + Qt.formatDate(new Date(rootItem.museStatsFirstDate), "MMM d, yyyy") : ""
+            }
+            StatTile {
+                tileValue: Math.round(rootItem.museStatsCurrentStreak) + "d"
+                tileLabel: "streak"
+                tileSub: "best " + Math.round(rootItem.museStatsLongestStreak) + "d"
+                tileTip: "Current consecutive-day streak\nLongest: " + Math.round(rootItem.museStatsLongestStreak) + " days"
+            }
+            StatTile {
+                tileValue: rootItem.formatDuration(rootItem.museStatsLongestSessionMs)
+                tileLabel: "longest session"
+                tileSub: rootItem.museStatsLongestSessionMessages > 0 ? Math.round(rootItem.museStatsLongestSessionMessages) + " msgs" : ""
+            }
+            StatTile {
+                visible: rootItem.museStatsPeakHour >= 0
+                tileValue: rootItem.museStatsPeakHour >= 0 ? (rootItem.museStatsPeakHour < 10 ? "0" : "") + rootItem.museStatsPeakHour + ":00" : "—"
+                tileLabel: "peak hour"
+                tileTip: "Hour of day with the most activity (UTC)"
+            }
+            StatTile {
+                visible: rootItem.museStatsTotalToolCalls > 0
+                tileValue: rootItem.formatTokens(rootItem.museStatsTotalToolCalls)
+                tileLabel: "tool calls"
+                tileTip: "Total tool invocations across all sessions"
+            }
+            StatTile {
+                visible: rootItem.museStatsSubagentSessions > 0
+                tileValue: Math.round(rootItem.museStatsSubagentSessions).toString()
+                tileLabel: "subagents"
+                tileTip: "Delegated subagent sessions, logged separately by Muse"
+            }
+        }
+
+        StatsSparkline {
+            series: rootItem.museStatsDailyTokens
+            unit: "tokens"
+            barColor: rootItem.museBlue
+            formatValue: rootItem.formatTokens
+        }
+
+        StatsTopList {
+            entries: rootItem.museStatsTopWorkspaces
+            label: "Top workspaces"
+            accent: rootItem.museBlue
+        }
+
+        // ── Per-model usage (all time) ─────────────────────────────────────
+        Repeater {
+            model: {
+                var keys = Object.keys(rootItem.museStatsModels);
+                keys.sort(function (a, b) {
+                    return rootItem.museStatsModels[b].output - rootItem.museStatsModels[a].output;
+                });
+                return keys;
+            }
+            RowLayout {
+                required property string modelData
+                readonly property var entry: rootItem.museStatsModels[modelData] || ({})
+
+                Layout.fillWidth: true
+                spacing: 8
+
+                PlasmaComponents.Label {
+                    text: rootItem.shortenModelName(parent.modelData)
+                    font.pixelSize: 10
+                    opacity: 0.75
+                    color: Kirigami.Theme.textColor
+                    elide: Text.ElideRight
+                    Layout.fillWidth: true
+                }
+                PlasmaComponents.Label {
+                    text: rootItem.formatTokens(parent.entry.output || 0) + " out"
+                    font.pixelSize: 10
+                    opacity: 0.6
+                    color: Kirigami.Theme.textColor
+                }
+                PlasmaComponents.Label {
+                    visible: (parent.entry.cost || 0) > 0
+                    text: "$" + (parent.entry.cost || 0).toFixed(2)
+                    font.pixelSize: 10
+                    color: rootItem.museBlue
+                }
+            }
+        }
+    }
+
+    component StatTile: StatTileBase {
+        accentColor: rootItem.museBlue
     }
 }

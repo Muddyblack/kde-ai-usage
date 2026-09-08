@@ -1,46 +1,51 @@
-"""Aggregate lifetime Muse Code usage from local session logs.
+"""Aggregate lifetime Muse Code usage from the CLI's own local files.
 
-Muse Code persists every session under
-${XDG_DATA_HOME:-~/.local/share}/muse/sessions/YYYY/MM/DD/<id>/session.jsonl
-(one JSON envelope per line), with one sub-log per delegated subagent under
-<subagent>/<child-id>/session.jsonl. Each model call leaves a
-run/model_completed record carrying {model, usage:{input_tokens,
-output_tokens, cached_tokens, reasoning_tokens}}, so lifetime totals are
-computable fully offline with only the standard library.
+This provider never opens a socket, and that is a deliberate design constraint
+rather than an accident of implementation.
 
-Two honesty notes, both verified against a live log plus `muse trace inspect`:
+Muse is the one vendor here whose plan quota cannot be read for free. The
+Current/Weekly windows the TUI's `/usage` screen shows arrive only as a
+`response.subscription_usage` frame riding a live model call: they are absent
+from the MSP wire schema (`muse schema generate-json-schema`), from the view
+fold, from `session-index.db` and from the feature-config cache, and the CLI
+exposes no `usage`/`status`/`quota` subcommand. Reading them would mean paying
+for a model call to be told how much you have spent, which
+docs/provider-contract.md forbids. So the widget does not show them, and this
+module has no HTTP client at all — there is nothing here to accidentally
+re-enable.
 
-- input_tokens are cumulative context per call (every request resends the
-  context), so their sum overstates; output/reasoning are incremental.
-  Totals follow the `trace inspect` convention (plain sums) and the raw
-  chart series uses output tokens only.
-- `trace inspect` projects a single run stream; this aggregates every run
-  and every subagent log, so totals legitimately exceed a one-run export.
+What it reads instead, all written by Muse itself:
 
-Results are cached and only recomputed when a session file is newer than
-the cache, mirroring providers/codex_stats.py.
+  ~/.config/muse/auth.json                     login presence + display identity
+  ~/.config/muse/settings.json                 the model currently selected
+  ~/.local/share/muse/model-catalog/*.json     every model, its context limit
+                                               and its price list
+  ~/.local/share/muse/sessions/**/session.jsonl per-session counters
+  ~/.local/share/muse/sessions/.msp-view-v1/…  the folded counted-once totals
 
-Subscription quota (the Current/Weekly windows of the in-TUI /usage view)
-comes from one minimal streaming Responses call per cache TTL: the server
-emits a response.subscription_usage event carrying
-{window: {used_percent, resets_at, window_duration_mins},
- weekly: {used_percent, resets_at}}. The call uses store:false,
-max_output_tokens:16 and costs a handful of tokens; quota is cached for
-MUSE_QUOTA_TTL_SECONDS (default 1800) so a 5-minute poll interval does not
-turn into a per-poll model call. Any quota failure degrades to local
-session statistics — it never fails the provider.
+No model id, context window or price is hardcoded here: they all come from the
+catalog the CLI caches on disk, so a new Muse model needs no change to this
+file. Prices are what make the spend estimate possible offline — Muse ships its
+own price list, which no other provider in this widget does.
+
+Only counters, model ids and workspace folder names ever leave this module: no
+prompt text, tool arguments, file contents or absolute paths. Results are cached
+and recomputed only when a session file is newer than the cache, mirroring
+providers/codex_stats.py.
 """
 
 import datetime
+import glob
 import json
 import os
 import re
 
 from .. import config as _config
-from ..http import resolve_key
+from ..billing import price_models
 
 _DATE_RE = re.compile(r"/(\d{4})/(\d{2})/(\d{2})/[^/]+/")
 _MAX_FILE_BYTES = 64 * 1024 * 1024
+_VIEW_DIR = ".msp-view-v1"
 
 
 def _n(v):
@@ -52,31 +57,49 @@ def _n(v):
         return 0
 
 
+def _data_home():
+    return os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
+
+
+def _config_home():
+    return os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
+
+
 def sessions_root():
-    override = os.environ.get("MUSE_SESSIONS_DIR")
-    if override:
-        return override
-    data_home = os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
-    return os.path.join(data_home, "muse", "sessions")
+    return os.environ.get("MUSE_SESSIONS_DIR") or os.path.join(_data_home(), "muse", "sessions")
+
+
+def _catalog_dir():
+    return os.environ.get("MUSE_CATALOG_DIR") or os.path.join(_data_home(), "muse", "model-catalog")
 
 
 def _auth_path():
-    override = os.environ.get("MUSE_AUTH_PATH")
-    if override:
-        return override
-    config_home = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
-    return os.path.join(config_home, "muse", "auth.json")
+    return os.environ.get("MUSE_AUTH_PATH") or os.path.join(_config_home(), "muse", "auth.json")
 
 
-def _auth_meta():
-    """The CLI login slot (providers.meta) or None when the store is
-    missing, unreadable or has no meta login. Tokens stay in memory here;
-    callers expose presence and the display identity only, never secrets."""
+def _settings_path():
+    return os.environ.get("MUSE_SETTINGS_PATH") or os.path.join(_config_home(), "muse", "settings.json")
+
+
+def _read_json(path):
+    """None on anything unreadable or malformed. These are other programs'
+    files: a corrupt one must cost the provider a field, never the run."""
     try:
-        with open(_auth_path(), errors="replace") as f:
-            doc = json.load(f)
+        with open(path, errors="replace") as f:
+            return json.load(f)
     except (OSError, ValueError):
         return None
+
+
+def auth_meta():
+    """The CLI login slot (providers.meta), or None when the store is missing,
+    unreadable or holds no meta login.
+
+    This module reads only the identity fields from it. The stored api_key is
+    for providers/muse_quota.py, the opt-in billed path — which is a separate
+    module precisely so that nothing on the free path can reach a credential or
+    a socket."""
+    doc = _read_json(_auth_path())
     if not isinstance(doc, dict):
         return None
     providers = doc.get("providers")
@@ -87,12 +110,65 @@ def _auth_meta():
 
 
 def auth_presence():
-    """Credential *presence* only — the OAuth token is never read out.
+    """Whether a Muse login exists — presence only, never the credential."""
+    return auth_meta() is not None
 
-    Best-effort: an unreadable or locked-down store means "unknown",
-    never an error. This function never changes any permission itself.
+
+def configured_model():
+    """The model the CLI would use on its next run, from its own settings."""
+    doc = _read_json(_settings_path())
+    if isinstance(doc, dict) and isinstance(doc.get("model"), str):
+        return doc["model"]
+    return ""
+
+
+def model_catalog():
+    """{model_id: {label, context, output, input$, output$, cached$, currency,
+    current, default}} from the catalog the CLI caches after talking to the
+    provider. Empty when the CLI has never fetched one.
+
+    The filename hex-encodes provider and profile (`6d657461__p746268` is
+    meta/tbh), so the directory is globbed rather than reconstructed.
     """
-    return _auth_meta() is not None
+    catalog = {}
+    try:
+        files = sorted(glob.glob(os.path.join(_catalog_dir(), "*.json")))
+    except OSError:
+        return catalog
+    for path in files:
+        doc = _read_json(path)
+        rows = doc.get("rows") if isinstance(doc, dict) else None
+        if not isinstance(rows, list):
+            continue
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            model_id = row.get("model_id")
+            if not isinstance(model_id, str) or model_id == "":
+                continue
+            cost = row.get("cost") if isinstance(row.get("cost"), dict) else {}
+            catalog[model_id] = {
+                "label": row.get("display_label") if isinstance(row.get("display_label"), str) else model_id,
+                "context": _n(row.get("context_limit")),
+                "output": _n(row.get("output_limit")),
+                "input$": _n(cost.get("input")),
+                "output$": _n(cost.get("output")),
+                "cached$": _n(cost.get("cached")) if cost.get("cached") is not None else None,
+                "currency": cost.get("currency") if isinstance(cost.get("currency"), str) else "USD",
+                "current": row.get("is_current") is True,
+                "default": row.get("is_default") is True,
+            }
+    return catalog
+
+
+def _pricing_table(catalog):
+    """The {model: {input, output, cached}} shape billing.price_models wants —
+    USD per million tokens, exactly as the catalog states them."""
+    return {
+        name: {"input": row["input$"], "output": row["output$"], "cached": row["cached$"]}
+        for name, row in catalog.items()
+        if row["input$"] or row["output$"]
+    }
 
 
 def _iter_session_files(root):
@@ -101,18 +177,19 @@ def _iter_session_files(root):
             if name != "session.jsonl":
                 continue
             path = os.path.join(dirpath, name)
-            m = _DATE_RE.search(path.replace(os.sep, "/"))
+            posix = path.replace(os.sep, "/")
+            m = _DATE_RE.search(posix)
             if not m:
                 continue
-            yield path, f"{m.group(1)}-{m.group(2)}-{m.group(3)}", "/subagent/" in path.replace(os.sep, "/")
+            yield path, f"{m.group(1)}-{m.group(2)}-{m.group(3)}", "/subagent/" in posix
 
 
 def _scan_file(path):
-    """Aggregate one session.jsonl into a record. Pure counters only: no
-    prompt text, tool arguments, file paths or any other payload content
-    is retained — only event kinds, model names and token numbers."""
+    """Aggregate one session.jsonl into a record. Pure counters: no prompt
+    text, tool arguments or file contents are retained — only event kinds,
+    model ids, token numbers and the workspace folder name."""
     calls = []
-    configured = {}
+    configured = []
     tool_calls = 0
     user_msgs = 0
     asst_msgs = 0
@@ -150,31 +227,29 @@ def _scan_file(path):
             payload = rec.get("payload")
             if not isinstance(payload, dict):
                 continue
+            record = payload.get("record") if isinstance(payload.get("record"), dict) else {}
             if rec.get("payload_type") == "run.model.configured":
-                record = payload.get("record") or {}
-                model_id = record.get("model_id") if isinstance(record, dict) else ""
-                if model_id:
-                    configured[str(model_id)] = True
+                model_id = record.get("model_id") or payload.get("model_id")
+                if isinstance(model_id, str) and model_id:
+                    configured.append(model_id)
                 continue
             if rec.get("payload_type") == "runtime.session.metadata":
-                record = payload.get("record") or {}
-                root = record.get("workspace_root") if isinstance(record, dict) else ""
-                if root:
-                    # Counted only (workspaceCount) — the path itself never
-                    # leaves this module, so project locations stay private.
-                    workspace = str(root)
+                root = record.get("workspace_root")
+                if isinstance(root, str) and root:
+                    # Folder name only: enough to tell projects apart in the
+                    # tab, without putting a filesystem layout in the envelope.
+                    workspace = os.path.basename(root.rstrip("/")) or root
                 continue
             event = payload.get("event")
             if not isinstance(event, dict):
                 continue
             kind = event.get("kind")
             if kind == "model_completed":
-                usage = event.get("usage") or {}
-                if not isinstance(usage, dict):
-                    usage = {}
+                usage = event.get("usage")
+                usage = usage if isinstance(usage, dict) else {}
                 calls.append(
                     {
-                        "model": str(event.get("model") or "unknown"),
+                        "model": str(event.get("model") or ""),
                         "run": str(payload.get("run_id") or ""),
                         "in": _n(usage.get("input_tokens")),
                         "out": _n(usage.get("output_tokens")),
@@ -203,25 +278,79 @@ def _scan_file(path):
     }
 
 
-def _aggregate(records):
+def _snapshot_tokens(root, session_id):
+    """The session's folded counted-once totals, or None.
+
+    `.msp-view-v1/<session>/snapshot-*.json` is the same fold the TUI's
+    `/usage` screen prints, and its `tokenUsage` member is the server-derived
+    counted-once block — the numbers the wire schema says clients should
+    display and sum rather than re-deriving the provider's cache convention.
+    Preferring it keeps our per-session figure identical to what `/usage`
+    shows; it is absent (null) until a model call reports usage, and then the
+    raw per-call sums below stand in.
+    """
+    try:
+        files = glob.glob(os.path.join(root, _VIEW_DIR, session_id, "snapshot-*.json"))
+        newest = max(files, key=os.path.getmtime) if files else ""
+    except OSError:
+        return None
+    if not newest:
+        return None
+    doc = _read_json(newest)
+    if not isinstance(doc, dict):
+        return None
+    state = ((doc.get("view_materialization") or {}) if isinstance(doc.get("view_materialization"), dict) else {}).get("current_state")
+    if not isinstance(state, dict):
+        return None
+    usage = state.get("tokenUsage")
+    if not isinstance(usage, dict):
+        return None
+    total = _n(usage.get("totalTokens"))
+    prompt = _n(usage.get("promptTokens"))
+    output = _n(usage.get("outputTokens"))
+    if total <= 0 and prompt <= 0 and output <= 0:
+        return None
+    return {"in": prompt, "out": output, "total": total or (prompt + output)}
+
+
+def _aggregate(records, catalog):
     s = sorted((r for r in records if r.get("date")), key=lambda r: r["start"])
 
-    model_usage = {}
+    per_model = {}
     for r in s:
         for call in r["calls"]:
-            e = model_usage.setdefault(
-                call["model"],
-                {"in": 0, "out": 0, "cached": 0, "reasoning": 0, "sessions": set(), "maxCtx": 0},
-            )
+            name = call["model"] or r["model"] or "unknown"
+            e = per_model.setdefault(name, {"in": 0, "out": 0, "cached": 0, "reasoning": 0, "sessions": set()})
             e["in"] += call["in"]
             e["out"] += call["out"]
             e["cached"] += call["cached"]
             e["reasoning"] += call["reasoning"]
             e["sessions"].add(r["key"])
-    for _run, calls in _runs(s).items():
-        peak = max([c["in"] for c in calls] or [0])
-        for c in calls:
-            model_usage[c["model"]]["maxCtx"] = max(model_usage[c["model"]]["maxCtx"], peak)
+
+    priced = price_models(
+        [{"model": name, "input_tokens": e["in"], "output_tokens": e["out"], "cached_tokens": e["cached"]} for name, e in per_model.items()],
+        _pricing_table(catalog),
+    )
+
+    model_usage = {}
+    for name, e in per_model.items():
+        # A model that reported no tokens at all is noise, not a row: Muse
+        # records completed calls whose usage block never arrived, and an
+        # "unknown · 0 in 0 out" line just makes the breakdown look broken.
+        if e["in"] + e["out"] + e["cached"] + e["reasoning"] <= 0:
+            continue
+        row = catalog.get(name) or {}
+        model_usage[name] = {
+            "inputTokens": e["in"],
+            "outputTokens": e["out"],
+            "cachedTokens": e["cached"],
+            "reasoningTokens": e["reasoning"],
+            "totalTokens": e["in"] + e["out"],
+            "sessions": len(e["sessions"]),
+            # The catalog's real context limit, not the largest prompt observed.
+            "contextWindow": row.get("context", 0),
+            "costUSD": (priced["models"].get(name) or {}).get("cost_usd", 0),
+        }
 
     daily = {}
     for r in s:
@@ -236,31 +365,42 @@ def _aggregate(records):
     for r in s:
         ms = (r["end"] - r["start"]) * 1000 if r["end"] > r["start"] > 0 else 0
         if ms > longest["ms"]:
-            longest = {"ms": ms, "messageCount": r["userMsgs"] + r["asstMsgs"]}
+            longest = {"ms": round(ms), "messageCount": r["userMsgs"] + r["asstMsgs"]}
 
     hours = {}
     for r in s:
         if r["start"] > 0:
-            h = datetime.datetime.fromtimestamp(r["start"]).strftime("%H")
-            hours[h.lstrip("0") or "0"] = hours.get(h.lstrip("0") or "0", 0) + 1
+            # UTC, like every other provider's peak-hour bucket.
+            h = datetime.datetime.fromtimestamp(r["start"], datetime.timezone.utc).strftime("%H")
+            key = h.lstrip("0") or "0"
+            hours[key] = hours.get(key, 0) + 1
 
-    model = ""
-    for r in reversed(s):
-        names = [m for m in r["configured"] if m != "unknown"]
-        if names:
-            model = names[-1]
-            break
+    workspaces = {}
+    for r in s:
+        if r["workspace"] and not r["subagent"]:
+            workspaces[r["workspace"]] = workspaces.get(r["workspace"], 0) + 1
+    top_workspaces = sorted(workspaces.items(), key=lambda kv: (-kv[1], kv[0]))[:5]
+
+    # What the user runs today comes from the CLI's own setting; the logs only
+    # answer what past sessions used.
+    model = configured_model()
     if not model:
         for r in reversed(s):
-            names = [c["model"] for c in r["calls"] if c["model"] != "unknown"]
-            if names:
-                model = names[-1]
+            if r["model"]:
+                model = r["model"]
+                break
+    if not model:
+        for name, row in catalog.items():
+            if row.get("current") or row.get("default"):
+                model = name
                 break
 
-    workspaces = set()
-    for r in s:
-        if r["workspace"]:
-            workspaces.add(r["workspace"])
+    currency = ""
+    for name in (model, *catalog):
+        row = catalog.get(name)
+        if row:
+            currency = row.get("currency") or "USD"
+            break
 
     return {
         "version": 1,
@@ -269,30 +409,22 @@ def _aggregate(records):
         "totalSessions": sum(1 for r in s if not r["subagent"]),
         "subagentSessions": sum(1 for r in s if r["subagent"]),
         "totalMessages": sum(r["userMsgs"] + r["asstMsgs"] for r in s),
-        "totalTokens": sum(c["in"] + c["out"] for r in s for c in r["calls"]),
-        "totalInputTokens": sum(c["in"] for r in s for c in r["calls"]),
-        "totalOutputTokens": sum(c["out"] for r in s for c in r["calls"]),
+        "totalTokens": sum(r["tokensTotal"] for r in s),
+        "totalInputTokens": sum(r["tokensIn"] for r in s),
+        "totalOutputTokens": sum(r["tokensOut"] for r in s),
         "totalCachedTokens": sum(c["cached"] for r in s for c in r["calls"]),
         "totalReasoningTokens": sum(c["reasoning"] for r in s for c in r["calls"]),
+        "totalCostUSD": priced["totalCostUSD"],
         "totalToolCalls": sum(r["toolCalls"] for r in s),
         "totalTurns": sum(r["turns"] for r in s),
         "totalModelCalls": sum(len(r["calls"]) for r in s),
-        "maxContextTokens": max([e["maxCtx"] for e in model_usage.values()] or [0]),
+        "contextWindow": max([row.get("context", 0) for row in catalog.values()] or [0]),
         "workspaceCount": len(workspaces),
+        "topWorkspaces": [{"name": name, "sessions": count} for name, count in top_workspaces],
         "firstSessionDate": min((r["date"] for r in s), default=""),
         "model": model,
-        "modelUsage": {
-            name: {
-                "inputTokens": e["in"],
-                "outputTokens": e["out"],
-                "cachedTokens": e["cached"],
-                "reasoningTokens": e["reasoning"],
-                "totalTokens": e["in"] + e["out"],
-                "sessions": len(e["sessions"]),
-                "contextWindow": e["maxCtx"],
-            }
-            for name, e in model_usage.items()
-        },
+        "currency": currency or "USD",
+        "modelUsage": model_usage,
         "dailyActivity": [
             {"date": date, "sessionCount": d["sessions"], "messageCount": d["msgs"], "toolCallCount": d["tools"]} for date, d in sorted(daily.items())
         ],
@@ -302,337 +434,46 @@ def _aggregate(records):
     }
 
 
-def _runs(records):
-    grouped = {}
-    for r in records:
-        for call in r["calls"]:
-            grouped.setdefault(call["run"] or r["key"], []).append(call)
-    return grouped
-
-
-def _muse_key():
-    """Widget field, then the vendor variable. No conventional file: the
-    OAuth login lives in a JSON store, not a raw-key file, and is handled
-    by auth_presence(). Kept as a named function so the credential tests
-    exercise the same order production does instead of restating it."""
-    return resolve_key("WIDGET_MUSE_API_KEY", "META_API_KEY")
-
-
-_QUOTA_BASE_URL = "https://api.meta.ai/v1"
-_QUOTA_URL = _QUOTA_BASE_URL + "/responses"
-_QUOTA_MODEL = "muse-spark-1.3"
-_QUOTA_TIMEOUT = 15
-
-
-def _quota_ttl():
-    try:
-        return max(0, int(os.environ.get("MUSE_QUOTA_TTL_SECONDS", "1800")))
-    except ValueError:
-        return 1800
-
-
-def _fetch_models(api_key):
-    """Account chat-model ids via a free GET (no tokens spent).
-
-    Lets the quota call track the newest model instead of a hardcoded id.
-    Runs at most once per quota refresh, and only when the local logs name
-    no usable model.
-    """
-    fixture_path = os.environ.get("MUSE_MODELS_RESPONSE_FILE")
-    if fixture_path and os.path.isfile(fixture_path):
-        try:
-            with open(fixture_path, errors="replace") as f:
-                doc = json.load(f)
-        except (OSError, ValueError):
-            return []
-        rows = doc.get("data") if isinstance(doc, dict) else doc
-        if not isinstance(rows, list):
-            return []
-        return [str(r.get("id") or "") for r in rows if isinstance(r, dict) and r.get("id")]
-    if not api_key:
-        return []
-
-    import urllib.error
-    import urllib.request
-
-    req = urllib.request.Request(
-        _QUOTA_BASE_URL + "/models",
-        headers={"Authorization": f"Bearer {api_key}", "Accept": "application/json", "User-Agent": "kde-ai-usage/muse"},
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=_QUOTA_TIMEOUT) as resp:
-            doc = json.loads(resp.read().decode("utf-8", "replace"))
-    except (urllib.error.URLError, TimeoutError, OSError, ValueError):
-        return []
-    rows = doc.get("data") if isinstance(doc, dict) else []
-    if not isinstance(rows, list):
-        return []
-    return [str(r.get("id") or "") for r in rows if isinstance(r, dict) and r.get("id")]
-
-
-def _quota_model(stats_model, api_key):
-    """Model id for the quota call: what the user actually runs (from local
-    logs), else the account list, else the last-known default. The snapshot
-    is account-level, so any chat model returns the same windows."""
-    if stats_model and stats_model != "unknown" and "spark" in stats_model:
-        return stats_model
-    for mid in _fetch_models(api_key):
-        if "spark" in mid and "voice" not in mid and "image" not in mid:
-            return mid
-    return _QUOTA_MODEL
-
-
-def _auth_api_key():
-    """The Model-API bearer from the CLI's own login store.
-
-    auth.json holds both the OIDC device-code access_token (401 on the
-    Model API) and the api_key the CLI itself sends as bearer — only the
-    latter is used here, and only in memory: it is never returned, logged
-    or placed in the envelope. Best-effort: an unreadable store just means
-    no OAuth credential.
-    """
-    meta = _auth_meta() or {}
-    return _clean(meta.get("api_key") or "")
-
-
-def _clean(s):
-    return s.translate(str.maketrans("", "", "\n\r ")).strip()
-
-
-def _quota_cache_path():
-    return os.path.join(_config.cache_dir(), "muse-quota.json")
-
-
-def _read_quota_cache(ttl):
-    try:
-        with open(_quota_cache_path(), errors="replace") as f:
-            cached = json.load(f)
-    except (OSError, ValueError):
+def _session_record(path, date, subagent, root):
+    scanned = _scan_file(path)
+    if scanned is None:
         return None
-    if not isinstance(cached, dict) or not isinstance(cached.get("quota"), dict):
-        return None
-    try:
-        age = datetime.datetime.now(datetime.timezone.utc).timestamp() - float(cached.get("fetchedAt") or 0)
-    except (TypeError, ValueError):
-        return None
-    if 0 <= age < ttl:
-        return cached["quota"]
-    return None
-
-
-def _write_quota_cache(quota):
-    try:
-        os.makedirs(_config.cache_dir(), exist_ok=True)
-        with open(_quota_cache_path(), "w") as f:
-            json.dump(
-                {"fetchedAt": datetime.datetime.now(datetime.timezone.utc).timestamp(), "quota": quota},
-                f,
-            )
-    except OSError:
-        pass
-
-
-def _parse_subscription_event(body):
-    """First response.subscription_usage object in an SSE stream, or {}.
-
-    Line endings are normalised first: an SSE frame boundary is a blank line,
-    which on the wire is frequently CRLF CRLF. Splitting a CRLF stream on
-    "\n\n" finds no boundary at all and silently returns {} — the quota would
-    just never appear, with no error to explain it.
-    """
-    buf = body if isinstance(body, str) else ""
-    buf = buf.replace("\r\n", "\n")
-    start = 0
-    while True:
-        end = buf.find("\n\n", start)
-        if end < 0:
-            break
-        for line in buf[start:end].splitlines():
-            line = line.strip()
-            if not line.startswith("data:"):
-                continue
-            try:
-                obj = json.loads(line[5:].strip())
-            except ValueError:
-                continue
-            if isinstance(obj, dict) and obj.get("type") == "response.subscription_usage":
-                sub = obj.get("subscription")
-                return sub if isinstance(sub, dict) else {}
-        start = end + 2
-    return {}
-
-
-def _subscription_to_quota(sub):
-    if not isinstance(sub, dict):
-        return {}
-    window = sub.get("window") or {}
-    weekly = sub.get("weekly") or {}
-    if not isinstance(window, dict):
-        window = {}
-    if not isinstance(weekly, dict):
-        weekly = {}
-    quota = {"plan": "", "current": {}, "weekly": {}}
-    cur_reset = int(_n(window.get("resets_at")))
-    wk_reset = int(_n(weekly.get("resets_at")))
-    if cur_reset > 0:
-        quota["current"] = {"pct": _n(window.get("used_percent")), "resetAt": cur_reset}
-    if wk_reset > 0:
-        quota["weekly"] = {"pct": _n(weekly.get("used_percent")), "resetAt": wk_reset}
-    if not quota["current"] and not quota["weekly"]:
-        return {}
-    return quota
-
-
-def _quota_error_code(exc):
-    """Stable reason code for a failed quota fetch.
-
-    Separates "the server said no" from "we could not ask". Without this a
-    network timeout was indistinguishable from a rejected credential, so a
-    flaky connection made the tab report the key as invalid.
-    """
-    status = getattr(exc, "code", None)
-    if status in (401, 403):
-        return "rejected"
-    return "unreachable"
-
-
-def _fetch_quota_sse(api_key, model, fixture_path=None):
-    """(quota, error): error is "" on success, else a _quota_error_code value."""
-    if fixture_path and os.path.isfile(fixture_path):
-        try:
-            # newline="" disables universal-newline translation: a replayed
-            # capture has to carry the CRLF the wire actually sent, or it
-            # silently tests a stream nobody ever receives.
-            with open(fixture_path, errors="replace", newline="") as f:
-                raw = f.read()
-        except OSError:
-            return {}, "unreachable"
-        try:
-            doc = json.loads(raw)
-        except ValueError:
-            # Not JSON: replay it as a raw SSE capture, CRLF included.
-            return _subscription_to_quota(_parse_subscription_event(raw)), ""
-        if isinstance(doc, dict) and isinstance(doc.get("subscription"), dict):
-            doc = doc["subscription"]
-        return _subscription_to_quota(doc), ""
-
-    import urllib.error
-    import urllib.request
-
-    body = json.dumps(
-        {
-            "model": model,
-            "input": "ping",
-            "stream": True,
-            "max_output_tokens": 16,
-            "store": False,
-        }
-    ).encode()
-    req = urllib.request.Request(
-        _QUOTA_URL,
-        data=body,
-        method="POST",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "Accept": "text/event-stream",
-            "User-Agent": "kde-ai-usage/muse",
-        },
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=_QUOTA_TIMEOUT) as resp:
-            raw = resp.read().decode("utf-8", "replace")
-    except (urllib.error.URLError, TimeoutError, OSError) as exc:
-        return {}, _quota_error_code(exc)
-    # A 200 with no snapshot is not a failure: the account simply reports no
-    # subscription windows. Only an unusable answer gets an error code.
-    return _subscription_to_quota(_parse_subscription_event(raw)), ""
-
-
-def get_muse_quota(api_key="", stats_model=""):
-    """(quota, error): Current/Weekly subscription windows, cached, never fatal.
-
-    `error` is "" when the snapshot came back (or when the account simply has
-    no windows), and otherwise one of "disabled", "no-credential", "rejected"
-    or "unreachable" — so the frontend can say "could not reach Meta" instead
-    of accusing a working credential of being invalid.
-
-    Credential order mirrors the CLI: an explicit META_API_KEY (widget
-    field or environment) wins over the OAuth login's own api_key, exactly
-    like the CLI's "META_API_KEY always takes priority". The call needs a
-    chat model id but the snapshot is account-level, so the model is picked
-    dynamically (local logs, then the free account list) with the
-    last-known default as fallback.
-
-    One refresh costs a minimal streaming call (~12 input + ~120 output
-    tokens, mostly reasoning, store:false so nothing is kept server-side).
-    The stream cannot be cut short to save the output tokens: the server
-    emits response.subscription_usage as the LAST event, after
-    response.incomplete (probed live — created, in_progress,
-    output_item.added, incomplete, subscription_usage), so the generation
-    is already paid for by the time the snapshot arrives.
-    There is no free endpoint for this data (verified: the usual billing
-    paths all 404 and the snapshot exists only on the Responses stream),
-    so the switch defaults to OFF: without WIDGET_MUSE_QUOTA=1 (or
-    museQuota=true) no call is made at all and the provider renders the free
-    offline statistics only.
-    """
-    if not _config.muse_quota_enabled():
-        return {}, "disabled"
-    fixture_path = os.environ.get("MUSE_QUOTA_RESPONSE_FILE")
-    if fixture_path and os.path.isfile(fixture_path):
-        # Test replay, like fetch_json's fixture_path: no credential needed.
-        return _fetch_quota_sse("", "", fixture_path=fixture_path)
-    key = _clean(api_key) or _auth_api_key()
-    if not key:
-        return {}, "no-credential"
-    model = _quota_model(stats_model, key)
-    ttl = _quota_ttl()
-    if ttl > 0:
-        cached = _read_quota_cache(ttl)
-        if cached is not None:
-            return cached, ""
-    quota, error = _fetch_quota_sse(key, model)
-    if quota and ttl > 0:
-        _write_quota_cache(quota)
-    return quota, error
-
-
-def get_muse_usage():
-    # One store read for identity, key and presence together.
-    slot = _auth_meta()
-    meta = slot or {}
-    has_oauth = slot is not None
-    api_key = _muse_key()
-    oauth_key = "" if api_key else _clean(meta.get("api_key") or "")
-    base = {
-        "hasOAuth": has_oauth,
-        "hasApiKey": bool(api_key) or bool(oauth_key),
-        "keyValid": False,
-        "quota": {},
-        "quotaError": "",
-        "email": str(meta.get("user_email") or ""),
-        "fullName": str(meta.get("user_full_name") or ""),
+    session_id = os.path.basename(os.path.dirname(path))
+    raw_in = sum(c["in"] for c in scanned["calls"])
+    raw_out = sum(c["out"] for c in scanned["calls"])
+    folded = _snapshot_tokens(root, session_id) if not subagent else None
+    return {
+        "key": f"{date}:{session_id}",
+        "date": date,
+        "subagent": subagent,
+        "start": scanned["firstTs"],
+        "end": scanned["lastTs"],
+        "calls": scanned["calls"],
+        "model": scanned["configured"][-1] if scanned["configured"] else "",
+        "toolCalls": scanned["toolCalls"],
+        "userMsgs": scanned["userMsgs"],
+        "asstMsgs": scanned["asstMsgs"],
+        "turns": scanned["turns"],
+        "workspace": scanned["workspace"],
+        "tokensIn": folded["in"] if folded else raw_in,
+        "tokensOut": folded["out"] if folded else raw_out,
+        "tokensTotal": folded["total"] if folded else raw_in + raw_out,
     }
 
+
+def get_muse_stats():
+    """The lifetime activity blob, or {} when Muse has never run here."""
     root = sessions_root()
     if not os.path.isdir(root):
-        base["quota"], base["quotaError"] = get_muse_quota(api_key or oauth_key)
-        base["keyValid"] = bool(base["quota"])
-        if not base["quota"]:
-            base["error"] = "No Muse sessions found — run muse once"
-        else:
-            base["stats"] = {"available": False}
-        return base
-
+        return {}
     try:
-        files = [(p, d, sub) for p, d, sub in _iter_session_files(root)]
+        files = list(_iter_session_files(root))
     except OSError:
-        base["error"] = "Muse session store could not be read"
-        return base
+        return {}
+    if not files:
+        return {}
 
     cache_path = os.path.join(_config.cache_dir(), "muse-stats.json")
-    stats = None
     if os.path.isfile(cache_path):
         try:
             cache_mtime = os.path.getmtime(cache_path)
@@ -640,54 +481,29 @@ def get_muse_usage():
         except OSError:
             stale = True
         if not stale:
-            try:
-                with open(cache_path) as fh:
-                    stats = json.load(fh)
-            except (OSError, ValueError):
-                stats = None
+            cached = _read_json(cache_path)
+            if isinstance(cached, dict) and cached:
+                return cached
 
-    if stats is None:
-        records = []
-        for path, date, subagent in files:
-            scanned = _scan_file(path)
-            if scanned is None:
-                continue
-            key = f"{date}:{os.path.basename(os.path.dirname(path))}"
-            records.append(
-                {
-                    "key": key,
-                    "date": date,
-                    "subagent": subagent,
-                    "start": scanned["firstTs"],
-                    "end": scanned["lastTs"],
-                    "calls": scanned["calls"],
-                    "configured": scanned["configured"],
-                    "toolCalls": scanned["toolCalls"],
-                    "userMsgs": scanned["userMsgs"],
-                    "asstMsgs": scanned["asstMsgs"],
-                    "turns": scanned["turns"],
-                    "workspace": scanned["workspace"],
-                }
-            )
-        stats = _aggregate(records)
-        try:
-            os.makedirs(_config.cache_dir(), exist_ok=True)
-            with open(cache_path, "w") as fh:
-                json.dump(stats, fh)
-        except OSError:
-            pass
+    catalog = model_catalog()
+    records = [rec for rec in (_session_record(p, d, sub, root) for p, d, sub in files) if rec is not None]
+    stats = _aggregate(records, catalog)
+    try:
+        os.makedirs(_config.cache_dir(), exist_ok=True)
+        with open(cache_path, "w") as fh:
+            json.dump(stats, fh)
+    except OSError:
+        pass
+    return stats
 
-    has_sessions = isinstance(stats, dict) and stats.get("totalSessions", 0) + stats.get("subagentSessions", 0) > 0
-    model_hint = stats.get("model", "") if isinstance(stats, dict) else ""
-    quota, quota_error = get_muse_quota(api_key or oauth_key, model_hint)
-    base["quota"] = quota
-    base["quotaError"] = quota_error
-    base["keyValid"] = bool(quota)
-    if has_sessions:
-        base["stats"] = stats
-        return base
-    if quota:
-        base["stats"] = {"available": False}
-        return base
-    base["error"] = "No Muse sessions found — run muse once"
-    return base
+
+def get_muse_usage():
+    slot = auth_meta()
+    meta = slot or {}
+    stats = get_muse_stats()
+    return {
+        "hasLogin": slot is not None,
+        "email": str(meta.get("user_email") or ""),
+        "fullName": str(meta.get("user_full_name") or ""),
+        "stats": stats,
+    }

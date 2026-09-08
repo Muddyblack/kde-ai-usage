@@ -353,33 +353,70 @@ check kimi-missing "reports a missing Moonshot API key" '
     (.ok | not) and .error == "Kimi: no Moonshot API key configured"'
 
 # ── Muse ────────────────────────────────────────────────────────────────────
+#
+# Muse is the only stats-only provider: Meta reports the plan windows solely on
+# a billed model call, so the widget reads Muse's own local files and shows no
+# quota at all. Every assertion here is therefore about totals, not meters.
 
-check muse-success "reports local session statistics" '
-    .ok and .details.hasOAuth and (.details.hasApiKey | not)
-    and .details.stats.totalSessions == 3 and .details.stats.totalOutputTokens == 30000
-    and .details.stats.model == "muse-spark-1.3-contributor"
-    and .summary.text == "30k out" and .historyValues == {mu: 30000}
-    and (.quotaWindows | length) == 3'
-check muse-error "passes the missing-sessions error through" '
-    (.ok | not) and .error == "Muse: No Muse sessions found — run muse once"'
-check muse-missing "reports empty input as no data" '
-    (.ok | not) and .error == "Muse: no data"'
-check muse-quota-only "renders quota bars with no local sessions" '
-    .ok and (.quotaWindows | length) == 2
-    and .summary.text == "26%" and .historyValues == {mu: 0, mc: 26, mw: 9}'
-check muse-quota-success "renders live quota windows with rolling charts" '
-    .ok and .details.keyValid
-    and .details.email == "user@example.com" and .details.fullName == "Test User"
-    and (.quotaWindows | length) == 2
-    and (.quotaWindows[0] | .key == "muse_current" and .pct == 26 and .resetAt == 1788528365)
-    and (.quotaWindows[1] | .key == "muse_weekly" and .pct == 9 and .resetAt == 1788739200)
-    and .quotaWindows[0].detail == "26% used · resets Sep 4, 15:26"
-    and .summary.pct == 26 and .summary.text == "30k out"
-    and .historyValues == {mu: 30000, mc: 26, mw: 9}
-    and ([.chartWindows[].key] | sort) == ["mc", "mc", "mw"]'
-check muse-malformed "degrades to no data when usage is not an object" '
-    (.ok | not) and .error == "Muse: no data"
-    and (.details.keyValid | not) and .details.quotaError == ""'
+check muse-success "reports lifetime totals from local sessions" '
+    .ok and .details.hasLogin
+    and .details.totalTokens == 150000 and .details.totalOutputTokens == 30000
+    and .details.model == "muse-spark-1.3-contributor"
+    and .summary.text == "150k" and .summary.detail == "muse-spark-1.3-contributor"
+    and .historyValues == {mu: 150000}'
+# The catalog Muse caches locally carries its own price list, so spend is
+# computed offline — the one provider here that can price itself.
+check muse-success "prices the tokens from the local catalog" '
+    .details.totalCostUSD == 0.009
+    and (.quotaWindows | map(.key)) == ["muse_tokens", "muse_spend"]
+    and (.quotaWindows[] | select(.key == "muse_spend") | .detail) == "$0.01"
+    and .details.stats.totalCostUSD == 0.009'
+# No quota exists, so no row may claim one: a meter with no denominator would
+# read as "0% used" forever.
+check muse-success "shows no meter, because there is no quota to meter" '
+    .summary.pct == 0 and ([.quotaWindows[].showMeter] | any | not)
+    and ([.quotaWindows[].resetAt] | unique) == [0]'
+check muse-success "carries the shared activity block" '
+    .details.stats.available and .details.stats.activeDays == 3
+    and .details.stats.longestStreak == 3 and .details.stats.peakHour == 14
+    and .details.stats.dailyUnit == "tokens"
+    and (.details.stats.dailySeries | map(.total)) == [10000, 8000, 12000]
+    and .details.stats.topWorkspaces[0].name == "ai-usage-widget"
+    and .details.stats.favoriteModel == "muse-spark-1.3-contributor"'
+# Muse 1.0.3 does not always record token counters; the tab still has to be
+# worth opening when it does not.
+check muse-unpriced "stays usable when the logs carry no token counters" '
+    .ok and .details.totalTokens == 0 and .details.totalCostUSD == 0
+    and (.quotaWindows | map(.key)) == ["muse_tokens"]
+    and .details.stats.available and .details.stats.totalSessions == 2
+    and .details.stats.totalToolCalls == 3'
+check muse-error "reports a login with no sessions yet" '
+    (.ok | not) and .error == "Muse: no sessions yet"
+    and .details.hasLogin and (.details.stats.available | not)'
+check muse-missing "reports a machine without Muse" '
+    (.ok | not) and .error == "Muse: not installed" and (.details.hasLogin | not)'
+check muse-malformed "degrades when usage is not an object" '
+    (.ok | not) and .error == "Muse: not installed"'
+
+# ── Muse, with the billed quota switched on ─────────────────────────────────
+
+check muse-quota-success "renders the plan windows above the free totals" '
+    .ok and .summary.pct == 26 and .summary.text == "26%"
+    and (.quotaWindows | map(.key)) == ["muse_current", "muse_weekly", "muse_tokens", "muse_spend"]
+    and (.quotaWindows[0] | .pct == 26 and .resetAt == 1788528365 and .showMeter)
+    and (.quotaWindows[1] | .pct == 9 and .resetAt == 1788739200)
+    and .details.current.available and .details.weekly.available
+    and .historyValues == {mu: 150000, mc: 26, mw: 9}
+    and ([.chartWindows[].key] | unique | sort) == ["mc", "mw"]'
+# The review case: paying for a quota and then discarding it because the local
+# logs happen to be empty would be the worst of both worlds.
+check muse-quota-only "renders a paid-for quota with no local sessions" '
+    .ok and (.quotaWindows | map(.key)) == ["muse_current", "muse_weekly"]
+    and .summary.pct == 26
+    and (.details.stats.available | not)'
+# A window at 0% used is a fresh window, not a missing one.
+check muse-quota-success "gates availability on the reset time, not the pct" '
+    [.quotaWindows[] | select(.showMeter) | .resetAt] | all(. > 1000000000)'
 
 # ── End-to-end: settings toggles, key plumbing and the outer envelope ───────
 
@@ -426,7 +463,8 @@ run_backend() {
         DEEPSEEK_BALANCE_RESPONSE_FILE="$TEST_TMP/deepseek.json" \
         MUSE_SESSIONS_DIR="$TEST_TMP/muse-sessions" \
         MUSE_AUTH_PATH="$TEST_TMP/muse-auth.json" \
-        MUSE_QUOTA_RESPONSE_FILE="${MUSE_QUOTA_RESPONSE_FILE:-$TEST_TMP/muse-quota.json}" \
+        MUSE_SETTINGS_PATH="$TEST_TMP/muse-settings.json" \
+        MUSE_CATALOG_DIR="$TEST_TMP/muse-catalog" \
         "$BACKEND" "$@"
 }
 
@@ -445,7 +483,7 @@ assert_backend() {
 check_prog() {
     local label="$1" expected="$2" prog="$3" got
     checks=$((checks + 1))
-    if ! got="$(python3 -c "import sys; sys.path.insert(0, '$ROOT/package/contents/tools')
+    if ! got="$(TEST_TMP="$TEST_TMP" python3 -c "import sys; sys.path.insert(0, '$ROOT/package/contents/tools')
 $prog" 2>&1)"; then
         got="raised: $got"
     fi
@@ -480,49 +518,92 @@ assert_backend "--provider fetches exactly what was asked for" '
 assert_backend "--provider ignores the enabled toggles" '
     (.providers | length) == 1 and .providers[0].id == "kiro"' --provider kiro
 
-mkdir -p "$TEST_TMP/muse-sessions/2026/09/04/aaa" "$TEST_TMP/muse-sessions/2026/09/04/aaa/subagent/bbb"
+# ── Muse, end to end: only local files, and never a socket ──────────────────
+#
+# The store, the catalog and the settings file are all planted here, so this
+# exercises the real reader: dynamic model, catalog pricing, workspace names.
+mkdir -p "$TEST_TMP/muse-sessions/2026/09/04/aaa" \
+    "$TEST_TMP/muse-sessions/2026/09/04/aaa/subagent/bbb" \
+    "$TEST_TMP/muse-sessions/.msp-view-v1/aaa" \
+    "$TEST_TMP/muse-catalog"
 cat >"$TEST_TMP/muse-auth.json" <<'JSON'
-{"providers": {"meta": {"mechanism": "oauth", "access_token": "muse-secret-token", "user_email": "test@example.com", "user_full_name": "Test User"}}}
+{"providers": {"meta": {"mechanism": "oauth", "api_key": "muse-secret-token", "access_token": "muse-secret-token", "user_email": "test@example.com", "user_full_name": "Test User"}}}
 JSON
-cp "$FIXTURES/muse-quota.json" "$TEST_TMP/muse-quota.json"
+cat >"$TEST_TMP/muse-settings.json" <<'JSON'
+{"schema_version": 1, "provider": "meta", "model": "fixture-spark-9.9"}
+JSON
+# Hex-named exactly as the CLI writes it, to prove the directory is globbed
+# rather than reconstructed from a provider id.
+cat >"$TEST_TMP/muse-catalog/6d657461__p746268.json" <<'JSON'
+{"schema_version": 1, "provider_id": "meta", "profile_id": "tbh", "source": "provider_catalog",
+ "rows": [
+   {"model_id": "fixture-spark-9.9", "display_label": "fixture-spark-9.9", "visibility": "visible",
+    "is_current": true, "is_default": true, "context_limit": 1007997, "output_limit": 128000,
+    "cost": {"input": "1.00", "output": "10.00", "cached": "0.10", "currency": "USD"}}
+ ]}
+JSON
 cat >"$TEST_TMP/muse-sessions/2026/09/04/aaa/session.jsonl" <<'JSON'
-{"schema_version":1,"id":"1","stream":{"kind":"session","id":"aaa"},"sequence":1,"recorded_at":1785000000000000,"record_type":"event","durability":"durable","causation_id":null,"payload_type":"runtime.session.metadata","payload_schema_version":1,"payload":{"kind":"metadata","record":{"workspace_root":"/tmp/secret-project"}}}
-{"schema_version":1,"id":"2","stream":{"kind":"session","id":"aaa"},"sequence":2,"recorded_at":1785000001000000,"record_type":"event","durability":"durable","causation_id":null,"payload_type":"run.model.configured","payload_schema_version":1,"payload":{"kind":"run_model","record":{"model_id":"test-model","provider_id":"meta"}}}
+{"schema_version":1,"id":"1","stream":{"kind":"session","id":"aaa"},"sequence":1,"recorded_at":1785000000000000,"record_type":"event","durability":"durable","causation_id":null,"payload_type":"runtime.session.metadata","payload_schema_version":1,"payload":{"kind":"metadata","record":{"workspace_root":"/home/someone/secret-project"}}}
+{"schema_version":1,"id":"2","stream":{"kind":"session","id":"aaa"},"sequence":2,"recorded_at":1785000001000000,"record_type":"event","durability":"durable","causation_id":null,"payload_type":"run.model.configured","payload_schema_version":1,"payload":{"kind":"run_model","record":{"model_id":"fixture-spark-9.9","provider_id":"meta"}}}
 {"schema_version":1,"id":"3","stream":{"kind":"session","id":"aaa"},"sequence":3,"recorded_at":1785000002000000,"record_type":"event","durability":"durable","causation_id":null,"payload_type":"runtime.session","payload_schema_version":1,"payload":{"kind":"run","run_id":"r1","event":{"kind":"user_prompt_display"}}}
-{"schema_version":1,"id":"4","stream":{"kind":"session","id":"aaa"},"sequence":4,"recorded_at":1785000003000000,"record_type":"event","durability":"durable","causation_id":null,"payload_type":"runtime.session","payload_schema_version":1,"payload":{"kind":"run","run_id":"r1","event":{"kind":"model_completed","model":"test-model","usage":{"input_tokens":1000,"output_tokens":200,"cached_tokens":50,"reasoning_tokens":10}}}}
+{"schema_version":1,"id":"4","stream":{"kind":"session","id":"aaa"},"sequence":4,"recorded_at":1785000003000000,"record_type":"event","durability":"durable","causation_id":null,"payload_type":"runtime.session","payload_schema_version":1,"payload":{"kind":"run","run_id":"r1","event":{"kind":"model_completed","model":"fixture-spark-9.9","usage":{"input_tokens":1000,"output_tokens":200,"cached_tokens":400,"reasoning_tokens":10}}}}
 {"schema_version":1,"id":"5","stream":{"kind":"session","id":"aaa"},"sequence":5,"recorded_at":1785000004000000,"record_type":"event","durability":"durable","causation_id":null,"payload_type":"runtime.session","payload_schema_version":1,"payload":{"kind":"run","run_id":"r1","event":{"kind":"assistant_tool_calls_committed","tool_calls":[{"name":"bash"},{"name":"read"}]}}}
 {"schema_version":1,"id":"6","stream":{"kind":"session","id":"aaa"},"sequence":6,"recorded_at":1785000005000000,"record_type":"event","durability":"durable","causation_id":null,"payload_type":"runtime.session","payload_schema_version":1,"payload":{"kind":"run","run_id":"r1","event":{"kind":"assistant_message_committed"}}}
 {"schema_version":1,"id":"7","stream":{"kind":"session","id":"aaa"},"sequence":7,"recorded_at":1785000006000000,"record_type":"event","durability":"durable","causation_id":null,"payload_type":"runtime.session","payload_schema_version":1,"payload":{"kind":"run","run_id":"r1","event":{"kind":"terminal"}}}
 JSON
-printf '{"schema_version":1,"id":"8","stream":{"kind":"session","id":"bbb"},"sequence":1,"recorded_at":1785000007000000,"record_type":"event","durability":"durable","causation_id":null,"payload_type":"runtime.session","payload_schema_version":1,"payload":{"kind":"run","run_id":"r2","event":{"kind":"model_completed","model":"test-model","usage":{"input_tokens":500,"output_tokens":100,"cached_tokens":0,"reasoning_tokens":5}}}}\n' >"$TEST_TMP/muse-sessions/2026/09/04/aaa/subagent/bbb/session.jsonl"
+printf '{"schema_version":1,"id":"8","stream":{"kind":"session","id":"bbb"},"sequence":1,"recorded_at":1785000007000000,"record_type":"event","durability":"durable","causation_id":null,"payload_type":"runtime.session","payload_schema_version":1,"payload":{"kind":"run","run_id":"r2","event":{"kind":"model_completed","model":"fixture-spark-9.9","usage":{"input_tokens":500,"output_tokens":100,"cached_tokens":0,"reasoning_tokens":5}}}}\n' >"$TEST_TMP/muse-sessions/2026/09/04/aaa/subagent/bbb/session.jsonl"
 
-WIDGET_MUSE_QUOTA=1 assert_backend "reads local Muse sessions with OAuth presence and no secret leaks" '
+# 1000 input of which 400 cached, + 200 output, on the subagent 500 + 100:
+#   (1500 - 400)/1e6 * $1.00 + 400/1e6 * $0.10 + 300/1e6 * $10.00 = $0.00414
+assert_backend "reads Muse from local files only, priced by the local catalog" '
     (.providers | length) == 1 and .providers[0].id == "muse"
     and .providers[0].ok
-    and .providers[0].details.hasOAuth
-    and (.providers[0].details.hasApiKey | not)
+    and .providers[0].details.hasLogin
+    and .providers[0].details.model == "fixture-spark-9.9"
+    and .providers[0].details.totalOutputTokens == 300
+    and .providers[0].details.totalTokens == 1800
+    and ((.providers[0].details.totalCostUSD * 100000 | round) == 414)
+    and .providers[0].details.contextWindow == 1007997
     and .providers[0].details.stats.totalSessions == 1
     and .providers[0].details.stats.subagentSessions == 1
-    and .providers[0].details.stats.totalOutputTokens == 300
     and .providers[0].details.stats.totalToolCalls == 2
     and .providers[0].details.stats.totalMessages == 2
-    and .providers[0].details.stats.model == "test-model"
-    and .providers[0].details.stats.workspaceCount == 1
+    and .providers[0].details.stats.topWorkspaces[0].name == "secret-project"
     and .providers[0].details.email == "test@example.com"
-    and .providers[0].details.fullName == "Test User"
-    and .providers[0].historyValues.mu == 300
-    and (.providers[0].quotaWindows | length) == 2
-    and .providers[0].quotaWindows[0].pct == 26
-    and .providers[0].details.keyValid
-    and .providers[0].historyValues.mc == 26
-    and (tojson | test("muse-secret-token|secret-project") | not)' --provider muse
+    and .providers[0].historyValues.mu == 1800
+    and (.providers[0].quotaWindows | map(.key)) == ["muse_tokens", "muse_spend"]' --provider muse
 
-assert_backend "live quota is off until asked for, so a default install spends nothing" '
-    (.providers | length) == 1 and .providers[0].id == "muse"
-    and .providers[0].ok
-    and .providers[0].details.quotaError == "disabled"
-    and (.providers[0].details.keyValid | not)
+# The credential in the store is never read, never exported and never rendered;
+# only the workspace *folder name* may appear, never the path it sits in.
+assert_backend "never leaks the stored credential or a filesystem path" '
+    (tojson | test("muse-secret-token") | not)
+    and (tojson | test("/home/someone") | not)' --provider muse
+
+# The counted-once fold the TUI itself prints wins over per-call raw sums.
+cat >"$TEST_TMP/muse-sessions/.msp-view-v1/aaa/snapshot-1.json" <<'JSON'
+{"view_materialization": {"current_state": {"tokenUsage": {"promptTokens": 900, "outputTokens": 250, "totalTokens": 1150}, "turnCount": 1}}}
+JSON
+rm -f "$TEST_TMP/cache/muse-stats.json"
+assert_backend "prefers the view snapshot's counted-once totals" '
+    (.providers[0].details.totalTokens) == 1750
+    and (.providers[0].details.totalOutputTokens) == 350' --provider muse
+
+# The billed quota is opt-in: an untouched install makes no call at all.
+assert_backend "the billed quota stays off until it is switched on" '
+    .providers[0].details.quotaError == "disabled"
+    and (.providers[0].details.current.available | not)
     and (.providers[0].historyValues | has("mc") | not)' --provider muse
+
+# SSE frames arrive CRLF-terminated often enough that splitting on "\n\n"
+# alone would silently yield no quota at all. Replay a real-shaped CRLF stream.
+printf 'event: response.created\r\ndata: {"type":"response.created"}\r\n\r\nevent: response.subscription_usage\r\ndata: {"type":"response.subscription_usage","subscription":{"window":{"used_percent":26,"resets_at":1788528365,"window_duration_mins":300},"weekly":{"used_percent":9,"resets_at":1788739200}}}\r\n\r\n' >"$TEST_TMP/muse-quota-crlf.sse"
+
+MUSE_QUOTA_RESPONSE_FILE="$TEST_TMP/muse-quota-crlf.sse" WIDGET_MUSE_QUOTA=1 \
+    assert_backend "parses a CRLF-terminated SSE quota stream" '
+    .providers[0].details.quotaError == ""
+    and .providers[0].details.current.pct == 26
+    and .providers[0].details.weekly.pct == 9
+    and .providers[0].historyValues.mc == 26' --provider muse
 
 check_prog "an unset switch reads as off" "False" '
 import os
@@ -535,93 +616,68 @@ os.environ["WIDGET_MUSE_QUOTA"] = "1"
 from aiusage.config import muse_quota_enabled
 print(muse_quota_enabled())'
 
-WIDGET_MUSE_QUOTA=0 assert_backend "a disabled quota switch renders free stats only" '
-    (.providers | length) == 1 and .providers[0].id == "muse"
-    and .providers[0].ok
-    and (.providers[0].details.keyValid | not)
-    and .providers[0].details.quotaError == "disabled"
-    and (.providers[0].quotaWindows | length) == 3
-    and (.providers[0].historyValues | has("mc") | not)' --provider muse
-
-# SSE frames arrive CRLF-terminated often enough that splitting on "\n\n"
-# alone would silently yield no quota at all. Replay a real-shaped CRLF stream.
-printf 'event: response.created\r\ndata: {"type":"response.created"}\r\n\r\nevent: response.subscription_usage\r\ndata: {"type":"response.subscription_usage","subscription":{"tier":"1","window":{"used_percent":26,"resets_at":1788528365,"window_duration_mins":300},"weekly":{"used_percent":9,"resets_at":1788739200}}}\r\n\r\n' >"$TEST_TMP/muse-quota-crlf.sse"
-
-MUSE_QUOTA_RESPONSE_FILE="$TEST_TMP/muse-quota-crlf.sse" WIDGET_MUSE_QUOTA=1 \
-    assert_backend "parses a CRLF-terminated SSE quota stream" '
-    (.providers | length) == 1 and .providers[0].id == "muse"
-    and .providers[0].details.keyValid
-    and .providers[0].details.quotaError == ""
-    and (.providers[0].quotaWindows | length) == 2
-    and .providers[0].quotaWindows[0].pct == 26
-    and .providers[0].quotaWindows[1].pct == 9' --provider muse
-
-muse_py() {
-    MUSE_MODELS_RESPONSE_FILE="${MUSE_MODELS_RESPONSE_FILE:-}" \
-        python3 -c "import sys; sys.path.insert(0, '$ROOT/package/contents/tools'); $1"
-}
-
-check_py() {
-    name="$1"
-    label="$2"
-    expected="$3"
-    got="$(muse_py "from aiusage.providers.muse import $4; print($4$5)")"
-    checks=$((checks + 1))
-    if [ "$got" = "$expected" ]; then
-        return 0
-    fi
-    failures=$((failures + 1))
-    printf 'FAIL %s %s\n  expected: %s\n  got: %s\n' "$name" "$label" "$expected" "$got"
-}
-
-cat >"$TEST_TMP/muse-models.json" <<'JSON'
-{"data": [{"id": "muse-voice-transcribe-1.0"}, {"id": "fixture-spark-2"}]}
-JSON
-
-check_py muse "prefers the model from local logs" \
-    "muse-spark-9.9" "_quota_model" "('muse-spark-9.9', '')"
-check_py muse "falls back to the last-known default offline" \
-    "muse-spark-1.3" "_quota_model" "('test-model', '')"
-MUSE_MODELS_RESPONSE_FILE="$TEST_TMP/muse-models.json" check_py muse "picks chat models from the account list" \
-    "fixture-spark-2" "_quota_model" "('test-model', '')"
-
-
 # A timeout must not be reported as a rejected credential.
 check_prog "an HTTP 401 is a rejected credential" "rejected" '
 from urllib.error import HTTPError
-from aiusage.providers.muse import _quota_error_code
-print(_quota_error_code(HTTPError("u", 401, "x", {}, None)))'
-check_prog "an HTTP 403 is a rejected credential" "rejected" '
-from urllib.error import HTTPError
-from aiusage.providers.muse import _quota_error_code
-print(_quota_error_code(HTTPError("u", 403, "x", {}, None)))'
+from aiusage.providers.muse_quota import error_code
+print(error_code(HTTPError("u", 401, "x", {}, None)))'
 check_prog "a timeout is unreachable, not invalid" "unreachable" '
-from aiusage.providers.muse import _quota_error_code
-print(_quota_error_code(TimeoutError()))'
-check_prog "a DNS failure is unreachable" "unreachable" '
-from urllib.error import URLError
-from aiusage.providers.muse import _quota_error_code
-print(_quota_error_code(URLError("name resolution failed")))'
+from aiusage.providers.muse_quota import error_code
+print(error_code(TimeoutError()))'
 check_prog "a 500 is unreachable, not a bad key" "unreachable" '
 from urllib.error import HTTPError
-from aiusage.providers.muse import _quota_error_code
-print(_quota_error_code(HTTPError("u", 500, "x", {}, None)))'
+from aiusage.providers.muse_quota import error_code
+print(error_code(HTTPError("u", 500, "x", {}, None)))'
 check_prog "no credential is reported as such" "{} no-credential" '
 import os
 os.environ["WIDGET_MUSE_QUOTA"] = "1"
 os.environ.pop("MUSE_QUOTA_RESPONSE_FILE", None)
 os.environ["MUSE_AUTH_PATH"] = "/nonexistent/auth.json"
 os.environ["META_API_KEY"] = ""
-from aiusage.providers.muse import get_muse_quota
-q, e = get_muse_quota("")
+from aiusage.providers.muse_quota import get_muse_quota
+q, e = get_muse_quota()
 print(q, e)'
-
-# CRLF frames must parse exactly like LF ones (see _parse_subscription_event).
+# CRLF frames must parse exactly like LF ones.
 check_prog "CRLF and LF frames parse identically" "True" '
-from aiusage.providers.muse import _parse_subscription_event
+from aiusage.providers.muse_quota import parse_subscription_event
 body = ("event: response.subscription_usage\r\n"
         "data: {\"type\": \"response.subscription_usage\", \"subscription\": {\"window\": {\"used_percent\": 7}}}\r\n\r\n")
-print(_parse_subscription_event(body) == _parse_subscription_event(body.replace("\r\n", "\n")))'
+print(parse_subscription_event(body) == parse_subscription_event(body.replace("\r\n", "\n")))'
+# The model for the billed call is the CLI's own, never a name pinned in our
+# source — and the warning the frontends show is priced from the local catalog.
+check_prog "the quota model comes from the CLI settings" "fixture-spark-9.9" '
+import os
+os.environ["MUSE_SETTINGS_PATH"] = os.environ["TEST_TMP"] + "/muse-settings.json"
+from aiusage.providers.muse_quota import quota_model
+print(quota_model())'
+check_prog "one refresh is priced from the local catalog" "132 0.00121" '
+import os
+os.environ["MUSE_SETTINGS_PATH"] = os.environ["TEST_TMP"] + "/muse-settings.json"
+os.environ["MUSE_CATALOG_DIR"] = os.environ["TEST_TMP"] + "/muse-catalog"
+from aiusage.providers.muse_quota import refresh_cost
+c = refresh_cost()
+print(c["tokens"], round(c["usd"], 5))'
+
+# Opt-in like every other provider that is useless without its vendor
+# installed — and unlike the PR this replaces, which defaulted Muse on.
+check_prog "muse stays off until it is switched on" "False" '
+from aiusage.config import provider_enabled
+print(provider_enabled({}, "muse"))'
+
+# A stats-only provider must not grow a network path by accident. Checked
+# against the import graph rather than the text, so prose about not opening a
+# socket does not fail its own test.
+check_prog "the provider module imports nothing that can reach the network" "clean" '
+import ast, inspect
+from aiusage.providers import muse
+NET = {"urllib", "http", "socket", "ssl", "requests", "httpx", "asyncio", "ftplib", "smtplib", "telnetlib", "xmlrpc"}
+found = set()
+for node in ast.walk(ast.parse(inspect.getsource(muse))):
+    if isinstance(node, ast.Import):
+        found.update(a.name.split(".")[0] for a in node.names)
+    elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
+        found.add(node.module.split(".")[0])
+print(", ".join(sorted(found & NET)) or "clean")'
 
 # The shared formatter must not have drifted either vendor'"'"'s printed strings.
 check_prog "the shared formatter keeps both vendors byte-identical" "41.18M 1.00K 500 30k 1.5k 2M 500" '

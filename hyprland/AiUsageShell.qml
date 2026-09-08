@@ -302,11 +302,11 @@ ShellRoot {
     property string chartGranularity: "7d"
 
     // Inner sub-tab for providers with activity stats (claude, openai,
-    // copilot): "usage" vs "stats"
+    // copilot, muse): "usage" vs "stats"
     property string activeSubTab: "usage"
     readonly property bool activeHasStats: {
         var p = activeProvider();
-        return p && (p.id === "claude" || p.id === "openai" || p.id === "copilot");
+        return p && (p.id === "claude" || p.id === "openai" || p.id === "copilot" || p.id === "muse");
     }
 
     function activeProvider() {
@@ -1152,6 +1152,43 @@ ShellRoot {
                                     barColor: modelData.color || (root.activeId === "antigravity" && (modelData.key === "external" || modelData.key === "rest" || (modelData.label && modelData.label.indexOf("Claude") !== -1)) ? "#34a853" : root.activeAccent)
                                     showMeter: modelData.showMeter !== false
                                 }
+                            }
+
+                            // Muse is the only provider whose plan bars cost
+                            // money to fetch, so the tab says where they went
+                            // rather than looking like it failed to load.
+                            Text {
+                                readonly property string quotaError: root.activeProvider() ? (root.activeProvider().details.quotaError || "") : ""
+
+                                Layout.fillWidth: true
+                                visible: root.activeId === "muse" && quotaError !== ""
+                                text: {
+                                    if (quotaError === "disabled")
+                                        return "Plan quota is off: Meta reports it only on a billed model call. Everything above is read from Muse's own local files.";
+                                    if (quotaError === "rejected")
+                                        return "Plan quota: Meta refused the credential.";
+                                    if (quotaError === "unreachable")
+                                        return "Plan quota: could not reach Meta — the local numbers above are unaffected.";
+                                    if (quotaError === "no-credential")
+                                        return "Plan quota needs a Meta API key, or a `muse login` that stored one.";
+                                    if (quotaError === "no-model")
+                                        return "Plan quota needs a model: run Muse once so it caches its catalog.";
+                                    return "";
+                                }
+                                font.pixelSize: 9
+                                color: "#94a3b8"
+                                opacity: 0.8
+                                wrapMode: Text.WordWrap
+                            }
+
+                            Text {
+                                Layout.fillWidth: true
+                                visible: root.activeId === "muse" && root.activeProvider() && (root.activeProvider().details.quotaError || "") === "" && !(root.activeProvider().details.current || {}).available && !(root.activeProvider().details.weekly || {}).available
+                                text: "No plan windows on this account — pay-as-you-go has none."
+                                font.pixelSize: 9
+                                color: "#94a3b8"
+                                opacity: 0.8
+                                wrapMode: Text.WordWrap
                             }
                         }
 

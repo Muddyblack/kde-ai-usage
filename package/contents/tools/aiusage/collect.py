@@ -23,6 +23,7 @@ from .providers.kiro import get_kiro_usage
 from .providers.mistral import get_mistral_usage
 from .providers.moonshot import get_moonshot_balance
 from .providers.muse import get_muse_usage
+from .providers.muse_quota import get_muse_quota
 from .providers.openai_credentials import get_openai_credentials
 from .providers.openrouter import get_openrouter_usage
 from .providers.zai import get_zai_usage
@@ -184,6 +185,16 @@ def collect_openai(now):
     }
 
 
+def collect_muse(now):
+    """Local statistics always; the plan quota only when the user switched the
+    billed call on (see providers/muse_quota.py)."""
+    usage = get_muse_usage() or {}
+    quota, quota_error = get_muse_quota()
+    usage["quota"] = quota
+    usage["quotaError"] = quota_error
+    return {"id": "muse", "now": now, "inputs": {"usage": usage}}
+
+
 def collect_copilot(now):
     """Like Claude and Codex, Copilot pairs a remote quota with a local CLI
     history — so it does not fit the _SIMPLE shape."""
@@ -198,7 +209,6 @@ _SIMPLE = {
     "antigravity": (get_antigravity_usage, None, None),
     "kiro": (get_kiro_usage, None, None),
     "mistral": (get_mistral_usage, "mistral", "https://status.mistral.ai/api/v2/summary.json"),
-    "muse": (get_muse_usage, None, None),
     "openrouter": (get_openrouter_usage, "openrouter", "https://status.openrouter.ai/api/v2/summary.json"),
     "grok": (get_grok_usage, None, None),
     "zai": (get_zai_usage, None, None),
@@ -214,6 +224,8 @@ def collect(id_, now):
         return collect_openai(now)
     if id_ == "copilot":
         return collect_copilot(now)
+    if id_ == "muse":
+        return collect_muse(now)
     if id_ in _SIMPLE:
         fn, status_name, status_url = _SIMPLE[id_]
         usage = fn() or {}

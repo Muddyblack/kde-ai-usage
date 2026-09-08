@@ -88,7 +88,7 @@ A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple serv
 | GitHub Copilot | Premium request usage against the plan's own entitlement, the real reset day, and local Copilot CLI activity stats | Personal billing supported; organization/enterprise billing not yet supported |
 | DeepSeek | Available balance with granted and topped-up breakdown | Supported |
 | Kimi / Moonshot AI | Available balance with voucher and cash breakdown | Supported |
-| Muse | Current/Weekly subscription windows plus local session stats (sessions, output/reasoning tokens, tool calls, turns) | Supported |
+| Muse | Local session stats: tokens, offline spend estimate, sessions, tool calls, workspaces, streaks. Plan windows available behind an opt-in switch | Supported (the plan quota costs tokens to read — off by default) |
 
 Provider APIs do not all expose the same information. In particular, Codex/ChatGPT
 plan limits are separate from OpenAI API organization usage, DeepSeek reports a
@@ -121,7 +121,7 @@ Enable only the services you use. Each one has its own setup requirement:
 | GitHub Copilot | Usually nothing to configure: the Copilot editor login (`~/.config/github-copilot/apps.json`), the Copilot CLI login, or `gh auth token` is picked up automatically. Widget settings, `$GITHUB_TOKEN` and `$GH_TOKEN` still win when set; a token with fine-grained **Plan: read** permission additionally unlocks the documented billing endpoint. Personal billing only |
 | DeepSeek | A DeepSeek API key from widget settings, `$DEEPSEEK_API_KEY`, or `~/.config/deepseek/api-key` |
 | Kimi / Moonshot AI | A Moonshot API key from widget settings, `$MOONSHOT_API_KEY`, `$KIMI_API_KEY`, or `~/.config/moonshot/api-key` |
-| Muse | Muse CLI, logged in with `muse login`; a Meta API key is optional (`$META_API_KEY` takes priority) |
+| Muse | Nothing to configure for the local stats — `muse login` is enough. The optional plan quota additionally uses `$META_API_KEY` or the key `muse login` stored |
 
 All configuration is done in the widget's settings panel (right-click the widget → *Configure*). See [How it works](#how-it-works) below for what each tab reads and where credentials are resolved from.
 
@@ -357,9 +357,28 @@ The DeepSeek tab calls `GET https://api.deepseek.com/user/balance` with the conf
 The Kimi tab calls `GET https://api.moonshot.ai/v1/users/me/balance` and shows the available, voucher, and cash balances. The key is resolved from widget settings → `$MOONSHOT_API_KEY` / `$KIMI_API_KEY` → `~/.config/moonshot/api-key`.
 
 ### Muse
-The Muse tab aggregates the Muse Code session logs (`~/.local/share/muse/sessions/`) fully offline: session and subagent counts, output/reasoning token totals, tool calls, turns, per-model breakdown, and a 30-day output chart. Per-call input tokens are cumulative context, so the headline and chart use output tokens, which are incremental.
+The Muse tab is **fully offline** — it opens no socket, and a test enforces that against the provider's import graph. It reads what Muse Code writes to disk anyway:
 
-The Current (5-hour) and Weekly subscription windows from the in-TUI `/usage` view come from one minimal streaming Responses call (`store: false`, 16 output tokens max): the server emits a `response.subscription_usage` event with `{window: {used_percent, resets_at, window_duration_mins}, weekly: {used_percent, resets_at}}`. The credential is an explicit `META_API_KEY` first (widget settings or environment — it takes priority, matching the CLI), falling back to the `api_key` of the Muse OAuth login (`$MUSE_AUTH_PATH` or `~/.config/muse/auth.json`); the OIDC `access_token` is not valid on the Model API. Quota refreshes one minimal call at a time (`store: false`, 16 output tokens max — about 12 input and 120 output tokens, mostly reasoning, nothing kept server-side). There is no free endpoint for this data: the usual billing paths all return 404, the CLI never writes the snapshot to disk, and the `response.subscription_usage` event is the *last* one on the stream — emitted after generation has ended — so the call cannot be cut short either. Because reading a statistic should not cost you anything, **live quota is off by default**: out of the box the Muse tab reads your local session logs and spends nothing. Turn it on in settings → "Live quota" (the Hyprland toggle, or `WIDGET_MUSE_QUOTA=1` / `museQuota: true`); refreshes are then cached for 30 minutes (`MUSE_QUOTA_TTL_SECONDS`). Any quota failure degrades to the local statistics, and the tab says whether the endpoint refused the credential or could not be reached rather than calling a working key invalid. Credentials never reach a frontend — only presence flags do. The quota call needs a chat model id but the snapshot is account-level: the provider uses the model from your local logs first, then your free account model list, then a last-known default.
+| File | What the tab takes from it |
+| --- | --- |
+| `~/.local/share/muse/sessions/**/session.jsonl` | sessions, subagents, turns, messages, tool calls, per-call token counters, workspace folder name |
+| `~/.local/share/muse/sessions/.msp-view-v1/<id>/snapshot-*.json` | the folded counted-once token totals — the same numbers the TUI's `/usage` prints |
+| `~/.local/share/muse/model-catalog/*.json` | every model id, its real context limit, and its price list |
+| `~/.config/muse/settings.json` | the model the CLI will use next |
+| `~/.config/muse/auth.json` | login presence and display name only; the stored tokens are never read |
+
+Because Meta ships the price list to disk, this is the one tab that can price its own usage offline: tokens × the catalog's rates gives the spend estimate, per model and in total, in the catalog's own currency. Nothing is hardcoded — a new Muse model needs no widget update.
+
+**The plan quota is opt-in, because it is the one number here that costs money.** The Current/Weekly windows in the TUI's `/usage` screen are stored nowhere: they arrive only as a `response.subscription_usage` frame riding a live model call, and are absent from the MSP wire schema, the view fold, `session-index.db` and the feature-config cache. The CLI has no `usage`/`status`/`quota` subcommand either, and the frame is the *last* event on the stream — after generation has been paid for — so the call cannot be cut short. (Running `/usage` in the CLI itself stays free: it re-displays what a call you already made told it.)
+
+So reading it from a widget means one minimal model call per refresh — about 12 input and 120 output tokens, `store: false`, cached 30 minutes. At the contributor tier that is a few cents a year; at standard rates closer to ten dollars. [The provider contract](docs/provider-contract.md) says a statistic must not cost the user, so:
+
+- **Off by default.** Out of the box the tab makes no network call at all — `providers/muse.py` imports no networking module, and a test enforces that against its import graph.
+- Turn it on in settings → *Muse Quota* (Hyprland has the same toggle, or `WIDGET_MUSE_QUOTA=1` / `museQuota: true`). Both panels state the cost next to the switch, priced from your own model's catalog rates.
+- The billed path lives in a separate module (`providers/muse_quota.py`) so it cannot be reached by accident, and every failure falls back to the free local numbers — saying whether the credential was refused or the endpoint was unreachable, rather than calling a working key invalid.
+- `MUSE_QUOTA_TTL_SECONDS` (default 1800) bounds how often it can fire, so a 5-minute poll interval cannot become a per-poll model call.
+
+The tab itself is off by default too: enable *Muse* in settings if you use Muse Code.
 
 ### Usage history
 Each refresh appends the usage values that a provider actually reports to a rolling history (the last 500 samples) used by the chart, spark-lines, burn-rate ETA, and period comparison. Rolling plan windows (Claude, Codex) empty at a known instant, so when the machine was asleep across one the chart replays the drop where it actually happened instead of sloping from the last pre-sleep sample to the first one after wake-up. Most series are percentages; Mistral stores its raw vibe CLI spend and DeepSeek stores its raw balance so their charts retain meaningful units. Existing session and weekly history fields are retained even while a window is unavailable, so five-hour charts can return without migration if providers restore that limit. History is stored in the widget's Plasma config **and** mirrored to `~/.local/share/ai-usage-widget/usage-history-latest.json`, so it survives a full uninstall/reinstall — on first launch with no config history, the widget restores from that file automatically. You can also manually **Export** (writes a timestamped JSON copy) and **Import** from the settings panel. If a saved file is unreadable or in an unrecognized format, it's discarded and history starts fresh rather than erroring out.

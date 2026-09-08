@@ -463,24 +463,44 @@ ColumnLayout {
             secret: false
         }
 
-        RowLayout {
+        KeyField {
+            shell: page.shell
+            label: "Muse"
+            placeholder: "optional — the CLI login is used"
+            settingKey: "muse"
+        }
+        ColumnLayout {
             Layout.fillWidth: true
-            spacing: 6
-            Text {
-                text: "Muse live quota"
-                font.pixelSize: 11
-                color: "#f8fafc"
-                Layout.preferredWidth: 90
+            spacing: 2
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 6
+                Text {
+                    text: "Muse quota"
+                    font.pixelSize: 11
+                    color: "#f8fafc"
+                    Layout.preferredWidth: 90
+                }
+                Toggle {
+                    checked: page.shell.settings.museQuota === true
+                    onToggled: page.shell.setSetting2("museQuota", checked)
+                }
+                Text {
+                    text: "off by default"
+                    font.pixelSize: 9
+                    color: "#94a3b8"
+                    Layout.fillWidth: true
+                }
             }
-            Toggle {
-                checked: page.shell.settings.museQuota === true
-                onToggled: page.shell.setSetting2("museQuota", checked)
-            }
+            // Every other tab reads its quota for free; Muse cannot.
             Text {
-                text: "off by default · one tiny model call per 30 min"
+                Layout.fillWidth: true
+                Layout.leftMargin: 96
+                text: "⚠ Meta reports Muse's plan windows only on a billed model call (~130 tokens per refresh, cached 30 min). Everything else in this tab is read from local files and costs nothing."
                 font.pixelSize: 9
                 color: "#94a3b8"
-                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
             }
         }
         KeyField {
@@ -488,12 +508,6 @@ ColumnLayout {
             label: "DeepSeek"
             placeholder: "or $DEEPSEEK_API_KEY"
             settingKey: "deepseek"
-        }
-        KeyField {
-            shell: page.shell
-            label: "Muse"
-            placeholder: "or $META_API_KEY"
-            settingKey: "muse"
         }
     }
 

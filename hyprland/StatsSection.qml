@@ -13,6 +13,10 @@ ColumnLayout {
     readonly property bool hasStats: stats && stats.available === true
     // Every provider draws one per-day sparkline, but not every provider
     // counts tokens — the Copilot CLI records messages only (see stats.py).
+    // Where the sessions went: repositories for Copilot, workspace folders for
+    // Muse. One list, named by whichever the provider reported.
+    readonly property var topGroups: stats.topRepositories || stats.topWorkspaces || []
+    readonly property string topGroupsLabel: stats.topRepositories ? "Top repositories" : "Top workspaces"
     readonly property var dailySeries: stats.dailySeries || stats.dailyTokens || []
     readonly property string dailyUnit: stats.dailyUnit || "tokens"
 
@@ -71,6 +75,8 @@ ColumnLayout {
                     return "No Codex history yet.\nRun a Codex CLI session and stats will appear here.";
                 if (statsSectionRoot.providerId === "copilot")
                     return "No local activity stats yet.\nRun the Copilot CLI to fill ~/.copilot/session-store.db";
+                if (statsSectionRoot.providerId === "muse")
+                    return "No Muse sessions yet.\nRun Muse Code and its own logs will appear here.";
                 return "No local activity stats yet.\nRun Claude Code to generate ~/.claude/stats-cache.json";
             }
             font.pixelSize: 11
@@ -289,21 +295,21 @@ ColumnLayout {
             }
         }
 
-        // ── Busiest repositories (Copilot) ─────────────────────────────────────
+        // ── Busiest repositories (Copilot) / workspaces (Muse) ─────────────────
         ColumnLayout {
             Layout.fillWidth: true
             spacing: 4
-            visible: (statsSectionRoot.stats.topRepositories || []).length > 0
+            visible: statsSectionRoot.topGroups.length > 0
 
             Text {
-                text: "Top repositories"
+                text: statsSectionRoot.topGroupsLabel
                 font.pixelSize: 9
                 color: "#94a3b8"
                 opacity: 0.8
             }
 
             Repeater {
-                model: statsSectionRoot.stats.topRepositories || []
+                model: statsSectionRoot.topGroups
 
                 RowLayout {
                     required property var modelData

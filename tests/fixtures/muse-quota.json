@@ -1,6 +1,6 @@
 {
   "subscription": {
-    "tier": "10000000000000001",
+    "tier": "1",
     "window": {"used_percent": 26, "resets_at": 1788528365, "window_duration_mins": 300},
     "weekly": {"used_percent": 9, "resets_at": 1788739200}
   }

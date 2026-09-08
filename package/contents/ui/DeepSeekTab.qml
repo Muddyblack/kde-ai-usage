@@ -103,71 +103,23 @@ ColumnLayout {
         Layout.fillWidth: true
         spacing: 8
 
-        Rectangle {
-            Layout.fillWidth: true
-            height: deepSeekStatsCol.implicitHeight + 16
-            radius: 8
-            color: Qt.rgba(0.31, 0.55, 1.0, 0.08)
-            border.width: 1
-            border.color: Qt.rgba(0.31, 0.55, 1.0, 0.22)
-
-            ColumnLayout {
-                id: deepSeekStatsCol
-                anchors.fill: parent
-                anchors.margins: 12
-                spacing: 8
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    PlasmaComponents.Label {
-                        text: "Total Balance"
-                        font.pixelSize: 11
-                        opacity: 0.65
-                        color: Kirigami.Theme.textColor
-                        Layout.fillWidth: true
-                    }
-                    PlasmaComponents.Label {
-                        text: deepSeekTabRoot.money(rootItem.deepseekPrimaryTotal, rootItem.deepseekPrimaryCurrency)
-                        font.pixelSize: 16
-                        font.bold: true
-                        color: rootItem.deepseekBlue
-                    }
+        StatValueCard {
+            accent: rootItem.deepseekBlue
+            rows: [
+                {
+                    label: "Total Balance",
+                    value: deepSeekTabRoot.money(rootItem.deepseekPrimaryTotal, rootItem.deepseekPrimaryCurrency),
+                    strong: true
+                },
+                {
+                    label: "Granted",
+                    value: deepSeekTabRoot.money(rootItem.deepseekPrimaryGranted, rootItem.deepseekPrimaryCurrency)
+                },
+                {
+                    label: "Topped Up",
+                    value: deepSeekTabRoot.money(rootItem.deepseekPrimaryToppedUp, rootItem.deepseekPrimaryCurrency)
                 }
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    PlasmaComponents.Label {
-                        text: "Granted"
-                        font.pixelSize: 11
-                        opacity: 0.65
-                        color: Kirigami.Theme.textColor
-                        Layout.fillWidth: true
-                    }
-                    PlasmaComponents.Label {
-                        text: deepSeekTabRoot.money(rootItem.deepseekPrimaryGranted, rootItem.deepseekPrimaryCurrency)
-                        font.pixelSize: 12
-                        color: Kirigami.Theme.textColor
-                        opacity: 0.85
-                    }
-                }
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    PlasmaComponents.Label {
-                        text: "Topped Up"
-                        font.pixelSize: 11
-                        opacity: 0.65
-                        color: Kirigami.Theme.textColor
-                        Layout.fillWidth: true
-                    }
-                    PlasmaComponents.Label {
-                        text: deepSeekTabRoot.money(rootItem.deepseekPrimaryToppedUp, rootItem.deepseekPrimaryCurrency)
-                        font.pixelSize: 12
-                        color: Kirigami.Theme.textColor
-                        opacity: 0.85
-                    }
-                }
-            }
+            ]
         }
 
         Rectangle {

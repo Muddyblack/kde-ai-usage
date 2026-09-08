@@ -483,39 +483,53 @@ ColumnLayout {
         }
         KeyRow {
             label: "Muse"
-            placeholder: "or $META_API_KEY"
+            placeholder: "optional — the CLI login is used"
             configKey: "museApiKey"
             rowVisible: Plasmoid.configuration.museEnabled
         }
-        RowLayout {
+        ColumnLayout {
             Layout.fillWidth: true
-            spacing: 6
+            spacing: 2
             visible: Plasmoid.configuration.museEnabled
 
-            PlasmaComponents.Label {
-                // Named for its provider like every other row here: "Live
-                // quota" alone read as a global setting. "Muse Live Quota"
-                // would elide in the 76px label column, and the hint on the
-                // right already says the quota is the live, billed one.
-                text: "Muse Quota"
-                font.pixelSize: 10
-                opacity: 0.6
-                color: Kirigami.Theme.textColor
-                Layout.preferredWidth: 76
-                elide: Text.ElideRight
-            }
-            QQC2.Switch {
-                implicitHeight: 20
-                checked: Plasmoid.configuration.museQuotaEnabled === true
-                onToggled: Plasmoid.configuration.museQuotaEnabled = checked
-            }
-            PlasmaComponents.Label {
-                text: "off by default · one tiny model call per 30 min"
-                font.pixelSize: 9
-                opacity: 0.45
-                color: Kirigami.Theme.textColor
-                elide: Text.ElideRight
+            RowLayout {
                 Layout.fillWidth: true
+                spacing: 6
+
+                PlasmaComponents.Label {
+                    // Named for its provider like every other row here: "Live
+                    // quota" alone read as a global setting.
+                    text: "Muse Quota"
+                    font.pixelSize: 10
+                    opacity: 0.6
+                    color: Kirigami.Theme.textColor
+                    Layout.preferredWidth: 76
+                    elide: Text.ElideRight
+                }
+                QQC2.Switch {
+                    implicitHeight: 20
+                    checked: Plasmoid.configuration.museQuotaEnabled === true
+                    onToggled: Plasmoid.configuration.museQuotaEnabled = checked
+                }
+                PlasmaComponents.Label {
+                    text: "off by default"
+                    font.pixelSize: 9
+                    opacity: 0.45
+                    color: Kirigami.Theme.textColor
+                    elide: Text.ElideRight
+                    Layout.fillWidth: true
+                }
+            }
+            // Every other tab reads its quota for free. Muse cannot, so the
+            // price of switching this on is stated before it is switched on.
+            PlasmaComponents.Label {
+                Layout.fillWidth: true
+                Layout.leftMargin: 82
+                text: "⚠ Meta reports Muse's plan windows only on a billed model\ncall (~130 tokens per refresh, cached 30 min). Everything\nelse in this tab is read from local files and costs nothing."
+                font.pixelSize: 9
+                opacity: 0.5
+                color: Kirigami.Theme.textColor
+                wrapMode: Text.WordWrap
             }
         }
         RowLayout {

@@ -1,0 +1,32 @@
+{
+  "id": "muse",
+  "now": 1785000000,
+  "inputs": {
+    "usage": {
+      "hasLogin": true,
+      "email": "user@example.com",
+      "fullName": "Test User",
+      "stats": {
+        "totalSessions": 2,
+        "subagentSessions": 0,
+        "totalMessages": 5,
+        "totalTokens": 0,
+        "totalInputTokens": 0,
+        "totalOutputTokens": 0,
+        "totalCostUSD": 0,
+        "totalToolCalls": 3,
+        "totalModelCalls": 4,
+        "workspaceCount": 1,
+        "firstSessionDate": "2026-07-25",
+        "model": "muse-spark-1.3-contributor",
+        "currency": "USD",
+        "modelUsage": {},
+        "dailyActivity": [{"date": "2026-07-25", "sessionCount": 2, "messageCount": 5, "toolCallCount": 3}],
+        "dailyModelTokens": [{"date": "2026-07-25", "total": 0}],
+        "longestSession": {"duration": 120000, "messageCount": 5},
+        "hourCounts": {"14": 2}
+      }
+    },
+    "status": null
+  }
+}

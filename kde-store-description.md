@@ -20,7 +20,7 @@ Switch between tabs in the popup for each service:
 [*] [b]Z.AI[/b] [i](untested)[/i] — 5-hour token quota + monthly tools quota
 [*] [b]GitHub Copilot[/b] — premium request usage for personally billed plans, plus local Copilot CLI activity stats
 [*] [b]DeepSeek[/b] [i](untested)[/i] — current account balance + granted/topped-up split
-[*] [b]Muse[/b] — Current/Weekly subscription windows + local session stats
+[*] [b]Muse[/b] — local Muse Code session stats with an offline spend estimate; plan windows behind an opt-in switch (Meta reports them only on a billed call, so it is off by default)
 [/list]
 
 [b]Why I like using it[/b]
