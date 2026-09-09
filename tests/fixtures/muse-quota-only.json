@@ -1,0 +1,18 @@
+{
+  "id": "muse",
+  "now": 1785000000,
+  "inputs": {
+    "usage": {
+      "hasLogin": true,
+      "email": "user@example.com",
+      "fullName": "Test User",
+      "quota": {
+        "current": {"pct": 26, "resetAt": 1788528365},
+        "weekly": {"pct": 9, "resetAt": 1788739200}
+      },
+      "quotaError": "",
+      "stats": {}
+    },
+    "status": null
+  }
+}

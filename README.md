@@ -41,16 +41,16 @@
 
 <p align="center">
   <b>Settings</b><br/><br/>
-  <img src="./readme/settings.svg?v=10" alt="Settings panel" width="340" valign="top"/>
+  <img src="./readme/settings.svg?v=11" alt="Settings panel" width="340" valign="top"/>
 </p>
 
-A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple services. Monitor your **Claude** subscription windows and local activity stats, **Antigravity/Google AI Studio**, **OpenAI API and Codex plan limits**, **Grok CLI**, **Kiro**, **Mistral AI**, **OpenRouter**, **Z.AI**, **GitHub Copilot**, **DeepSeek**, and **Kimi / Moonshot AI** usage or balance at a glance with animated segmented bars, live countdown timers, account status, and per-model breakdowns.
+A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple services. Monitor your **Claude** subscription windows and local activity stats, **Antigravity/Google AI Studio**, **OpenAI API and Codex plan limits**, **Grok CLI**, **Kiro**, **Mistral AI**, **OpenRouter**, **Z.AI**, **GitHub Copilot**, **DeepSeek**, **Kimi / Moonshot AI**, and **Muse** usage or balance at a glance with animated segmented bars, live countdown timers, account status, and per-model breakdowns.
 
 ---
 
 ## Features
 
-- **Multi-service support** — Switch between Claude, Antigravity, OpenAI, Grok, Kiro, Mistral, OpenRouter, Z.AI, GitHub Copilot, DeepSeek, and Kimi tabs in the popup
+- **Multi-service support** — Switch between Claude, Antigravity, OpenAI, Grok, Kiro, Mistral, OpenRouter, Z.AI, GitHub Copilot, DeepSeek, Kimi, and Muse tabs in the popup
 - **Balance tracking** — DeepSeek current balance with granted / topped-up breakdown
 - **Panel view** — Compact percentage readouts in the taskbar, color-coded by usage level, with an inline spark-line trend
 - **Popup view** — Segmented bars showing exact fill level with reset times and countdowns
@@ -88,6 +88,7 @@ A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple serv
 | GitHub Copilot | Premium request usage against the plan's own entitlement, the real reset day, and local Copilot CLI activity stats | Personal billing supported; organization/enterprise billing not yet supported |
 | DeepSeek | Available balance with granted and topped-up breakdown | Supported |
 | Kimi / Moonshot AI | Available balance with voucher and cash breakdown | Supported |
+| Muse | Local session stats: tokens, offline spend estimate, sessions, tool calls, workspaces, streaks. Plan windows available behind an opt-in switch | Supported (the plan quota costs tokens to read — off by default) |
 
 Provider APIs do not all expose the same information. In particular, Codex/ChatGPT
 plan limits are separate from OpenAI API organization usage, DeepSeek reports a
@@ -120,6 +121,7 @@ Enable only the services you use. Each one has its own setup requirement:
 | GitHub Copilot | Usually nothing to configure: the Copilot editor login (`~/.config/github-copilot/apps.json`), the Copilot CLI login, or `gh auth token` is picked up automatically. Widget settings, `$GITHUB_TOKEN` and `$GH_TOKEN` still win when set; a token with fine-grained **Plan: read** permission additionally unlocks the documented billing endpoint. Personal billing only |
 | DeepSeek | A DeepSeek API key from widget settings, `$DEEPSEEK_API_KEY`, or `~/.config/deepseek/api-key` |
 | Kimi / Moonshot AI | A Moonshot API key from widget settings, `$MOONSHOT_API_KEY`, `$KIMI_API_KEY`, or `~/.config/moonshot/api-key` |
+| Muse | Nothing to configure for the local stats — `muse login` is enough. The optional plan quota additionally uses `$META_API_KEY` or the key `muse login` stored |
 
 All configuration is done in the widget's settings panel (right-click the widget → *Configure*). See [How it works](#how-it-works) below for what each tab reads and where credentials are resolved from.
 
@@ -353,6 +355,30 @@ The DeepSeek tab calls `GET https://api.deepseek.com/user/balance` with the conf
 
 ### Kimi / Moonshot AI
 The Kimi tab calls `GET https://api.moonshot.ai/v1/users/me/balance` and shows the available, voucher, and cash balances. The key is resolved from widget settings → `$MOONSHOT_API_KEY` / `$KIMI_API_KEY` → `~/.config/moonshot/api-key`.
+
+### Muse
+The Muse tab is **fully offline** — it opens no socket, and a test enforces that against the provider's import graph. It reads what Muse Code writes to disk anyway:
+
+| File | What the tab takes from it |
+| --- | --- |
+| `~/.local/share/muse/sessions/**/session.jsonl` | sessions, subagents, turns, messages, tool calls, per-call token counters, workspace folder name |
+| `~/.local/share/muse/sessions/.msp-view-v1/<id>/snapshot-*.json` | the folded counted-once token totals — the same numbers the TUI's `/usage` prints |
+| `~/.local/share/muse/model-catalog/*.json` | every model id, its real context limit, and its price list |
+| `~/.config/muse/settings.json` | the model the CLI will use next |
+| `~/.config/muse/auth.json` | login presence and display name only; the stored tokens are never read |
+
+Because Meta ships the price list to disk, this is the one tab that can price its own usage offline: tokens × the catalog's rates gives the spend estimate, per model and in total, in the catalog's own currency. Nothing is hardcoded — a new Muse model needs no widget update.
+
+**The plan quota is opt-in, because it is the one number here that costs money.** The Current/Weekly windows in the TUI's `/usage` screen are stored nowhere: they arrive only as a `response.subscription_usage` frame riding a live model call, and are absent from the MSP wire schema, the view fold, `session-index.db` and the feature-config cache. The CLI has no `usage`/`status`/`quota` subcommand either, and the frame is the *last* event on the stream — after generation has been paid for — so the call cannot be cut short. (Running `/usage` in the CLI itself stays free: it re-displays what a call you already made told it.)
+
+So reading it from a widget means one minimal model call per refresh — about 12 input and 120 output tokens, `store: false`, cached 30 minutes. At the contributor tier that is a few cents a year; at standard rates closer to ten dollars. [The provider contract](docs/provider-contract.md) says a statistic must not cost the user, so:
+
+- **Off by default.** Out of the box the tab makes no network call at all — `providers/muse.py` imports no networking module, and a test enforces that against its import graph.
+- Turn it on in settings → *Muse Quota* (Hyprland has the same toggle, or `WIDGET_MUSE_QUOTA=1` / `museQuota: true`). Both panels state the cost next to the switch, priced from your own model's catalog rates.
+- The billed path lives in a separate module (`providers/muse_quota.py`) so it cannot be reached by accident, and every failure falls back to the free local numbers — saying whether the credential was refused or the endpoint was unreachable, rather than calling a working key invalid.
+- `MUSE_QUOTA_TTL_SECONDS` (default 1800) bounds how often it can fire, so a 5-minute poll interval cannot become a per-poll model call.
+
+The tab itself is off by default too: enable *Muse* in settings if you use Muse Code.
 
 ### Usage history
 Each refresh appends the usage values that a provider actually reports to a rolling history (the last 500 samples) used by the chart, spark-lines, burn-rate ETA, and period comparison. Rolling plan windows (Claude, Codex) empty at a known instant, so when the machine was asleep across one the chart replays the drop where it actually happened instead of sloping from the last pre-sleep sample to the first one after wake-up. Most series are percentages; Mistral stores its raw vibe CLI spend and DeepSeek stores its raw balance so their charts retain meaningful units. Existing session and weekly history fields are retained even while a window is unavailable, so five-hour charts can return without migration if providers restore that limit. History is stored in the widget's Plasma config **and** mirrored to `~/.local/share/ai-usage-widget/usage-history-latest.json`, so it survives a full uninstall/reinstall — on first launch with no config history, the widget restores from that file automatically. You can also manually **Export** (writes a timestamped JSON copy) and **Import** from the settings panel. If a saved file is unreadable or in an unrecognized format, it's discarded and history starts fresh rather than erroring out.

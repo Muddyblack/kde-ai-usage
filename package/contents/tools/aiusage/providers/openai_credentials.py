@@ -1,17 +1,7 @@
 import base64
 import os
 
-from ..http import as_json
-
-
-def _read_key_file(path):
-    if not os.path.isfile(path):
-        return ""
-    try:
-        with open(path) as f:
-            return f.read().translate(str.maketrans("", "", "\n\r ")).strip()
-    except OSError:
-        return ""
+from ..http import as_json, clean_credential, resolve_key
 
 
 def _decode_jwt_payload(token):
@@ -27,11 +17,12 @@ def _decode_jwt_payload(token):
 
 
 def get_openai_credentials():
-    api_key = os.environ.get("WIDGET_OPENAI_API_KEY", "") or os.environ.get("OPENAI_API_KEY", "")
-    if not api_key:
-        api_key = _read_key_file(os.path.expanduser("~/.config/openai-api-key"))
-    if not api_key:
-        api_key = _read_key_file(os.path.expanduser("~/.openai/api-key"))
+    api_key = resolve_key(
+        "WIDGET_OPENAI_API_KEY",
+        "OPENAI_API_KEY",
+        os.path.expanduser("~/.config/openai-api-key"),
+        os.path.expanduser("~/.openai/api-key"),
+    )
 
     access_token = email = plan_type = org_id = account_id = auth_mode = ""
 
@@ -44,12 +35,12 @@ def get_openai_credentials():
             codex_auth = None
         if isinstance(codex_auth, dict):
             tokens = codex_auth.get("tokens") or {}
-            access_token = tokens.get("access_token") or codex_auth.get("access_token") or ""
+            access_token = clean_credential(tokens.get("access_token") or codex_auth.get("access_token"))
             account_id = tokens.get("account_id") or codex_auth.get("account_id") or ""
             auth_mode = codex_auth.get("auth_mode") or ""
 
             if not api_key:
-                codex_api_key = codex_auth.get("OPENAI_API_KEY") or ""
+                codex_api_key = clean_credential(codex_auth.get("OPENAI_API_KEY"))
                 if codex_api_key:
                     api_key = codex_api_key
 

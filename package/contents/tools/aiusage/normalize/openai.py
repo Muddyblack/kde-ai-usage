@@ -14,7 +14,7 @@ from ..stats import codex_stats
 
 
 def _codex_window(w):
-    if w is None or not isinstance(w, dict):
+    if not isinstance(w, dict):
         return {"kind": "", "value": unavailable_window()}
     mins = w.get("windowDurationMins")
     mins = mins if isinstance(mins, (int, float)) and not isinstance(mins, bool) else None
@@ -36,15 +36,14 @@ def _assign_codex_window(base, w):
     c = _codex_window(w)
     if c["kind"] != "":
         base[c["kind"]] = c["value"]
-    return base
 
 
 def codex_normalize(p):
     main = p.get("rateLimits") or p.get("rate_limit")
     base = {"session": unavailable_window(), "weekly": unavailable_window()}
     if main is not None:
-        base = _assign_codex_window(base, main.get("primary") or main.get("primary_window"))
-        base = _assign_codex_window(base, main.get("secondary") or main.get("secondary_window"))
+        _assign_codex_window(base, main.get("primary") or main.get("primary_window"))
+        _assign_codex_window(base, main.get("secondary") or main.get("secondary_window"))
 
     by_id = p.get("rateLimitsByLimitId")
     additional = []
@@ -58,8 +57,8 @@ def codex_normalize(p):
                 "weekly": unavailable_window(),
                 "limitReached": s.get("rateLimitReachedType") is not None,
             }
-            entry = _assign_codex_window(entry, s.get("primary"))
-            entry = _assign_codex_window(entry, s.get("secondary"))
+            _assign_codex_window(entry, s.get("primary"))
+            _assign_codex_window(entry, s.get("secondary"))
             additional.append(entry)
     else:
         for i, lim in enumerate(p.get("additional_rate_limits") or []):
@@ -70,8 +69,8 @@ def codex_normalize(p):
                 "weekly": unavailable_window(),
                 "limitReached": r.get("limit_reached") is True,
             }
-            entry = _assign_codex_window(entry, r.get("primary_window"))
-            entry = _assign_codex_window(entry, r.get("secondary_window"))
+            _assign_codex_window(entry, r.get("primary_window"))
+            _assign_codex_window(entry, r.get("secondary_window"))
             additional.append(entry)
 
     m = main or {}

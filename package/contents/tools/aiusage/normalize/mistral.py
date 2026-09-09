@@ -6,7 +6,7 @@ def normalize_mistral(raw):
     res = raw["inputs"].get("usage") or {}
     status = status_summary(raw["inputs"].get("status"))
 
-    if not isinstance(res, dict) or len(res) == 0:
+    if not isinstance(res, dict) or not res:
         return provider_error(
             "mistral",
             "Mistral",

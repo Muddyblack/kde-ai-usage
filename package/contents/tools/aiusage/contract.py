@@ -28,6 +28,7 @@ PROVIDER_ICONS = {
     "kimi": "kimi.svg",
     "kiro": "kiro.svg",
     "mistral": "mistral-color.svg",
+    "muse": "muse-color.svg",
     "openai": "openai.svg",
     "openrouter": "openrouter.svg",
     "zai": "zai.svg",
@@ -60,10 +61,6 @@ def jround(x):
     if x >= 0:
         return math.floor(x + 0.5)
     return math.ceil(x - 0.5)
-
-
-def round_pct(x):
-    return jround(x * 100) / 100
 
 
 _TZ_SUFFIX_RE = re.compile(r"(Z|[+-]\d{2}:?\d{2})$")
@@ -203,7 +200,7 @@ def rolling_windows(session_id, day_id, weekly_id, session_key, weekly_key, sess
     return out
 
 
-def fixed_windows(id_prefix, key, raw):
+def monthly_window(id_prefix, key, raw):
     return [
         {**chart_window(f"{id_prefix}_5h", key, "5H", 18000000, "5h"), "raw": raw},
         {**chart_window(f"{id_prefix}_24h", key, "24H", 86400000, "24h"), "raw": raw},
@@ -212,8 +209,30 @@ def fixed_windows(id_prefix, key, raw):
     ]
 
 
-def monthly_window(id_, key, raw):
-    return fixed_windows(id_, key, raw)
+_TOKEN_UNITS = (("B", 1000000000), ("M", 1000000), ("k", 1000))
+
+
+def compact_tokens(v, decimals=1, units=_TOKEN_UNITS, trim_zeros=True):
+    """Token counts run to eight digits; a table cell has room for a few.
+
+    Shared so the providers agree on the shape, parameterised because they
+    legitimately disagree on the details: z.ai prints two decimals and an
+    uppercase "K" to match the figure on the vendor's own dashboard — this
+    number exists to be checked against that page, and a differently rounded
+    one invites the reader to wonder which is wrong — while the panel pills
+    want the shortest thing that still reads as a count ("30k", not "30.00K").
+
+    `units` is ordered largest first; pass a shorter tuple to opt out of a
+    magnitude entirely.
+    """
+    n = num(v)
+    for suffix, limit in units:
+        if abs(n) >= limit:
+            s = f"{n / limit:.{decimals}f}"
+            if trim_zeros and "." in s:
+                s = s.rstrip("0").rstrip(".")
+            return s + suffix
+    return str(int(n))
 
 
 def money(v, currency):
@@ -241,7 +260,7 @@ def empty_status():
 
 
 def status_summary(d):
-    if d is None or not isinstance(d, dict) or "status" not in d:
+    if not isinstance(d, dict) or "status" not in d:
         return empty_status()
     incidents = d.get("incidents") or []
     body = ""

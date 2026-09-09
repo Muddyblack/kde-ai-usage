@@ -5,6 +5,9 @@ import org.kde.plasma.plasmoid
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
 
+// The settings page. Four sections, one on screen at a time — the whole page at
+// once was a wall of unrelated rows in which a provider's own options (its key,
+// its quota) sat far from the switch that turns it on.
 ColumnLayout {
     id: settingsPanelRoot
     property Item rootItem
@@ -13,506 +16,89 @@ ColumnLayout {
     Layout.fillWidth: true
     spacing: 10
 
-    // ── Services ───────────────────────────────────────────────
-    PlasmaComponents.Label {
-        text: "Services"
-        font.bold: true
-        font.pixelSize: 10
-        opacity: 0.5
-        color: Kirigami.Theme.textColor
+    SubTabBar {
+        accent: rootItem.activeAccent
+        currentId: rootItem.settingsTab
+        tabs: [
+            {
+                id: "providers",
+                label: "Providers"
+            },
+            {
+                id: "appearance",
+                label: "Appearance"
+            },
+            {
+                id: "data",
+                label: "Data"
+            },
+            {
+                id: "advanced",
+                label: "Advanced"
+            }
+        ]
+        onSelected: id => rootItem.settingsTab = id
     }
 
-    // 2-column grid of toggles
-    GridLayout {
+    // ── Providers ───────────────────────────────────────────────
+    ColumnLayout {
         Layout.fillWidth: true
-        columns: 2
-        columnSpacing: 12
-        rowSpacing: 2
+        spacing: 2
+        visible: rootItem.settingsTab === "providers"
 
         Repeater {
-            // Labels and brand colours come from the provider registry in
-            // main.qml rather than being restated here, so a colour change
-            // cannot leave this dot disagreeing with the tab it represents.
+            // Labels, brand colours and key names all come from the provider
+            // registry in main.qml rather than being restated here, so adding a
+            // provider there is enough to make it configurable here.
             model: rootItem.providers
-            RowLayout {
-                spacing: 6
-                Rectangle {
-                    width: 7
-                    height: 7
-                    radius: 3.5
-                    color: modelData.color
-                    Layout.alignment: Qt.AlignVCenter
-                }
-                PlasmaComponents.Label {
-                    text: modelData.label
-                    font.pixelSize: 11
-                    color: Kirigami.Theme.textColor
-                    Layout.preferredWidth: 80
-                }
-                QQC2.Switch {
-                    implicitHeight: 20
-                    // Config key follows a fixed "<id>Enabled" convention for every
-                    // provider, so it can be looked up rather than enumerated.
-                    checked: Plasmoid.configuration[modelData.id + "Enabled"] || false
-                    onToggled: Plasmoid.configuration[modelData.id + "Enabled"] = checked
-                }
+
+            ProviderSettingRow {
+                required property var modelData
+                provider: modelData
+                rootItem: settingsPanelRoot.rootItem
             }
         }
-    }
 
-    RowLayout {
-        Layout.fillWidth: true
-        spacing: 6
-        Rectangle {
-            width: 7
-            height: 7
-            radius: 3.5
-            color: rootItem.weeklyColor
-            Layout.alignment: Qt.AlignVCenter
-        }
         PlasmaComponents.Label {
-            text: "Usage chart"
-            font.pixelSize: 11
-            color: Kirigami.Theme.textColor
-            Layout.preferredWidth: 80
-        }
-        QQC2.Switch {
-            implicitHeight: 20
-            checked: Plasmoid.configuration.showUsageChart
-            onToggled: Plasmoid.configuration.showUsageChart = checked
-        }
-    }
-
-    // Theme accent toggle
-    RowLayout {
-        Layout.fillWidth: true
-        spacing: 6
-        Rectangle {
-            width: 7
-            height: 7
-            radius: 3.5
-            color: Kirigami.Theme.highlightColor
-            Layout.alignment: Qt.AlignVCenter
-        }
-        PlasmaComponents.Label {
-            text: "Theme accent"
-            font.pixelSize: 11
-            color: Kirigami.Theme.textColor
-            Layout.preferredWidth: 80
-        }
-        QQC2.Switch {
-            implicitHeight: 20
-            checked: Plasmoid.configuration.useThemeAccent
-            onToggled: {
-                Plasmoid.configuration.useThemeAccent = checked;
-                rootItem.useThemeAccent = checked;
-            }
-        }
-        PlasmaComponents.Label {
-            text: "Use Plasma accent color"
+            Layout.fillWidth: true
+            Layout.topMargin: 4
+            text: "Expand a provider for its API key and options. Keys are optional wherever a local CLI login can be read instead."
             font.pixelSize: 9
-            opacity: 0.45
+            opacity: 0.4
             color: Kirigami.Theme.textColor
-            Layout.fillWidth: true
-            elide: Text.ElideRight
-        }
-    }
-
-    // Poll interval
-    RowLayout {
-        Layout.fillWidth: true
-        spacing: 6
-        Rectangle {
-            width: 7
-            height: 7
-            radius: 3.5
-            color: Qt.rgba(1, 1, 1, 0.3)
-            Layout.alignment: Qt.AlignVCenter
-        }
-        PlasmaComponents.Label {
-            text: "Refresh"
-            font.pixelSize: 11
-            color: Kirigami.Theme.textColor
-            Layout.preferredWidth: 80
-        }
-        QQC2.ComboBox {
-            id: pollCombo
-            implicitHeight: 24
-            Layout.preferredWidth: 120
-            font.pixelSize: 10
-            readonly property var secs: [60, 120, 300, 600, 900, 1800]
-            model: ["1 min", "2 min", "5 min", "10 min", "15 min", "30 min"]
-            currentIndex: Math.max(0, secs.indexOf(Plasmoid.configuration.pollIntervalSec || 300))
-            onActivated: {
-                var s = secs[currentIndex];
-                Plasmoid.configuration.pollIntervalSec = s;
-                rootItem.pollIntervalSec = s;
-            }
-        }
-        Item {
-            Layout.fillWidth: true
+            wrapMode: Text.WordWrap
         }
     }
 
     // ── Appearance ──────────────────────────────────────────────
-    Rectangle {
-        Layout.fillWidth: true
-        height: 1
-        color: Qt.rgba(1, 1, 1, 0.08)
-    }
-    PlasmaComponents.Label {
-        text: "Appearance"
-        font.bold: true
-        font.pixelSize: 10
-        opacity: 0.5
-        color: Kirigami.Theme.textColor
-    }
-
-    // Grid of appearance settings
-    GridLayout {
-        Layout.fillWidth: true
-        columns: 3
-        columnSpacing: 8
-        rowSpacing: 6
-
-        // Row 1: Popup Background Color & Opacity
-        PlasmaComponents.Label {
-            text: "Popup BG"
-            font.pixelSize: 11
-            color: Kirigami.Theme.textColor
-            Layout.preferredWidth: 80
-        }
-        RowLayout {
-            spacing: 4
-            Layout.fillWidth: true
-            Rectangle {
-                width: 12
-                height: 12
-                radius: 2
-                color: rootItem.resolvedPopupBg
-                border.width: 1
-                border.color: Qt.rgba(1, 1, 1, 0.2)
-
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    hoverEnabled: true
-                    onClicked: {
-                        rootItem.openColorDialog("popup", rootItem.popupBgColor);
-                    }
-                    QQC2.ToolTip.delay: 400
-                    QQC2.ToolTip.visible: containsMouse
-                    QQC2.ToolTip.text: "Click to open color picker"
-                }
-            }
-            QQC2.TextField {
-                text: Plasmoid.configuration.popupBgColor || "#000000"
-                placeholderText: "#000000"
-                implicitHeight: 22
-                Layout.fillWidth: true
-                font.pixelSize: 9
-                onTextEdited: {
-                    if (/^#[0-9A-Fa-f]{6}$/.test(text)) {
-                        Plasmoid.configuration.popupBgColor = text;
-                        rootItem.popupBgColor = text;
-                    }
-                }
-            }
-        }
-        RowLayout {
-            spacing: 4
-            PlasmaComponents.Label {
-                text: "Opacity:"
-                font.pixelSize: 10
-                opacity: 0.6
-            }
-            QQC2.TextField {
-                text: Math.round(rootItem.popupBgOpacity * 100)
-                placeholderText: "0"
-                implicitHeight: 22
-                Layout.preferredWidth: 32
-                font.pixelSize: 9
-                validator: IntValidator {
-                    bottom: 0
-                    top: 100
-                }
-                onTextEdited: {
-                    var val = parseInt(text);
-                    if (!isNaN(val) && val >= 0 && val <= 100) {
-                        var opacityVal = val / 100.0;
-                        Plasmoid.configuration.popupBgOpacity = opacityVal;
-                        rootItem.popupBgOpacity = opacityVal;
-                    }
-                }
-            }
-            PlasmaComponents.Label {
-                text: "%"
-                font.pixelSize: 10
-                opacity: 0.6
-            }
-        }
-
-        // Row 2: Card Background Color & Opacity
-        PlasmaComponents.Label {
-            text: "Card BG"
-            font.pixelSize: 11
-            color: Kirigami.Theme.textColor
-            Layout.preferredWidth: 80
-        }
-        RowLayout {
-            spacing: 4
-            Layout.fillWidth: true
-            Rectangle {
-                width: 12
-                height: 12
-                radius: 2
-                color: rootItem.resolvedCardBg
-                border.width: 1
-                border.color: Qt.rgba(1, 1, 1, 0.2)
-
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    hoverEnabled: true
-                    onClicked: {
-                        rootItem.openColorDialog("card", rootItem.cardBgColor);
-                    }
-                    QQC2.ToolTip.delay: 400
-                    QQC2.ToolTip.visible: containsMouse
-                    QQC2.ToolTip.text: "Click to open color picker"
-                }
-            }
-            QQC2.TextField {
-                text: Plasmoid.configuration.cardBgColor || "#100a1a"
-                placeholderText: "#100a1a"
-                implicitHeight: 22
-                Layout.fillWidth: true
-                font.pixelSize: 9
-                onTextEdited: {
-                    if (/^#[0-9A-Fa-f]{6}$/.test(text)) {
-                        Plasmoid.configuration.cardBgColor = text;
-                        rootItem.cardBgColor = text;
-                    }
-                }
-            }
-        }
-        RowLayout {
-            spacing: 4
-            PlasmaComponents.Label {
-                text: "Opacity:"
-                font.pixelSize: 10
-                opacity: 0.6
-            }
-            QQC2.TextField {
-                text: Math.round(rootItem.cardBgOpacity * 100)
-                placeholderText: "90"
-                implicitHeight: 22
-                Layout.preferredWidth: 32
-                font.pixelSize: 9
-                validator: IntValidator {
-                    bottom: 0
-                    top: 100
-                }
-                onTextEdited: {
-                    var val = parseInt(text);
-                    if (!isNaN(val) && val >= 0 && val <= 100) {
-                        var opacityVal = val / 100.0;
-                        Plasmoid.configuration.cardBgOpacity = opacityVal;
-                        rootItem.cardBgOpacity = opacityVal;
-                    }
-                }
-            }
-            PlasmaComponents.Label {
-                text: "%"
-                font.pixelSize: 10
-            }
-        }
-
-        // Row 3: Widget Background Style
-        PlasmaComponents.Label {
-            text: "Bg Style"
-            font.pixelSize: 11
-            color: Kirigami.Theme.textColor
-            Layout.preferredWidth: 80
-        }
-        QQC2.ComboBox {
-            Layout.columnSpan: 2
-            Layout.fillWidth: true
-            implicitHeight: 22
-            font.pixelSize: 10
-            model: ["Plasma Native", "Translucent (Flat)", "Glassmorphic (Shadow + Blur)"]
-            currentIndex: {
-                var val = rootItem.backgroundHints;
-                if (val === 0)
-                    return 0;
-                if (val === 1)
-                    return 1;
-                if (val === 2)
-                    return 2;
-                return 1;
-            }
-            onActivated: {
-                var hints = 1;
-                if (index === 0)
-                    hints = 0;
-                else if (index === 1)
-                    hints = 1;
-                else if (index === 2)
-                    hints = 2;
-                Plasmoid.configuration.backgroundHints = hints;
-                rootItem.backgroundHints = hints;
-            }
-        }
-    }
-
-    // History export / import
-    RowLayout {
-        Layout.fillWidth: true
-        spacing: 6
-        Rectangle {
-            width: 7
-            height: 7
-            radius: 3.5
-            color: rootItem.activeAccent
-            Layout.alignment: Qt.AlignVCenter
-        }
-        PlasmaComponents.Label {
-            text: "History"
-            font.pixelSize: 11
-            color: Kirigami.Theme.textColor
-            Layout.preferredWidth: 80
-        }
-        PlasmaComponents.Button {
-            text: "Export"
-            icon.name: "document-export"
-            implicitHeight: 26
-            font.pixelSize: 10
-            onClicked: rootItem.exportHistory()
-        }
-        PlasmaComponents.Button {
-            text: "Import"
-            icon.name: "document-import"
-            implicitHeight: 26
-            font.pixelSize: 10
-            onClicked: rootItem.importHistory()
-        }
-        Item {
-            Layout.fillWidth: true
-        }
-    }
-
-    PlasmaComponents.Label {
-        visible: rootItem.historyIOMsg !== ""
-        text: rootItem.historyIOMsg
-        font.pixelSize: 9
-        opacity: 0.6
-        color: Kirigami.Theme.textColor
-        Layout.fillWidth: true
-        wrapMode: Text.WordWrap
-    }
-
-    Rectangle {
-        Layout.fillWidth: true
-        height: 1
-        color: Qt.rgba(1, 1, 1, 0.08)
-    }
-
-    // ── API Keys ───────────────────────────────────────────────
-    PlasmaComponents.Label {
-        text: "API Keys"
-        font.bold: true
-        font.pixelSize: 10
-        opacity: 0.5
-        color: Kirigami.Theme.textColor
-    }
-
     ColumnLayout {
         Layout.fillWidth: true
-        spacing: 3
-        KeyRow {
-            label: "Claude Admin"
-            placeholder: "sk-ant-api03-…"
-            configKey: "claudeAdminApiKey"
-        }
-        KeyRow {
-            label: "OpenAI API"
-            placeholder: "sk-proj-…"
-            configKey: "openaiApiKey"
-        }
-        KeyRow {
-            label: "Mistral"
-            placeholder: "or $MISTRAL_API_KEY"
-            configKey: "mistralApiKey"
-            rowVisible: Plasmoid.configuration.mistralEnabled
-        }
-        KeyRow {
-            label: "OpenRouter"
-            placeholder: "or $OPENROUTER_API_KEY"
-            configKey: "openrouterApiKey"
-            rowVisible: Plasmoid.configuration.openrouterEnabled
-        }
-        KeyRow {
-            label: "Grok / xAI"
-            placeholder: "or $GROK_API_KEY"
-            configKey: "grokApiKey"
-            rowVisible: Plasmoid.configuration.grokEnabled
-        }
-        KeyRow {
-            label: "Z.AI Token"
-            placeholder: "or $ZAI_TOKEN"
-            configKey: "zaiToken"
-            rowVisible: Plasmoid.configuration.zaiEnabled
-        }
-        KeyRow {
-            label: "GitHub Token"
-            placeholder: "optional — gh/Copilot login is used"
-            configKey: "githubToken"
-            rowVisible: Plasmoid.configuration.copilotEnabled
-        }
-        KeyRow {
-            label: "DeepSeek"
-            placeholder: "or $DEEPSEEK_API_KEY"
-            configKey: "deepseekApiKey"
-            rowVisible: Plasmoid.configuration.deepseekEnabled
-        }
-        KeyRow {
-            label: "Kimi / Moonshot"
-            placeholder: "or $MOONSHOT_API_KEY"
-            configKey: "moonshotApiKey"
-            rowVisible: Plasmoid.configuration.kimiEnabled
-        }
+        spacing: 6
+        visible: rootItem.settingsTab === "appearance"
+
         RowLayout {
             Layout.fillWidth: true
-            spacing: 4
-            visible: Plasmoid.configuration.copilotEnabled
-
+            spacing: 6
+            Rectangle {
+                width: 7
+                height: 7
+                radius: 3.5
+                color: rootItem.weeklyColor
+                Layout.alignment: Qt.AlignVCenter
+            }
             PlasmaComponents.Label {
-                text: "Copilot Quota"
-                font.pixelSize: 10
-                opacity: 0.6
+                text: "Usage chart"
+                font.pixelSize: 11
                 color: Kirigami.Theme.textColor
-                Layout.preferredWidth: 76
-                elide: Text.ElideRight
+                Layout.preferredWidth: 82
             }
-            QQC2.TextField {
-                text: Plasmoid.configuration.copilotQuota !== undefined && Plasmoid.configuration.copilotQuota !== null ? Plasmoid.configuration.copilotQuota.toString() : "300"
-                placeholderText: "300"
-                implicitHeight: 26
-                Layout.preferredWidth: 64
-                font.pixelSize: 10
-                validator: RegularExpressionValidator {
-                    regularExpression: /^[0-9]*$/
-                }
-                onEditingFinished: {
-                    var val = parseInt(text);
-                    if (isNaN(val))
-                        val = 300;
-                    Plasmoid.configuration.copilotQuota = val;
-                    text = val.toString();
-                }
+            QQC2.Switch {
+                implicitHeight: 20
+                checked: Plasmoid.configuration.showUsageChart
+                onToggled: Plasmoid.configuration.showUsageChart = checked
             }
             PlasmaComponents.Label {
-                text: "fallback if the plan reports none"
+                text: "History graph in the popup"
                 font.pixelSize: 9
                 opacity: 0.45
                 color: Kirigami.Theme.textColor
@@ -520,129 +106,444 @@ ColumnLayout {
                 elide: Text.ElideRight
             }
         }
-    }
-
-    Rectangle {
-        Layout.fillWidth: true
-        height: 1
-        color: Qt.rgba(1, 1, 1, 0.08)
-    }
-
-    // ── Advanced ───────────────────────────────────────────────
-    PlasmaComponents.Label {
-        text: "Advanced"
-        font.bold: true
-        font.pixelSize: 10
-        opacity: 0.5
-        color: Kirigami.Theme.textColor
-    }
-
-    ColumnLayout {
-        Layout.fillWidth: true
-        spacing: 3
 
         RowLayout {
             Layout.fillWidth: true
-            spacing: 4
-
+            spacing: 6
+            Rectangle {
+                width: 7
+                height: 7
+                radius: 3.5
+                color: Kirigami.Theme.highlightColor
+                Layout.alignment: Qt.AlignVCenter
+            }
             PlasmaComponents.Label {
-                text: "Python"
-                font.pixelSize: 10
-                opacity: 0.6
+                text: "Theme accent"
+                font.pixelSize: 11
                 color: Kirigami.Theme.textColor
-                Layout.preferredWidth: 76
+                Layout.preferredWidth: 82
+            }
+            QQC2.Switch {
+                implicitHeight: 20
+                checked: Plasmoid.configuration.useThemeAccent
+                onToggled: {
+                    Plasmoid.configuration.useThemeAccent = checked;
+                    rootItem.useThemeAccent = checked;
+                }
+            }
+            PlasmaComponents.Label {
+                text: "Use Plasma accent color"
+                font.pixelSize: 9
+                opacity: 0.45
+                color: Kirigami.Theme.textColor
+                Layout.fillWidth: true
                 elide: Text.ElideRight
             }
-            QQC2.TextField {
-                id: pythonPathField
+        }
 
-                text: Plasmoid.configuration.pythonPath || ""
-                placeholderText: "auto-detect"
-                implicitHeight: 26
+        GridLayout {
+            Layout.fillWidth: true
+            Layout.topMargin: 2
+            columns: 3
+            columnSpacing: 8
+            rowSpacing: 6
+
+            // Row 1: Popup Background Color & Opacity
+            PlasmaComponents.Label {
+                text: "Popup BG"
+                font.pixelSize: 11
+                color: Kirigami.Theme.textColor
+                Layout.preferredWidth: 82
+            }
+            RowLayout {
+                spacing: 4
                 Layout.fillWidth: true
-                font.pixelSize: 10
-                // Exported as $PYTHON3 to the shell tools; empty restores the
-                // built-in PATH search (python3 → python3.x → python).
-                onEditingFinished: {
-                    var val = String(text).trim();
-                    if (val === Plasmoid.configuration.pythonPath)
-                        return;
+                Rectangle {
+                    width: 12
+                    height: 12
+                    radius: 2
+                    color: rootItem.resolvedPopupBg
+                    border.width: 1
+                    border.color: Qt.rgba(1, 1, 1, 0.2)
 
-                    Plasmoid.configuration.pythonPath = val;
-                    text = val;
-                    // Re-run immediately so a wrong path shows up as an error
-                    // here rather than at the next poll, minutes later.
-                    rootItem.refresh();
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        hoverEnabled: true
+                        onClicked: {
+                            rootItem.openColorDialog("popup", rootItem.popupBgColor);
+                        }
+                        QQC2.ToolTip.delay: 400
+                        QQC2.ToolTip.visible: containsMouse
+                        QQC2.ToolTip.text: "Click to open color picker"
+                    }
+                }
+                QQC2.TextField {
+                    text: Plasmoid.configuration.popupBgColor || "#000000"
+                    placeholderText: "#000000"
+                    implicitHeight: 22
+                    Layout.fillWidth: true
+                    font.pixelSize: 9
+                    onTextEdited: {
+                        if (/^#[0-9A-Fa-f]{6}$/.test(text)) {
+                            Plasmoid.configuration.popupBgColor = text;
+                            rootItem.popupBgColor = text;
+                        }
+                    }
+                }
+            }
+            RowLayout {
+                spacing: 4
+                PlasmaComponents.Label {
+                    text: "Opacity:"
+                    font.pixelSize: 10
+                    opacity: 0.6
+                }
+                QQC2.TextField {
+                    text: Math.round(rootItem.popupBgOpacity * 100)
+                    placeholderText: "0"
+                    implicitHeight: 22
+                    Layout.preferredWidth: 32
+                    font.pixelSize: 9
+                    validator: IntValidator {
+                        bottom: 0
+                        top: 100
+                    }
+                    onTextEdited: {
+                        var val = parseInt(text);
+                        if (!isNaN(val) && val >= 0 && val <= 100) {
+                            var opacityVal = val / 100.0;
+                            Plasmoid.configuration.popupBgOpacity = opacityVal;
+                            rootItem.popupBgOpacity = opacityVal;
+                        }
+                    }
+                }
+                PlasmaComponents.Label {
+                    text: "%"
+                    font.pixelSize: 10
+                    opacity: 0.6
+                }
+            }
+
+            // Row 2: Card Background Color & Opacity
+            PlasmaComponents.Label {
+                text: "Card BG"
+                font.pixelSize: 11
+                color: Kirigami.Theme.textColor
+                Layout.preferredWidth: 82
+            }
+            RowLayout {
+                spacing: 4
+                Layout.fillWidth: true
+                Rectangle {
+                    width: 12
+                    height: 12
+                    radius: 2
+                    color: rootItem.resolvedCardBg
+                    border.width: 1
+                    border.color: Qt.rgba(1, 1, 1, 0.2)
+
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        hoverEnabled: true
+                        onClicked: {
+                            rootItem.openColorDialog("card", rootItem.cardBgColor);
+                        }
+                        QQC2.ToolTip.delay: 400
+                        QQC2.ToolTip.visible: containsMouse
+                        QQC2.ToolTip.text: "Click to open color picker"
+                    }
+                }
+                QQC2.TextField {
+                    text: Plasmoid.configuration.cardBgColor || "#100a1a"
+                    placeholderText: "#100a1a"
+                    implicitHeight: 22
+                    Layout.fillWidth: true
+                    font.pixelSize: 9
+                    onTextEdited: {
+                        if (/^#[0-9A-Fa-f]{6}$/.test(text)) {
+                            Plasmoid.configuration.cardBgColor = text;
+                            rootItem.cardBgColor = text;
+                        }
+                    }
+                }
+            }
+            RowLayout {
+                spacing: 4
+                PlasmaComponents.Label {
+                    text: "Opacity:"
+                    font.pixelSize: 10
+                    opacity: 0.6
+                }
+                QQC2.TextField {
+                    text: Math.round(rootItem.cardBgOpacity * 100)
+                    placeholderText: "90"
+                    implicitHeight: 22
+                    Layout.preferredWidth: 32
+                    font.pixelSize: 9
+                    validator: IntValidator {
+                        bottom: 0
+                        top: 100
+                    }
+                    onTextEdited: {
+                        var val = parseInt(text);
+                        if (!isNaN(val) && val >= 0 && val <= 100) {
+                            var opacityVal = val / 100.0;
+                            Plasmoid.configuration.cardBgOpacity = opacityVal;
+                            rootItem.cardBgOpacity = opacityVal;
+                        }
+                    }
+                }
+                PlasmaComponents.Label {
+                    text: "%"
+                    font.pixelSize: 10
+                }
+            }
+
+            // Row 3: Widget Background Style
+            PlasmaComponents.Label {
+                text: "Bg Style"
+                font.pixelSize: 11
+                color: Kirigami.Theme.textColor
+                Layout.preferredWidth: 82
+            }
+            QQC2.ComboBox {
+                Layout.columnSpan: 2
+                Layout.fillWidth: true
+                implicitHeight: 22
+                font.pixelSize: 10
+                model: ["Plasma Native", "Translucent (Flat)", "Glassmorphic (Shadow + Blur)"]
+                currentIndex: {
+                    var val = rootItem.backgroundHints;
+                    if (val === 0)
+                        return 0;
+                    if (val === 1)
+                        return 1;
+                    if (val === 2)
+                        return 2;
+                    return 1;
+                }
+                onActivated: {
+                    var hints = 1;
+                    if (index === 0)
+                        hints = 0;
+                    else if (index === 1)
+                        hints = 1;
+                    else if (index === 2)
+                        hints = 2;
+                    Plasmoid.configuration.backgroundHints = hints;
+                    rootItem.backgroundHints = hints;
                 }
             }
         }
-        PlasmaComponents.Label {
-            text: "Interpreter for the backend — e.g. a venv's bin/python. Empty auto-detects from PATH."
-            font.pixelSize: 9
-            opacity: 0.45
-            color: Kirigami.Theme.textColor
-            Layout.fillWidth: true
-            wrapMode: Text.WordWrap
-        }
     }
 
-    // ── Terminal ───────────────────────────────────────────────
-    PlasmaComponents.Label {
-        text: "Terminal"
-        font.bold: true
-        font.pixelSize: 10
-        opacity: 0.5
-        color: Kirigami.Theme.textColor
-    }
-
+    // ── Data ────────────────────────────────────────────────────
     ColumnLayout {
         Layout.fillWidth: true
-        spacing: 3
+        spacing: 6
+        visible: rootItem.settingsTab === "data"
 
         RowLayout {
             Layout.fillWidth: true
-            spacing: 4
-
+            spacing: 6
+            Rectangle {
+                width: 7
+                height: 7
+                radius: 3.5
+                color: Qt.rgba(1, 1, 1, 0.3)
+                Layout.alignment: Qt.AlignVCenter
+            }
             PlasmaComponents.Label {
-                text: "Command"
-                font.pixelSize: 10
-                opacity: 0.6
+                text: "Refresh"
+                font.pixelSize: 11
                 color: Kirigami.Theme.textColor
-                Layout.preferredWidth: 76
+                Layout.preferredWidth: 82
+            }
+            QQC2.ComboBox {
+                id: pollCombo
+                implicitHeight: 24
+                Layout.preferredWidth: 120
+                font.pixelSize: 10
+                readonly property var secs: [60, 120, 300, 600, 900, 1800]
+                model: ["1 min", "2 min", "5 min", "10 min", "15 min", "30 min"]
+                currentIndex: Math.max(0, secs.indexOf(Plasmoid.configuration.pollIntervalSec || 300))
+                onActivated: {
+                    var s = secs[currentIndex];
+                    Plasmoid.configuration.pollIntervalSec = s;
+                    rootItem.pollIntervalSec = s;
+                }
+            }
+            PlasmaComponents.Label {
+                text: "How often usage is re-read"
+                font.pixelSize: 9
+                opacity: 0.45
+                color: Kirigami.Theme.textColor
+                Layout.fillWidth: true
                 elide: Text.ElideRight
             }
-            QQC2.TextField {
-                id: cliPathField
+        }
 
-                // Resolved at runtime like every other tool path, so it stays
-                // correct wherever the plasmoid is installed.
-                readOnly: true
-                text: rootItem.scriptDir + "ai-usage-cli"
-                implicitHeight: 26
-                Layout.fillWidth: true
-                font.pixelSize: 10
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 6
+            Rectangle {
+                width: 7
+                height: 7
+                radius: 3.5
+                color: rootItem.activeAccent
+                Layout.alignment: Qt.AlignVCenter
+            }
+            PlasmaComponents.Label {
+                text: "History"
+                font.pixelSize: 11
+                color: Kirigami.Theme.textColor
+                Layout.preferredWidth: 82
             }
             PlasmaComponents.Button {
-                text: "Copy"
-                icon.name: "edit-copy"
+                text: "Export"
+                icon.name: "document-export"
                 implicitHeight: 26
                 font.pixelSize: 10
-                // QML has no clipboard API without a C++ helper; selecting the
-                // read-only field and copying it is the portable way.
-                onClicked: {
-                    cliPathField.selectAll();
-                    cliPathField.copy();
-                    cliPathField.deselect();
-                }
+                onClicked: rootItem.exportHistory()
+            }
+            PlasmaComponents.Button {
+                text: "Import"
+                icon.name: "document-import"
+                implicitHeight: 26
+                font.pixelSize: 10
+                onClicked: rootItem.importHistory()
+            }
+            Item {
+                Layout.fillWidth: true
             }
         }
+
         PlasmaComponents.Label {
-            text: "Same data as this popup, as a table in a shell. Link it into ~/.local/bin to run it as ai-usage-cli, or pass --compact for one status-bar line."
+            visible: rootItem.historyIOMsg !== ""
+            text: rootItem.historyIOMsg
             font.pixelSize: 9
-            opacity: 0.45
+            opacity: 0.6
             color: Kirigami.Theme.textColor
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
+        }
+
+        PlasmaComponents.Label {
+            text: "The chart's recorded history, as JSON — for a backup, or to carry it to another machine."
+            font.pixelSize: 9
+            opacity: 0.4
+            color: Kirigami.Theme.textColor
+            Layout.fillWidth: true
+            wrapMode: Text.WordWrap
+        }
+    }
+
+    // ── Advanced ────────────────────────────────────────────────
+    ColumnLayout {
+        Layout.fillWidth: true
+        spacing: 10
+        visible: rootItem.settingsTab === "advanced"
+
+        ColumnLayout {
+            Layout.fillWidth: true
+            spacing: 3
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 4
+
+                PlasmaComponents.Label {
+                    text: "Python"
+                    font.pixelSize: 10
+                    opacity: 0.6
+                    color: Kirigami.Theme.textColor
+                    Layout.preferredWidth: 76
+                    elide: Text.ElideRight
+                }
+                QQC2.TextField {
+                    id: pythonPathField
+
+                    text: Plasmoid.configuration.pythonPath || ""
+                    placeholderText: "auto-detect"
+                    implicitHeight: 26
+                    Layout.fillWidth: true
+                    font.pixelSize: 10
+                    // Exported as $PYTHON3 to the shell tools; empty restores the
+                    // built-in PATH search (python3 → python3.x → python).
+                    onEditingFinished: {
+                        var val = String(text).trim();
+                        if (val === Plasmoid.configuration.pythonPath)
+                            return;
+
+                        Plasmoid.configuration.pythonPath = val;
+                        text = val;
+                        // Re-run immediately so a wrong path shows up as an error
+                        // here rather than at the next poll, minutes later.
+                        rootItem.refresh();
+                    }
+                }
+            }
+            PlasmaComponents.Label {
+                text: "Interpreter for the backend — e.g. a venv's bin/python. Empty auto-detects from PATH."
+                font.pixelSize: 9
+                opacity: 0.45
+                color: Kirigami.Theme.textColor
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+            }
+        }
+
+        ColumnLayout {
+            Layout.fillWidth: true
+            spacing: 3
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 4
+
+                PlasmaComponents.Label {
+                    text: "Terminal"
+                    font.pixelSize: 10
+                    opacity: 0.6
+                    color: Kirigami.Theme.textColor
+                    Layout.preferredWidth: 76
+                    elide: Text.ElideRight
+                }
+                QQC2.TextField {
+                    id: cliPathField
+
+                    // Resolved at runtime like every other tool path, so it stays
+                    // correct wherever the plasmoid is installed.
+                    readOnly: true
+                    text: rootItem.scriptDir + "ai-usage-cli"
+                    implicitHeight: 26
+                    Layout.fillWidth: true
+                    font.pixelSize: 10
+                }
+                PlasmaComponents.Button {
+                    text: "Copy"
+                    icon.name: "edit-copy"
+                    implicitHeight: 26
+                    font.pixelSize: 10
+                    // QML has no clipboard API without a C++ helper; selecting the
+                    // read-only field and copying it is the portable way.
+                    onClicked: {
+                        cliPathField.selectAll();
+                        cliPathField.copy();
+                        cliPathField.deselect();
+                    }
+                }
+            }
+            PlasmaComponents.Label {
+                text: "Same data as this popup, as a table in a shell. Link it into ~/.local/bin to run it as ai-usage-cli, or pass --compact for one status-bar line."
+                font.pixelSize: 9
+                opacity: 0.45
+                color: Kirigami.Theme.textColor
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+            }
         }
     }
 }

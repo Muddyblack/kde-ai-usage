@@ -321,12 +321,58 @@ PlasmoidItem {
     property real kimiVoucherBalance: 0
     property real kimiCashBalance: 0
     property string kimiError: ""
+    // ── Muse data ───────────────────────────────────────────────────────────
+    // Muse Code. No quota properties: Meta reports the plan windows only on a
+    // billed model call, so the widget never asks (see providers/muse.py).
+    property bool museHasLogin: false
+    property string museEmail: ""
+    property string museFullName: ""
+    property string museModel: ""
+    property real museTotalTokens: 0
+    property real museInputTokens: 0
+    property real museOutputTokens: 0
+    property real museCostUSD: 0
+    // The catalog states its own currency, so the estimate is not USD by
+    // definition — keep what the backend reported rather than assuming.
+    property string museCurrency: "USD"
+    property real museModelCalls: 0
+    property string museError: ""
+    // Plan windows: only present when the user switched the billed call on.
+    property bool museQuotaOn: Plasmoid.configuration.museQuotaEnabled === true
+    property string museQuotaError: ""
+    property bool museCurrentAvailable: false
+    property real museCurrentPct: 0
+    property var museCurrentResetDate: null
+    property string museCurrentCountdown: ""
+    property bool museWeeklyAvailable: false
+    property real museWeeklyPct: 0
+    property var museWeeklyResetDate: null
+    property string museWeeklyCountdown: ""
+    // Muse CLI local activity.
+    property real museStatsTotalSessions: 0
+    property real museStatsSubagentSessions: 0
+    property real museStatsTotalMessages: 0
+    property real museStatsTotalToolCalls: 0
+    property real museStatsActiveDays: 0
+    property real museStatsSpanDays: 0
+    property real museStatsCurrentStreak: 0
+    property real museStatsLongestStreak: 0
+    property real museStatsLongestSessionMs: 0
+    property real museStatsLongestSessionMessages: 0
+    property real museStatsPeakHour: -1
+    property string museStatsFirstDate: ""
+    property var museStatsModels: ({})
+    property var museStatsDailyTokens: []
+    property var museStatsTopWorkspaces: []
     // ── Common ────────────────────────────────────────────────────────────────
     property string errorMsg: ""
     property bool stale: false
     property string lastUpdate: ""
     property int backoffMs: 0
     property bool showSettings: false
+    // Which settings section is on screen. Session-only on purpose: the panel
+    // always opens on Providers, the section people come here for.
+    property string settingsTab: "providers"
     property bool showUsageChart: Plasmoid.configuration.showUsageChart
     // Unified usage history: array of {t, s, w, cp, cw}.
     // s=Claude session%, w=Claude weekly%, cp=Codex 5h%, cw=Codex weekly%.
@@ -429,6 +475,7 @@ PlasmoidItem {
     readonly property color copilotPurple: "#8b5cf6"
     readonly property color deepseekBlue: "#4f8cff"
     readonly property color kimiBlue: "#1e3a8a"
+    readonly property color museBlue: "#0064e0"
     readonly property color sessionColor: "#e05252"
     readonly property color weeklyColor: "#f5a623"
     readonly property color warningColor: "#ffa64d"
@@ -446,7 +493,9 @@ PlasmoidItem {
             id: "claude",
             label: "Claude",
             color: root.claudeOrange,
-            icon: "claude-color.svg"
+            icon: "claude-color.svg",
+            keyConfig: "claudeAdminApiKey",
+            keyPlaceholder: "sk-ant-api03-…"
         },
         {
             id: "antigravity",
@@ -458,7 +507,9 @@ PlasmoidItem {
             id: "openai",
             label: "OpenAI",
             color: root.openaiGreen,
-            icon: "openai.svg"
+            icon: "openai.svg",
+            keyConfig: "openaiApiKey",
+            keyPlaceholder: "sk-proj-…"
         },
         {
             id: "kiro",
@@ -470,43 +521,65 @@ PlasmoidItem {
             id: "mistral",
             label: "Mistral",
             color: root.mistralOrange,
-            icon: "mistral-color.svg"
+            icon: "mistral-color.svg",
+            keyConfig: "mistralApiKey",
+            keyPlaceholder: "or $MISTRAL_API_KEY"
         },
         {
             id: "openrouter",
             label: "OpenRouter",
             color: root.openrouterPurple,
-            icon: "openrouter.svg"
+            icon: "openrouter.svg",
+            keyConfig: "openrouterApiKey",
+            keyPlaceholder: "or $OPENROUTER_API_KEY"
         },
         {
             id: "grok",
             label: "Grok",
             color: root.grokWhite,
-            icon: "grok.svg"
+            icon: "grok.svg",
+            keyConfig: "grokApiKey",
+            keyPlaceholder: "or $GROK_API_KEY"
         },
         {
             id: "zai",
             label: "Z.AI",
             color: root.zaiBlue,
-            icon: "zai.svg"
+            icon: "zai.svg",
+            keyConfig: "zaiToken",
+            keyPlaceholder: "or $ZAI_TOKEN"
         },
         {
             id: "copilot",
             label: "Copilot",
             color: root.copilotPurple,
-            icon: "copilot-color.svg"
+            icon: "copilot-color.svg",
+            keyConfig: "githubToken",
+            keyPlaceholder: "optional — gh/Copilot login is used"
         },
         {
             id: "deepseek",
             label: "DeepSeek",
             color: root.deepseekBlue,
-            icon: "deepseek-color.svg"
+            icon: "deepseek-color.svg",
+            keyConfig: "deepseekApiKey",
+            keyPlaceholder: "or $DEEPSEEK_API_KEY"
         },
         {
             id: "kimi",
             label: "Kimi",
             color: root.kimiBlue,
-            icon: "kimi.svg"
+            icon: "kimi.svg",
+            keyConfig: "moonshotApiKey",
+            keyPlaceholder: "or $MOONSHOT_API_KEY"
+        },
+        {
+            id: "muse",
+            label: "Muse",
+            color: root.museBlue,
+            icon: "muse-color.svg",
+            keyConfig: "museApiKey",
+            keyPlaceholder: "optional — the CLI login is used"
         }
     ]
 
@@ -1031,6 +1104,8 @@ PlasmoidItem {
         root.zaiTokenCountdown = root.formatCountdown(root.zaiTokenResetDate);
         root.zaiToolsCountdown = root.formatCountdown(root.zaiToolsResetDate);
         root.copilotCountdown = root.formatCountdown(root.copilotResetDate);
+        root.museCurrentCountdown = root.formatCountdown(root.museCurrentResetDate);
+        root.museWeeklyCountdown = root.formatCountdown(root.museWeeklyResetDate);
     }
 
     function usageColor(pct) {
@@ -1102,6 +1177,8 @@ PlasmoidItem {
         env += root.envAssign("WIDGET_GROK_API_KEY", Plasmoid.configuration.grokApiKey);
         env += root.envAssign("WIDGET_ZAI_TOKEN", Plasmoid.configuration.zaiToken);
         env += root.envAssign("WIDGET_GITHUB_TOKEN", Plasmoid.configuration.githubToken);
+        env += root.envAssign("WIDGET_MUSE_API_KEY", Plasmoid.configuration.museApiKey);
+        env += "WIDGET_MUSE_QUOTA=" + (Plasmoid.configuration.museQuotaEnabled === true ? "1" : "0") + " ";
         env += root.envAssign("WIDGET_DEEPSEEK_API_KEY", Plasmoid.configuration.deepseekApiKey);
         env += root.envAssign("WIDGET_MOONSHOT_API_KEY", Plasmoid.configuration.moonshotApiKey);
         var quota = parseInt(Plasmoid.configuration.copilotQuota || 300);
@@ -1188,6 +1265,8 @@ PlasmoidItem {
             root.applyDeepSeek(details, provider.error || "");
         else if (provider.id === "kimi")
             root.applyKimi(details, provider.error || "");
+        else if (provider.id === "muse")
+            root.applyMuse(details, provider.error || "");
     }
 
     function applyClaude(d) {
@@ -1489,6 +1568,45 @@ PlasmoidItem {
         root.kimiError = error;
     }
 
+    function applyMuse(d, error) {
+        root.museHasLogin = d.hasLogin === true;
+        root.museEmail = d.email || "";
+        root.museFullName = d.fullName || "";
+        root.museError = error;
+        var current = d.current || {};
+        var weekly = d.weekly || {};
+        root.museQuotaError = d.quotaError || "";
+        root.museCurrentAvailable = current.available === true;
+        root.museCurrentPct = current.pct || 0;
+        root.museCurrentResetDate = root.dateFromEpoch(current.resetAt);
+        root.museWeeklyAvailable = weekly.available === true;
+        root.museWeeklyPct = weekly.pct || 0;
+        root.museWeeklyResetDate = root.dateFromEpoch(weekly.resetAt);
+        var stats = d.stats || {};
+        root.museModel = stats.model || "";
+        root.museTotalTokens = stats.totalTokens || 0;
+        root.museInputTokens = stats.totalInputTokens || 0;
+        root.museOutputTokens = stats.totalOutputTokens || 0;
+        root.museCostUSD = stats.totalCostUSD || 0;
+        root.museCurrency = stats.currency || "USD";
+        root.museModelCalls = stats.totalModelCalls || 0;
+        root.museStatsTotalSessions = stats.totalSessions || 0;
+        root.museStatsSubagentSessions = stats.subagentSessions || 0;
+        root.museStatsTotalMessages = stats.totalMessages || 0;
+        root.museStatsTotalToolCalls = stats.totalToolCalls || 0;
+        root.museStatsActiveDays = stats.activeDays || 0;
+        root.museStatsSpanDays = stats.spanDays || 0;
+        root.museStatsCurrentStreak = stats.currentStreak || 0;
+        root.museStatsLongestStreak = stats.longestStreak || 0;
+        root.museStatsLongestSessionMs = stats.longestSessionMs || 0;
+        root.museStatsLongestSessionMessages = stats.longestSessionMessages || 0;
+        root.museStatsPeakHour = stats.peakHour === undefined ? -1 : stats.peakHour;
+        root.museStatsFirstDate = stats.firstDate || "";
+        root.museStatsModels = stats.models || ({});
+        root.museStatsDailyTokens = stats.dailySeries || [];
+        root.museStatsTopWorkspaces = stats.topWorkspaces || [];
+    }
+
     function refresh() {
         if (root.enabledTabs.length === 0)
             return;
@@ -1651,6 +1769,18 @@ PlasmoidItem {
             }
             if (root.deepseekError)
                 lines.push("⚠ " + root.deepseekError);
+        } else if (tab === "muse") {
+            lines.push("Muse" + (root.museModel ? " · " + root.museModel : ""));
+            if (root.museCurrentAvailable)
+                lines.push("Current: " + Math.round(root.museCurrentPct) + "%" + (root.museCurrentCountdown ? " (" + root.museCurrentCountdown + ")" : ""));
+            if (root.museWeeklyAvailable)
+                lines.push("Weekly: " + Math.round(root.museWeeklyPct) + "%");
+            if (root.museTotalTokens > 0)
+                lines.push(root.formatTokens(root.museTotalTokens) + " tokens · " + root.museStatsTotalSessions + " sessions");
+            if (root.museCostUSD > 0)
+                lines.push("Spend (est.): " + root.formatMoney(root.museCostUSD, root.museCurrency));
+            if (root.museError)
+                lines.push("⚠ " + root.museError);
         }
         if (root.errorMsg !== "")
             lines.push("⚠ " + root.errorMsg);
@@ -2079,6 +2209,20 @@ PlasmoidItem {
                 costText: root.kimiKeyValid ? root.formatMoney(root.kimiAvailableBalance, "USD") : "—"
                 tooltipText: "Kimi / Moonshot" + (root.kimiKeyValid ? "\nBalance: " + root.formatMoney(root.kimiAvailableBalance, "USD") + "\nVoucher: " + root.formatMoney(root.kimiVoucherBalance, "USD") + "\nCash: " + root.formatMoney(root.kimiCashBalance, "USD") : "\nNo Moonshot API key set")
             }
+
+            PanelSlot {
+                pct: root.museCurrentAvailable ? root.museCurrentPct : 0
+                iconColor: root.museBlue
+                iconSource: Qt.resolvedUrl("../icons/muse-color.svg")
+                iconText: "Mu"
+                stale: root.stale && root.panelShows("muse")
+                visible: root.panelShows("muse")
+                // With the billed quota off there is no percentage to fill, so
+                // the pill carries the lifetime total instead of an empty bar.
+                showCost: !root.museCurrentAvailable
+                costText: root.museTotalTokens > 0 ? root.formatTokens(root.museTotalTokens) : "—"
+                tooltipText: "Muse" + (root.museCurrentAvailable ? "\nCurrent: " + Math.round(root.museCurrentPct) + "%" + (root.museCurrentCountdown ? " (" + root.museCurrentCountdown + ")" : "") : "") + (root.museWeeklyAvailable ? "\nWeekly: " + Math.round(root.museWeeklyPct) + "%" : "") + (root.museModel ? "\n" + root.museModel : "") + (root.museTotalTokens > 0 ? "\n" + root.formatTokens(root.museTotalTokens) + " tokens · " + root.museStatsTotalSessions + " sessions" : "\nNo local sessions yet") + (root.museCostUSD > 0 ? "\nSpend (est.): " + root.formatMoney(root.museCostUSD, root.museCurrency) : "")
+            }
         }
     }
 
@@ -2107,6 +2251,12 @@ PlasmoidItem {
             }
 
             function onShowSettingsChanged() {
+                relayoutTimer.restart();
+            }
+
+            // A settings section swap changes the panel's height the same way a
+            // tab swap does, and the dialog needs the same nudge to shrink back.
+            function onSettingsTabChanged() {
                 relayoutTimer.restart();
             }
 
@@ -2328,7 +2478,20 @@ PlasmoidItem {
 
                     PlasmaComponents.Label {
                         visible: root.showSettings
-                        text: "Configure API keys and providers"
+                        // Names the section on screen, so the header says where
+                        // you are rather than repeating what the page is.
+                        text: {
+                            if (root.settingsTab === "appearance")
+                                return "Colors, chart and popup style";
+
+                            if (root.settingsTab === "data")
+                                return "Refresh interval and usage history";
+
+                            if (root.settingsTab === "advanced")
+                                return "Python interpreter and terminal tool";
+
+                            return "Turn providers on and set their keys";
+                        }
                         font.pixelSize: 10
                         opacity: 0.5
                         color: Kirigami.Theme.textColor
@@ -2588,6 +2751,10 @@ PlasmoidItem {
             }
 
             KimiTab {
+                rootItem: root
+            }
+
+            MuseTab {
                 rootItem: root
             }
 

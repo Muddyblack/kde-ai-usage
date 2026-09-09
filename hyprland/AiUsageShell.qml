@@ -51,7 +51,9 @@ ShellRoot {
         {
             id: "claude",
             label: "Claude",
-            accent: "#cc785c"
+            accent: "#cc785c",
+            keySetting: "claudeAdmin",
+            keyPlaceholder: "sk-ant-api03-…"
         },
         {
             id: "antigravity",
@@ -61,7 +63,9 @@ ShellRoot {
         {
             id: "openai",
             label: "OpenAI",
-            accent: "#10a37f"
+            accent: "#10a37f",
+            keySetting: "openai",
+            keyPlaceholder: "sk-proj-…"
         },
         {
             id: "kiro",
@@ -71,32 +75,51 @@ ShellRoot {
         {
             id: "mistral",
             label: "Mistral",
-            accent: "#ff7000"
+            accent: "#ff7000",
+            keySetting: "mistral",
+            keyPlaceholder: "or $MISTRAL_API_KEY"
         },
         {
             id: "openrouter",
             label: "OpenRouter",
-            accent: "#9333ea"
+            accent: "#9333ea",
+            keySetting: "openrouter",
+            keyPlaceholder: "or $OPENROUTER_API_KEY"
         },
         {
             id: "grok",
             label: "Grok",
-            accent: "#e6e6e6"
+            accent: "#e6e6e6",
+            keySetting: "grok",
+            keyPlaceholder: "optional; uses Grok CLI login"
         },
         {
             id: "zai",
             label: "Z.AI",
-            accent: "#126ef4"
+            accent: "#126ef4",
+            keySetting: "zai",
+            keyPlaceholder: "or $ZAI_TOKEN"
         },
         {
             id: "copilot",
             label: "Copilot",
-            accent: "#8b5cf6"
+            accent: "#8b5cf6",
+            keySetting: "github",
+            keyPlaceholder: "optional — gh/Copilot login is used"
         },
         {
             id: "deepseek",
             label: "DeepSeek",
-            accent: "#4f8cff"
+            accent: "#4f8cff",
+            keySetting: "deepseek",
+            keyPlaceholder: "or $DEEPSEEK_API_KEY"
+        },
+        {
+            id: "muse",
+            label: "Muse",
+            accent: "#0064e0",
+            keySetting: "muse",
+            keyPlaceholder: "optional — the CLI login is used"
         }
     ]
 
@@ -106,6 +129,11 @@ ShellRoot {
             keys: {},
             pollSec: 300,
             showChart: true,
+            // The backend reads this straight out of the JSON, but it has to
+            // survive a round-trip through this object too: saveSettings()
+            // writes the whole thing back, so a field missing here is a field
+            // erased from the file by the next unrelated setting change.
+            museQuota: false,
             antigravityChartFilter: "both",
             pillMode: "always",
             position: "top-right",
@@ -205,6 +233,7 @@ ShellRoot {
                         keys: d.keys || {},
                         pollSec: d.pollSec || 300,
                         showChart: d.showChart !== false,
+                        museQuota: d.museQuota === true,
                         antigravityChartFilter: d.antigravityChartFilter || "both",
                         pillMode: d.pillMode || (d.floatingPill === false ? "tray" : "always"),
                         position: d.position || "top-right",
@@ -297,11 +326,11 @@ ShellRoot {
     property string chartGranularity: "7d"
 
     // Inner sub-tab for providers with activity stats (claude, openai,
-    // copilot): "usage" vs "stats"
+    // copilot, muse): "usage" vs "stats"
     property string activeSubTab: "usage"
     readonly property bool activeHasStats: {
         var p = activeProvider();
-        return p && (p.id === "claude" || p.id === "openai" || p.id === "copilot");
+        return p && (p.id === "claude" || p.id === "openai" || p.id === "copilot" || p.id === "muse");
     }
 
     function activeProvider() {
@@ -854,7 +883,21 @@ ShellRoot {
                                 }
                                 Text {
                                     visible: root.showSettings
-                                    text: "Providers, API keys and refresh"
+                                    // Names the section on screen, so the header
+                                    // says where you are rather than repeating
+                                    // what the page is.
+                                    text: {
+                                        if (settingsPage.section === "panel")
+                                            return "Pill, position and chart";
+
+                                        if (settingsPage.section === "data")
+                                            return "Refresh interval and usage history";
+
+                                        if (settingsPage.section === "advanced")
+                                            return "Python interpreter and terminal tool";
+
+                                        return "Turn providers on and set their keys";
+                                    }
                                     font.pixelSize: 10
                                     opacity: 0.5
                                     color: "#f8fafc"
@@ -928,6 +971,8 @@ ShellRoot {
 
                         // ── Settings page ────────────────────────────────────────────
                         SettingsPage {
+                            id: settingsPage
+
                             visible: root.showSettings
                             Layout.fillWidth: true
                             shell: root
@@ -1147,6 +1192,43 @@ ShellRoot {
                                     barColor: modelData.color || (root.activeId === "antigravity" && (modelData.key === "external" || modelData.key === "rest" || (modelData.label && modelData.label.indexOf("Claude") !== -1)) ? "#34a853" : root.activeAccent)
                                     showMeter: modelData.showMeter !== false
                                 }
+                            }
+
+                            // Muse is the only provider whose plan bars cost
+                            // money to fetch, so the tab says where they went
+                            // rather than looking like it failed to load.
+                            Text {
+                                readonly property string quotaError: root.activeProvider() ? (root.activeProvider().details.quotaError || "") : ""
+
+                                Layout.fillWidth: true
+                                visible: root.activeId === "muse" && quotaError !== ""
+                                text: {
+                                    if (quotaError === "disabled")
+                                        return "Plan quota is off: Meta reports it only on a billed model call. Everything above is read from Muse's own local files.";
+                                    if (quotaError === "rejected")
+                                        return "Plan quota: Meta refused the credential.";
+                                    if (quotaError === "unreachable")
+                                        return "Plan quota: could not reach Meta — the local numbers above are unaffected.";
+                                    if (quotaError === "no-credential")
+                                        return "Plan quota needs a Meta API key, or a `muse login` that stored one.";
+                                    if (quotaError === "no-model")
+                                        return "Plan quota needs a model: run Muse once so it caches its catalog.";
+                                    return "";
+                                }
+                                font.pixelSize: 9
+                                color: "#94a3b8"
+                                opacity: 0.8
+                                wrapMode: Text.WordWrap
+                            }
+
+                            Text {
+                                Layout.fillWidth: true
+                                visible: root.activeId === "muse" && root.activeProvider() && (root.activeProvider().details.quotaError || "") === "" && !(root.activeProvider().details.current || {}).available && !(root.activeProvider().details.weekly || {}).available
+                                text: "No plan windows on this account — pay-as-you-go has none."
+                                font.pixelSize: 9
+                                color: "#94a3b8"
+                                opacity: 0.8
+                                wrapMode: Text.WordWrap
                             }
                         }
 

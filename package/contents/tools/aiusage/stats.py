@@ -100,7 +100,7 @@ def activity_base(s, now, daily_series, unit, tool_calls=None):
 
 
 def claude_stats(s, now):
-    if s is None or not isinstance(s, dict) or len(s) == 0:
+    if not isinstance(s, dict) or not s:
         return {"available": False}
 
     usage = s.get("modelUsage") or {}
@@ -159,8 +159,70 @@ def claude_stats(s, now):
     return r
 
 
+def muse_stats(s, now):
+    """Normalize the providers/muse.py aggregate blob.
+
+    Muse is the only provider whose price list is on disk, so this is also the
+    only stats blob that can carry a cost it computed itself — the shared
+    "spend" tile renders it with no extra frontend code.
+    """
+    if not isinstance(s, dict) or num(s.get("totalSessions")) + num(s.get("subagentSessions")) == 0:
+        return {"available": False}
+
+    models = {}
+    favorite = ""
+    # Starts at zero, not -1: a model with no recorded output is never the
+    # "favourite", and Muse does not always record usage (see providers/muse.py).
+    favorite_total = 0
+    for key, e in (s.get("modelUsage") or {}).items():
+        e = e or {}
+        out = num(e.get("outputTokens"))
+        models[key] = {
+            "input": num(e.get("inputTokens")),
+            "output": out,
+            "cached": num(e.get("cachedTokens")),
+            "reasoning": num(e.get("reasoningTokens")),
+            "total": num(e.get("totalTokens")),
+            "sessions": num(e.get("sessions")),
+            "contextWindow": num(e.get("contextWindow")),
+            "cost": num(e.get("costUSD")),
+        }
+        # Output tokens, not the total: input is context resent on every call,
+        # so ranking by it would just name whichever model ran longest.
+        if out > favorite_total:
+            favorite, favorite_total = key, out
+
+    daily_tokens = [{"date": a.get("date") or "", "total": num(a.get("total"))} for a in (s.get("dailyModelTokens") or [])]
+    daily_tokens.sort(key=lambda a: a["date"])
+
+    workspaces = [w for w in (s.get("topWorkspaces") or []) if isinstance(w, dict)]
+
+    r = activity_base(s, now, daily_tokens, "tokens")
+    r.update(
+        {
+            "subagentSessions": num(s.get("subagentSessions")),
+            "totalTokens": num(s.get("totalTokens")),
+            "totalInputTokens": num(s.get("totalInputTokens")),
+            "totalOutputTokens": num(s.get("totalOutputTokens")),
+            "totalCachedTokens": num(s.get("totalCachedTokens")),
+            "totalReasoningTokens": num(s.get("totalReasoningTokens")),
+            "totalCostUSD": num(s.get("totalCostUSD")),
+            "totalModelCalls": num(s.get("totalModelCalls")),
+            "contextWindow": num(s.get("contextWindow")),
+            "workspaceCount": num(s.get("workspaceCount")),
+            "topWorkspaces": [{"name": w.get("name") or "", "sessions": num(w.get("sessions"))} for w in workspaces],
+            "favoriteModel": favorite,
+            "models": models,
+            "dailyTokens": daily_tokens,
+            "model": s.get("model") or "",
+            "currency": s.get("currency") or "USD",
+        }
+    )
+    return r
+
+
 def codex_stats(s, now):
-    if s is None or not isinstance(s, dict) or num(s.get("totalSessions")) == 0:
+    if not isinstance(s, dict) or num(s.get("totalSessions")) == 0:
         return {"available": False}
 
     usage = s.get("modelUsage") or {}
@@ -203,7 +265,7 @@ def copilot_stats(s, now):
     """The Copilot CLI records activity but no tokens, models or cost, so this
     fills in the activity half of the same shape and leaves the token tiles
     empty (see providers/copilot_stats.py)."""
-    if s is None or not isinstance(s, dict) or num(s.get("totalSessions")) == 0:
+    if not isinstance(s, dict) or num(s.get("totalSessions")) == 0:
         return {"available": False}
 
     activity = [a for a in (s.get("dailyActivity") or []) if isinstance(a, dict)]

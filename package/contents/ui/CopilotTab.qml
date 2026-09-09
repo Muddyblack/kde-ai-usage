@@ -134,84 +134,24 @@ ColumnLayout {
             tooltipText: "GitHub Copilot premium requests" + (rootItem.copilotCountdown !== "" ? "\nResets in " + rootItem.copilotCountdown : "")
         }
 
-        Rectangle {
-            Layout.fillWidth: true
-            height: copilotStatsCol.implicitHeight + 16
-            radius: 8
-            color: Qt.rgba(0.55, 0.36, 0.96, 0.08)
-            border.width: 1
-            border.color: Qt.rgba(0.55, 0.36, 0.96, 0.22)
-
-            ColumnLayout {
-                id: copilotStatsCol
-                anchors {
-                    left: parent.left
-                    right: parent.right
-                    top: parent.top
-                    margins: 12
+        StatValueCard {
+            accent: rootItem.copilotPurple
+            rows: [
+                {
+                    label: "Used",
+                    value: copilotTabRoot.fmtRequests(rootItem.copilotUsed),
+                    strong: true
+                },
+                {
+                    label: "Remaining",
+                    value: rootItem.copilotUnlimited ? "unlimited" : copilotTabRoot.fmtRequests(copilotTabRoot.remaining),
+                    valueColor: rootItem.copilotUnlimited ? Kirigami.Theme.textColor : rootItem.usageColor(rootItem.copilotPct)
+                },
+                {
+                    label: "Reset",
+                    value: rootItem.copilotCountdown !== "" ? rootItem.copilotCountdown : "next month"
                 }
-                spacing: 8
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
-
-                    PlasmaComponents.Label {
-                        text: "Used"
-                        font.pixelSize: 11
-                        opacity: 0.65
-                        color: Kirigami.Theme.textColor
-                        Layout.fillWidth: true
-                    }
-
-                    PlasmaComponents.Label {
-                        text: copilotTabRoot.fmtRequests(rootItem.copilotUsed)
-                        font.pixelSize: 14
-                        font.bold: true
-                        color: rootItem.copilotPurple
-                    }
-                }
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
-
-                    PlasmaComponents.Label {
-                        text: "Remaining"
-                        font.pixelSize: 11
-                        opacity: 0.65
-                        color: Kirigami.Theme.textColor
-                        Layout.fillWidth: true
-                    }
-
-                    PlasmaComponents.Label {
-                        text: rootItem.copilotUnlimited ? "unlimited" : copilotTabRoot.fmtRequests(copilotTabRoot.remaining)
-                        font.pixelSize: 12
-                        font.bold: true
-                        color: rootItem.copilotUnlimited ? Kirigami.Theme.textColor : rootItem.usageColor(rootItem.copilotPct)
-                    }
-                }
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
-
-                    PlasmaComponents.Label {
-                        text: "Reset"
-                        font.pixelSize: 11
-                        opacity: 0.65
-                        color: Kirigami.Theme.textColor
-                        Layout.fillWidth: true
-                    }
-
-                    PlasmaComponents.Label {
-                        text: rootItem.copilotCountdown !== "" ? rootItem.copilotCountdown : "next month"
-                        font.pixelSize: 12
-                        color: Kirigami.Theme.textColor
-                        opacity: 0.85
-                    }
-                }
-            }
+            ]
         }
     }
 
@@ -320,39 +260,10 @@ ColumnLayout {
             formatValue: rootItem.formatTokens
         }
 
-        // ── Busiest repositories ───────────────────────────────────────────
-        ColumnLayout {
-            Layout.fillWidth: true
-            spacing: 3
-            visible: rootItem.copilotStatsTopRepositories.length > 0
-
-            PlasmaComponents.Label {
-                text: "Top repositories"
-                font.pixelSize: 9
-                opacity: 0.45
-                color: Kirigami.Theme.textColor
-            }
-            Repeater {
-                model: rootItem.copilotStatsTopRepositories
-                RowLayout {
-                    required property var modelData
-                    Layout.fillWidth: true
-                    spacing: 8
-                    PlasmaComponents.Label {
-                        text: modelData.name
-                        font.pixelSize: 10
-                        opacity: 0.75
-                        color: Kirigami.Theme.textColor
-                        elide: Text.ElideMiddle
-                        Layout.fillWidth: true
-                    }
-                    PlasmaComponents.Label {
-                        text: Math.round(modelData.sessions) + (modelData.sessions === 1 ? " session" : " sessions")
-                        font.pixelSize: 10
-                        color: rootItem.copilotPurple
-                    }
-                }
-            }
+        StatsTopList {
+            entries: rootItem.copilotStatsTopRepositories
+            label: "Top repositories"
+            accent: rootItem.copilotPurple
         }
     }
 

@@ -96,6 +96,9 @@ renders claude-success   "renders both Claude windows"     '5-hour session' --co
 renders claude-success   "renders the weekly percentage"   '61%' --color never
 renders claude-success   "draws a meter"                   '\[[#█]+[-░]*\]' --color never
 renders kimi-success     "renders money without a meter"   'Available balance +\$' --color never
+renders muse-success     "renders the lifetime token row"  'Tokens +150k' --color never
+renders muse-success     "renders the offline spend row"   'Spend \(est\.\) +\$0\.01' --color never
+renders_not muse-success "draws no meter without a quota"  'Tokens +\[' --color never
 renders kimi-success     "draws no meter for a balance"    '^Kimi' --color never
 renders_not kimi-success "omits the meter on a balance row" 'Available balance +\[' --color never
 renders openrouter-unlimited "keeps the window note"       'unlimited' --color never
@@ -115,6 +118,13 @@ compact="$(envelope_for kimi-success | "$CLI" --compact --color never)"
 case "$compact" in
     *'$'*) ;;
     *) fail kimi-success "compact mode must use summary.text, got: $compact" ;;
+esac
+
+checks=$((checks + 1))
+compact="$(envelope_for muse-success | "$CLI" --compact --color never)"
+case "$compact" in
+    *'150k'*) ;;
+    *) fail muse-success "compact mode must use summary.text, got: $compact" ;;
 esac
 
 # ── Colour ──────────────────────────────────────────────────────────────────

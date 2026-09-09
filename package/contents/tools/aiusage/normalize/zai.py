@@ -1,7 +1,7 @@
 import datetime
 import math
 
-from ..contract import flat_window, jround, monthly_window, num, pct_clamp, provider_base, provider_error
+from ..contract import compact_tokens, flat_window, jround, monthly_window, num, pct_clamp, provider_base, provider_error
 
 # Anything at or above this, read as a duration, would be more than 31 years —
 # so it is an absolute epoch instead. Live z.ai responses put an absolute
@@ -11,18 +11,14 @@ from ..contract import flat_window, jround, monthly_window, num, pct_clamp, prov
 _ABSOLUTE_MS_FLOOR = 1000000000000
 
 
-def _compact(n):
-    """Token counts run to eight digits; the table has room for a few.
+# Two decimals and an uppercase "K" to match how the vendor's dashboard prints
+# the same figure — this number exists to be checked against that page, and a
+# differently rounded one invites the reader to wonder which is wrong.
+_ZAI_UNITS = (("B", 1000000000), ("M", 1000000), ("K", 1000))
 
-    Two decimals to match how the vendor's dashboard prints the same figure —
-    this number exists to be checked against that page, and a differently
-    rounded one invites the reader to wonder which is wrong.
-    """
-    n = num(n)
-    for limit, suffix in ((1000000000, "B"), (1000000, "M"), (1000, "K")):
-        if abs(n) >= limit:
-            return f"{n / limit:.2f}{suffix}"
-    return str(int(n))
+
+def _compact(n):
+    return compact_tokens(n, decimals=2, units=_ZAI_UNITS, trim_zeros=False)
 
 
 def _today_label(today):
@@ -62,7 +58,7 @@ def normalize_zai(raw):
     now = raw["now"]
     res = raw["inputs"].get("usage") or {}
 
-    if not isinstance(res, dict) or len(res) == 0:
+    if not isinstance(res, dict) or not res:
         return provider_error("zai", "Z.AI", "#126ef4", now, "Z.AI: no token configured", {"hasKey": False, "keyValid": False})
     if res.get("error") is not None:
         return provider_error(

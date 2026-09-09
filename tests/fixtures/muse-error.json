@@ -1,0 +1,13 @@
+{
+  "id": "muse",
+  "now": 1785000000,
+  "inputs": {
+    "usage": {
+      "hasLogin": true,
+      "email": "user@example.com",
+      "fullName": "Test User",
+      "stats": {}
+    },
+    "status": null
+  }
+}

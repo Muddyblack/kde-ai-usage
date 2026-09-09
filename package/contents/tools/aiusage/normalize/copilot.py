@@ -29,7 +29,7 @@ def normalize_copilot(raw):
     res = inp.get("usage") or {}
     stats = copilot_stats(inp.get("stats"), now)
 
-    if not isinstance(res, dict) or len(res) == 0:
+    if not isinstance(res, dict) or not res:
         return provider_error(
             "copilot", "Copilot", "#8b5cf6", now, "Copilot: no token configured", {"hasKey": False, "keyValid": False, "stats": stats}
         )

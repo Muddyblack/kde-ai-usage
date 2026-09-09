@@ -23,7 +23,7 @@ import os
 import shutil
 import subprocess
 
-from ..http import as_json, error_json, fetch_json, http_error_json, resolve_key
+from ..http import as_json, clean_credential, error_json, fetch_json, http_error_json, resolve_key
 
 # Sent by the Copilot editor plugins; /copilot_internal rejects a request that
 # does not identify an editor.
@@ -105,7 +105,7 @@ def _gh_cli_token():
         return ""
     if proc.returncode != 0:
         return ""
-    return proc.stdout.translate(str.maketrans("", "", "\n\r ")).strip()
+    return clean_credential(proc.stdout)
 
 
 def _copilot_cli_login():

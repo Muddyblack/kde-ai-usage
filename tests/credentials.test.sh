@@ -39,6 +39,20 @@ expect() {
     fi
 }
 
+# expect_expr <description> <expected> <import line> <expression> — for the
+# resolvers that return a record rather than a bare string.
+expect_expr() {
+    local description="$1" expected="$2" import="$3" expr="$4" got
+    checks=$((checks + 1))
+    got="$(HOME="$tmp/home" PYTHONPATH="$repo/package/contents/tools" python3 -c "
+$import
+print($expr)")"
+    if [ "$got" != "$expected" ]; then
+        printf 'FAIL %s\n  want: %s\n  got:  %s\n' "$description" "$expected" "$got" >&2
+        failures=$((failures + 1))
+    fi
+}
+
 fresh_home() {
     rm -rf "$tmp/home"
     mkdir -p "$tmp/home/.config"
@@ -218,6 +232,128 @@ gh_stub
 mkdir -p "$tmp/home/.config/github-copilot"
 printf 'not json at all\n' >"$tmp/home/.config/github-copilot/apps.json"
 expect_copilot "a corrupt apps.json is empty, not an exception" ""
+
+# ── Muse ────────────────────────────────────────────────────────────────────
+#
+# Muse has no credential to resolve: the provider makes no request, so it reads
+# presence and identity only and never touches the stored tokens. What must
+# hold is that a missing or broken store is "not logged in" rather than a
+# traceback, and that the model comes from the CLI's settings.
+
+fresh_home
+MUSE_AUTH_PATH="$tmp/nope.json" expect "a missing auth store means no login" \
+    "False" "muse:auth_presence"
+
+fresh_home
+printf '{"providers": {"meta": {"mechanism": "oauth"}}}' >"$tmp/muse-auth.json"
+MUSE_AUTH_PATH="$tmp/muse-auth.json" expect "detects the meta login" \
+    "True" "muse:auth_presence"
+
+fresh_home
+printf 'not json' >"$tmp/muse-auth.json"
+MUSE_AUTH_PATH="$tmp/muse-auth.json" expect "a corrupt auth store is no login, not an exception" \
+    "False" "muse:auth_presence"
+
+fresh_home
+printf '{"providers": {}}' >"$tmp/muse-auth.json"
+MUSE_AUTH_PATH="$tmp/muse-auth.json" expect "an auth store without meta is no login" \
+    "False" "muse:auth_presence"
+
+# The model is whatever the CLI is set to — never a name pinned in our source.
+fresh_home
+printf '{"schema_version": 1, "provider": "meta", "model": "muse-spark-9.9"}' >"$tmp/muse-settings.json"
+MUSE_SETTINGS_PATH="$tmp/muse-settings.json" expect "reads the model from the CLI settings" \
+    "muse-spark-9.9" "muse:configured_model"
+
+fresh_home
+MUSE_SETTINGS_PATH="$tmp/nope.json" expect "no settings file means no model claim" \
+    "" "muse:configured_model"
+
+# ── Claude admin key, OpenAI key, Grok key ──────────────────────────────────
+#
+# These three resolve their credential through the shared resolve_key() rather
+# than their own file readers. That is the right factoring, but it moved code
+# that decides whether a tab renders a number or "no token configured", and the
+# contract tests cannot see a wrong precedence — so the order is pinned here.
+
+CLAUDE_IMPORT="from aiusage.providers.claude_credentials import get_claude_credentials"
+CLAUDE_EXPR="get_claude_credentials().get('claudeAdminApiKey', '')"
+OPENAI_IMPORT="from aiusage.providers.openai_credentials import get_openai_credentials"
+OPENAI_EXPR="get_openai_credentials().get('openaiApiKey', '')"
+GROK_IMPORT="from aiusage.providers.grok import _resolve_api_key"
+GROK_EXPR="_resolve_api_key()"
+
+fresh_home
+expect_expr "no Claude admin key anywhere yields an empty key" "" "$CLAUDE_IMPORT" "$CLAUDE_EXPR"
+
+fresh_home
+printf 'from-config-file\n' >"$tmp/home/.config/claude-admin-api-key"
+mkdir -p "$tmp/home/.claude"
+printf 'from-dot-claude\n' >"$tmp/home/.claude/admin-api-key"
+expect_expr "prefers ~/.config/claude-admin-api-key over ~/.claude" \
+    "from-config-file" "$CLAUDE_IMPORT" "$CLAUDE_EXPR"
+
+fresh_home
+mkdir -p "$tmp/home/.claude"
+printf 'from-dot-claude\n' >"$tmp/home/.claude/admin-api-key"
+expect_expr "falls back to ~/.claude/admin-api-key" \
+    "from-dot-claude" "$CLAUDE_IMPORT" "$CLAUDE_EXPR"
+
+fresh_home
+printf 'from-config-file\n' >"$tmp/home/.config/claude-admin-api-key"
+CLAUDE_ADMIN_API_KEY=from-env expect_expr "the environment outranks the file" \
+    "from-env" "$CLAUDE_IMPORT" "$CLAUDE_EXPR"
+
+fresh_home
+WIDGET_CLAUDE_ADMIN_KEY=from-widget CLAUDE_ADMIN_API_KEY=from-env \
+    expect_expr "the widget field outranks the environment" \
+    "from-widget" "$CLAUDE_IMPORT" "$CLAUDE_EXPR"
+
+# A key pasted with a stray newline used to reach urllib and raise with the
+# credential in the traceback; every source is cleaned the same way now.
+fresh_home
+CLAUDE_ADMIN_API_KEY='  sk-with-space
+' expect_expr "an environment key is whitespace-cleaned like a file one" \
+    "sk-with-space" "$CLAUDE_IMPORT" "$CLAUDE_EXPR"
+
+fresh_home
+printf 'from-config-openai\n' >"$tmp/home/.config/openai-api-key"
+mkdir -p "$tmp/home/.openai"
+printf 'from-dot-openai\n' >"$tmp/home/.openai/api-key"
+expect_expr "prefers ~/.config/openai-api-key over ~/.openai" \
+    "from-config-openai" "$OPENAI_IMPORT" "$OPENAI_EXPR"
+
+fresh_home
+printf 'from-config-openai\n' >"$tmp/home/.config/openai-api-key"
+OPENAI_API_KEY=from-env expect_expr "OPENAI_API_KEY outranks the file" \
+    "from-env" "$OPENAI_IMPORT" "$OPENAI_EXPR"
+
+fresh_home
+WIDGET_OPENAI_API_KEY=from-widget OPENAI_API_KEY=from-env \
+    expect_expr "the widget field outranks OPENAI_API_KEY" \
+    "from-widget" "$OPENAI_IMPORT" "$OPENAI_EXPR"
+
+# xAI renamed the product; both spellings are accepted, xai first.
+fresh_home
+XAI_API_KEY=from-xai GROK_API_KEY=from-grok \
+    expect_expr "XAI_API_KEY outranks GROK_API_KEY" "from-xai" "$GROK_IMPORT" "$GROK_EXPR"
+
+fresh_home
+WIDGET_GROK_API_KEY=from-widget XAI_API_KEY=from-xai \
+    expect_expr "either widget spelling outranks the environment" \
+    "from-widget" "$GROK_IMPORT" "$GROK_EXPR"
+
+fresh_home
+WIDGET_XAI_API_KEY=from-widget-xai WIDGET_GROK_API_KEY=from-widget-grok \
+    expect_expr "the xai widget spelling wins over the grok one" \
+    "from-widget-xai" "$GROK_IMPORT" "$GROK_EXPR"
+
+fresh_home
+mkdir -p "$tmp/home/.config/xai" "$tmp/home/.config/grok"
+printf 'from-xai-file\n' >"$tmp/home/.config/xai/api-key"
+printf 'from-grok-file\n' >"$tmp/home/.config/grok/api-key"
+expect_expr "prefers ~/.config/xai/api-key over the grok one" \
+    "from-xai-file" "$GROK_IMPORT" "$GROK_EXPR"
 
 if [ "$failures" -eq 0 ]; then
     printf 'ok — %d credential checks passed\n' "$checks"
