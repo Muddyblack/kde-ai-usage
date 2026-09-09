@@ -317,12 +317,73 @@ Three things are identical in both QML frontends and live in
 history and formats its own countdowns from `resetText`):
 
 - `Format.js` — countdown formatting (`countdown`, `countdownFromEpoch`).
-- `UsageHistory.js` — collecting `historyValues` from a response, merging into
-  the rolling series, migrating legacy points, and replaying quota resets.
+- `UsageHistory.js` — collecting `historyValues` from a response, the rolling
+  series and the state machine that saves it, migrating legacy points, and
+  replaying quota resets.
 
-Persistence stays with each frontend, because Plasma writes its widget config
-and Quickshell writes the mirror file. Both write the same format to the same
-`~/.local/share/ai-usage-widget/usage-history-latest.json`.
+`~/.local/share/ai-usage-widget/usage-history-latest.json` is the store, shared
+by both frontends, and `tools/sh/history-io` owns every access to it. A save
+(`history-io autosave`) takes an `flock`, unions the payload into whatever is
+already on disk, replaces the file by rename, and prints the merged series back
+to the caller. A lock it cannot take is an error, not something to go ahead
+without: the merge is a read-modify-write, so racing the holder would drop one
+side's points. The frontend keeps its batch and retries on the next poll. That makes a save a merge rather than an overwrite, so two
+frontends — or two Plasma widget instances, which are two writers too — converge
+instead of clobbering each other, and each one picks up the other's points on
+its next poll without a separate read. The rename matters because a reader that
+catches a partial write treats the file as corrupt and *deletes* it.
+
+The union has no way to tell which of two values for one key is the newer one, so
+it gives the payload precedence — which makes what a payload may hold the whole
+contract. There are two kinds, and `history-io` has an entry point for each:
+
+- `autosave` — **readings the frontend has just taken**, and only those keys.
+  Asserted, which is right because nothing anywhere is newer for them. A whole
+  series would also carry that frontend's copies of the *other* one's points,
+  with the same precedence, and roll them back.
+- `seed` — **a series the frontend restored** rather than measured: the widget
+  config it starts from, a snapshot the user imported. Offered, not asserted:
+  the file keeps its own values and gains only the keys it lacks. It can predate
+  what is on disk, and a frontend cannot tell — its copy of the file is from
+  whenever it last saved, and the other frontend may have written since. So the
+  comparison happens inside the lock, where both sides are visible at once,
+  rather than out in the frontend against a copy that may already be behind.
+
+A third rule keeps the two apart: **a point is only ever patched by the writer
+that created it.** `UsageHistory.record` patches the caller's own last point and
+appends otherwise. The timestamp *is* that ownership, so two frontends polling in
+the same millisecond both claim the point and its value flips between their
+readings until the merge window passes — left as it is, since closing it means a
+writer id in every point for a one-point wobble at roughly 0.1% a day.
+
+The state machine over all this — the two lanes, one batch in flight, what an
+answer means — is `UsageHistory.js` too, shared rather than written out twice in
+QML, where only a running Plasma session or Quickshell could exercise it. Each
+frontend is left with the transport and the timers. One batch is in flight at a
+time, because the answer replaces the series with what is on disk and two could
+land out of order; anything recorded meanwhile waits its turn. A batch that fails
+goes back to its lane and waits for the *next poll* — history-io leaves the file
+untouched when it cannot merge, so nothing is lost, and resending immediately
+would only fail the same way as fast as the shell can fork.
+
+Neither frontend writes the file before it has read it: the startup read is
+asynchronous while the poll timer fires immediately, so a write that got in
+first would drop everything recorded under the other frontend. The file wins over
+the restored copy for everything it knows; what it does not know follows as a
+seed.
+
+The Plasma widget also keeps a copy in its widget config, but only as a backup
+to seed a fresh install — it is read at startup and flushed on a slow timer,
+because Plasma rewrites `plasma-org.kde.plasma.desktop-appletsrc` (every
+widget's config) whole on each change and the series runs to 30-100 KiB.
+
+The union therefore exists twice: in QML (`UsageHistory.union`) for the startup
+restore, and in Python (`aiusage/history.py`) for the on-disk merge.
+`tests/shared-code.test.js` replays the same cases through both and compares the
+JSON byte for byte, so they cannot drift.
+
+A save costs about 60 ms of CPU, nearly all of it process startup — at the
+default 300 s poll that is 0.02% of one core, or ~17 s of CPU per day.
 
 ## Testing
 

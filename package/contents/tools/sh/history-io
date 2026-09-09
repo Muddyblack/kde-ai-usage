@@ -2,13 +2,22 @@
 # History persistence helper for the AI Usage widget.
 #
 # Usage:
-#   history-io autosave   — silently mirror $WIDGET_HISTORY_JSON to the latest file (no timestamped copy)
+#   history-io autosave   — union $WIDGET_HISTORY_JSON into the latest file, print the merged
+#                           series. The payload is the caller's own new readings and wins.
+#   history-io seed       — the same, for a series the caller restored rather than measured;
+#                           the file keeps its own values and gains only the keys it lacks
 #   history-io autoload   — read the latest file for startup restore; delete it if unreadable
-#   history-io export     — write $WIDGET_HISTORY_JSON to a timestamped file + latest, print its path
+#   history-io export     — snapshot $WIDGET_HISTORY_JSON to a timestamped file, print its
+#                           path; the latest file gains what it lacks and keeps the rest
 #   history-io import     — read the most recent file, print its JSON (delete if corrupt)
 #
 # Output is a single JSON object: {"ok":true,"path":…} | {"ok":true,"data":[…]} |
 #   {"ok":true,"empty":true} | {"error":…}.
+#
+# This tool owns every access to the shared file. Both frontends call it, so a
+# save merges rather than overwrites and neither can roll the other back. One
+# save costs ~60 ms of CPU, almost all of it process startup, against a poll
+# interval of 300 s by default and 30 s at the fastest.
 set -euo pipefail
 
 # Shared interpreter resolution — sets $PY, empty when no Python 3 exists.
@@ -17,7 +26,28 @@ py_resolve || true
 
 DIR="${XDG_DATA_HOME:-$HOME/.local/share}/ai-usage-widget"
 LATEST="$DIR/usage-history-latest.json"
+LOCK="$DIR/.usage-history.lock"
 mkdir -p "$DIR"
+
+# Serialize read-modify-write against the other frontend (and against a second
+# Plasma widget instance, which is a writer too). Held until the script exits,
+# because the fd closing is what releases it.
+#
+# Returns non-zero when there is a lock here and it could not be taken. Merging
+# anyway would race the holder — both sides read, both merge, and the second
+# rename drops the first one's points — so the caller reports it instead and the
+# frontend keeps its batch for the next poll.
+#
+# A system with no flock at all is the one case that goes ahead unlocked: it
+# degrades to the atomic rename alone, where two writes landing in the same
+# instant cost one sample and never the file. Refusing there would mean never
+# saving at all.
+lock_history() {
+  command -v flock >/dev/null 2>&1 || return 0
+  exec 9>"$LOCK" 2>/dev/null || return 1
+  # Overridable so the tests do not have to sit out the real wait.
+  flock -w "${WIDGET_HISTORY_LOCK_WAIT:-5}" 9 2>/dev/null || return 1
+}
 
 # JSON-escape a string. Prefer jq (a hard dependency of the other scripts); fall back to python3.
 jstr() {
@@ -30,6 +60,20 @@ jstr() {
   fi
 }
 emit_err() { printf '{"error":%s}\n' "$(jstr "$1")"; }
+
+# Write $2 with the contents of $1, atomically.
+#
+# The mirror file is shared with the Quickshell frontend, and a reader that
+# catches a plain `> file` mid-write sees a truncated array — which
+# validate_or_delete below then treats as corrupt and *removes*. A temp file in
+# the same directory plus a rename means a reader only ever sees the whole old
+# file or the whole new one.
+write_atomic() {
+  local content="$1" dest="$2" tmp
+  tmp="$(mktemp "$dest.tmp.XXXXXX")" || return 1
+  printf '%s' "$content" > "$tmp" || { rm -f "$tmp"; return 1; }
+  mv -f "$tmp" "$dest" || { rm -f "$tmp"; return 1; }
+}
 
 # Validate a file parses as a JSON array; on failure delete it and return non-zero.
 # Uses jq if present, else python3. If neither exists we cannot safely validate, so
@@ -47,6 +91,41 @@ validate_or_delete() {
   return 0
 }
 
+# Merge $1 (a JSON array of points) into $LATEST, $2 being the precedence flag
+# passed through to aiusage.history. Prints one envelope either way; returns
+# non-zero when the merge could not run, and the file is then untouched.
+#
+# That last part is the point: a payload that could not be unioned in must not be
+# written over the file instead. Several processes write it, and an overwrite
+# would drop what the others recorded while reporting success. The caller still
+# holds its payload and retries. Python's stderr is left alone so a failure is
+# visible by hand; the frontends read stdout only.
+sync_latest() {
+  local json="$1" mode="${2:-}" out pkg_tools
+  if [ -n "$PY" ]; then
+    pkg_tools="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    if out="$(printf '%s' "$json" | PYTHONPATH="$pkg_tools${PYTHONPATH:+:$PYTHONPATH}" "$PY" -B -m aiusage.history save "$LATEST" 500 ${mode:+"$mode"})"; then
+      printf '%s\n' "$out"
+      return 0
+    fi
+    # aiusage.history reports its own failures as an {"error":…} envelope; hand
+    # that on rather than flattening it into a generic message.
+    case "$out" in
+      '{"error"'*) printf '%s\n' "$out" ;;
+      *) emit_err "could not merge history into $LATEST" ;;
+    esac
+    return 1
+  fi
+  # No interpreter, so nothing here can union. Writing is only safe when there is
+  # nothing to lose; an existing file belongs to whoever last merged into it.
+  if [ -e "$LATEST" ]; then
+    emit_err "no python3 to merge history into $LATEST"
+    return 1
+  fi
+  write_atomic "$json" "$LATEST" || { emit_err "could not write $LATEST"; return 1; }
+  printf '{"ok":true}\n'
+}
+
 # Resolve which file to read: explicit path > latest > newest timestamped.
 resolve_src() {
   local s="${WIDGET_HISTORY_IMPORT_PATH:-}"
@@ -56,14 +135,21 @@ resolve_src() {
 }
 
 case "${1:-}" in
-  autosave)
+  autosave|seed)
     json="${WIDGET_HISTORY_JSON:-}"
     if [ -z "$json" ] || [ "$json" = "[]" ]; then
       printf '{"ok":true,"empty":true}\n'
       exit 0
     fi
-    printf '%s' "$json" > "$LATEST"
-    printf '{"ok":true}\n'
+    lock_history || { emit_err "could not lock $LOCK"; exit 0; }
+    # Union against what is on disk rather than overwriting it, and hand the
+    # merged series back so both frontends converge on it.
+    #
+    # `autosave` asserts its payload, `seed` only offers it. Either way the two
+    # sides meet here, inside the lock: a caller weighing them against its own
+    # copy of the file may be weighing against a value already replaced.
+    if [ "$1" = "seed" ]; then mode="--keep-existing"; else mode=""; fi
+    sync_latest "$json" ${mode:+"$mode"} || true
     ;;
   autoload)
     src="$(resolve_src)"
@@ -85,9 +171,24 @@ case "${1:-}" in
       exit 0
     fi
     ts="$(date +%Y%m%d-%H%M%S)"
-    out="$DIR/usage-history-$ts.json"
-    printf '%s' "$json" > "$out"
-    printf '%s' "$json" > "$LATEST"
+    # Fill a hidden file and publish it by rename. `date` is second-precision, so
+    # the reserved token is what keeps two exports in one second apart — and the
+    # reservation has to stay outside the usage-history-*.json glob, or a reader
+    # would take the empty file for the newest, call it corrupt, and its `rm -f`
+    # would carry off the finished snapshot when the write lands in between.
+    tmp="$(mktemp "$DIR/.usage-history-export.tmp.XXXXXX")" || { emit_err "could not write to $DIR"; exit 0; }
+    out="$DIR/usage-history-$ts-${tmp##*.}.json"
+    if ! printf '%s' "$json" > "$tmp" || ! mv -f "$tmp" "$out"; then
+      rm -f "$tmp"
+      emit_err "could not write $out"
+      exit 0
+    fi
+    # The shared file is not the caller's to replace, so it only gains what it
+    # lacks — and a merge that cannot run, or cannot lock, leaves it alone. The
+    # export the user asked for has succeeded either way.
+    if lock_history; then
+      sync_latest "$json" --keep-existing >/dev/null || true
+    fi
     printf '{"ok":true,"path":%s}\n' "$(jstr "$out")"
     ;;
   import)

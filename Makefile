@@ -26,6 +26,7 @@ test: ## run the provider backend contract tests
 	@./tests/ai-usage-cli.test.sh
 	@./tests/credentials.test.sh
 	@./tests/python-interp.test.sh
+	@./tests/history-io.test.sh
 	@./tests/get-codex-stats.test.sh
 	@./tests/get-codex-rate-limits.test.sh
 	@if command -v node >/dev/null 2>&1; then node --test tests/*.test.js; \

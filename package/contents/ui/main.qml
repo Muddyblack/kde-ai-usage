@@ -764,23 +764,20 @@ PlasmoidItem {
 
     function loadUsageHistory() {
         var raw = Plasmoid.configuration.usageHistory || "";
+        // The config is a backup of the series, not the live store — the mirror
+        // file is, since both frontends share it. It is only read here, at startup.
+        if (!raw)
+            // Legacy weekly-only history ({t, v}); normalize() migrates the shape.
+            raw = Plasmoid.configuration.weeklyUsageHistory || "";
         if (raw) {
             try {
-                root.usageHistory = JSON.parse(raw);
+                // restore(), not record(): the config is this widget's own backup
+                // and can be older than the shared file, so it is offered to it
+                // rather than asserted over it.
+                UsageHistory.restore(root.historyStore, JSON.parse(raw));
+                root.syncUsageHistory();
             } catch (_) {
-                root.usageHistory = [];
-            }
-        } else {
-            // Migrate legacy weekly-only history ({t, v}) into the dual-series format.
-            var legacy = Plasmoid.configuration.weeklyUsageHistory || "";
-            if (legacy) {
-                try {
-                    var migrated = UsageHistory.normalize(JSON.parse(legacy), root.historyLimit);
-                    root.usageHistory = migrated;
-                    Plasmoid.configuration.usageHistory = JSON.stringify(migrated);
-                } catch (_) {
-                    root.usageHistory = [];
-                }
+                // Unparseable config — the mirror file is the real store anyway.
             }
         }
         // Always sync with the shared mirror file on disk so points recorded in
@@ -788,26 +785,132 @@ PlasmoidItem {
         root.autoloadHistory();
     }
 
-    // Merge one provider's history values into the shared series. The backend
-    // decides which keys a provider contributes (see historyValues in the
-    // contract), so the frontend never has to know a provider's chart series.
-    function recordHistoryValues(values) {
-        var history = UsageHistory.merge(root.usageHistory, values, new Date().getTime(), root.historyLimit);
-        if (history === root.usageHistory)
+    // The save protocol is in UsageHistory.js, shared with the Quickshell panel;
+    // what is left here is the transport, the clock and the timers. The store's
+    // `ready` flag is what keeps the mirror file from being written before the
+    // startup autoload has answered — that read is async while the poll timer
+    // fires at once, and a write that got in first would drop everything recorded
+    // under Hyprland. `historyLimit` is readonly, so this binding runs once.
+    property var historyStore: UsageHistory.newStore(root.historyLimit)
+    // JSON form of usageHistory, kept alongside it so nothing has to re-serialize
+    // ~30-100 KiB to find out whether anything actually changed.
+    property string historyJson: "[]"
+    property bool historyConfigDirty: false
+    // The command the batch in flight went out on, so the watchdog can drop it.
+    property string historySaveCmd: ""
+
+    // Publish the store's series to the bindings. It replaces `history` rather
+    // than patching it, so an unchanged reference means nothing to repaint.
+    function syncUsageHistory() {
+        if (root.usageHistory === root.historyStore.history)
             return;
 
-        root.usageHistory = history;
-        var json = JSON.stringify(history);
-        Plasmoid.configuration.usageHistory = json;
-        // Mirror to a file so history survives a full uninstall/reinstall.
-        root.autosaveHistory(json);
+        root.usageHistory = root.historyStore.history;
+        // Same content, different array: worth the reference swap, not a rewrite
+        // of every widget's config.
+        if (root.historyJson === root.historyStore.json)
+            return;
+
+        root.historyJson = root.historyStore.json;
+        root.historyConfigDirty = true;
     }
 
-    // Silently mirror history JSON to ~/.local/share/ai-usage-widget/usage-history-latest.json
-    function autosaveHistory(json) {
-        var cmd = root.pythonEnv() + "WIDGET_HISTORY_JSON=\"$(printf %s '" + root.base64(json) + "' | base64 -d)\" " + root.scriptPath("history-io") + " autosave";
-        historyIOSource.disconnectSource(cmd);
-        historyIOSource.connectSource(cmd);
+    // Plasma rewrites plasma-org.kde.plasma.desktop-appletsrc — the config of
+    // every widget on the desktop — whole on each change, so pushing the series
+    // through it on every poll churns a shared file for nothing. The mirror file
+    // is written every poll and is what both frontends read, so the config only
+    // has to be recent enough to seed a fresh install.
+    function flushHistoryConfig() {
+        if (!root.historyConfigDirty)
+            return;
+
+        root.historyConfigDirty = false;
+        Plasmoid.configuration.usageHistory = root.historyJson;
+    }
+
+    Timer {
+        interval: 600000
+        running: true
+        repeat: true
+        onTriggered: root.flushHistoryConfig()
+    }
+
+    // One poll's provider values — the backend decides which keys a provider
+    // contributes (historyValues in the contract). Called on every snapshot even
+    // when none reported, which is what releases a save that failed.
+    function recordHistoryValues(values) {
+        UsageHistory.record(root.historyStore, values, new Date().getTime());
+        root.syncUsageHistory();
+        root.saveHistory();
+    }
+
+    // Ship the next batch to ~/.local/share/ai-usage-widget/usage-history-latest.json,
+    // shared with the Quickshell frontend. history-io unions it in and hands the
+    // merged series back, so this is also how the other frontend's points arrive.
+    // take() decides whether there is anything to send, and what.
+    function saveHistory() {
+        var batch = UsageHistory.take(root.historyStore);
+        if (!batch)
+            return;
+
+        historySaveTimeout.restart();
+        // Pass the payload base64-encoded and decode it inside the shell, so the
+        // JSON (quotes, brackets) never has to survive command-line quoting.
+        root.historySaveCmd = root.pythonEnv() + "WIDGET_HISTORY_JSON=\"$(printf %s '" + root.base64(JSON.stringify(batch.points)) + "' | base64 -d)\" " + root.scriptPath("history-io") + " " + batch.op;
+        historyIOSource.disconnectSource(root.historySaveCmd);
+        historyIOSource.connectSource(root.historySaveCmd);
+    }
+
+    function finishHistorySave(merged) {
+        historySaveTimeout.stop();
+        root.historySaveCmd = "";
+        UsageHistory.done(root.historyStore, merged);
+        root.syncUsageHistory();
+        // Whatever queued up while that batch was out goes now.
+        root.saveHistory();
+    }
+
+    function failHistorySave() {
+        historySaveTimeout.stop();
+        // Drop the source too: answering after the watchdog has given up would
+        // otherwise be taken for the answer to whatever went out since.
+        if (root.historySaveCmd !== "")
+            historyIOSource.disconnectSource(root.historySaveCmd);
+
+        root.historySaveCmd = "";
+        UsageHistory.failed(root.historyStore);
+    }
+
+    // A save that never answers would hold its batch in flight for the rest of
+    // the session and stop this widget mirroring at all.
+    Timer {
+        id: historySaveTimeout
+
+        interval: 30000
+        repeat: false
+        onTriggered: root.failHistorySave()
+    }
+
+    // The startup read is done (or gave up): the mirror is ours to write again.
+    function releaseHistoryMirror() {
+        if (root.historyStore.ready)
+            return;
+
+        historyMirrorTimeout.stop();
+        UsageHistory.opened(root.historyStore);
+        root.saveHistory();
+    }
+
+    // Waiting for the read is only ever a short deferral. If the answer never
+    // comes — no shell tool, a command that never reports back — mirroring again
+    // beats a widget that silently stops saving to disk for the rest of its life.
+    Timer {
+        id: historyMirrorTimeout
+
+        interval: 15000
+        running: true
+        repeat: false
+        onTriggered: root.releaseHistoryMirror()
     }
 
     // Restore from the mirror file when plasmoid config has no history (e.g. fresh install).
@@ -869,7 +972,7 @@ PlasmoidItem {
     }
 
     function exportHistory() {
-        var json = JSON.stringify(root.usageHistory);
+        var json = root.historyJson;
         // Pass the payload base64-encoded and decode it inside the shell, so the JSON
         // (quotes, brackets) never has to survive command-line quoting.
         var cmd = root.pythonEnv() + "WIDGET_HISTORY_JSON=\"$(printf %s '" + root.base64(json) + "' | base64 -d)\" " + root.scriptPath("history-io") + " export";
@@ -1819,6 +1922,7 @@ PlasmoidItem {
             }
         }
     }
+    Component.onDestruction: root.flushHistoryConfig()
     Component.onCompleted: {
         root.loadUsageHistory();
         // Honor the first pinned service on startup by selecting its tab.
@@ -1848,7 +1952,9 @@ PlasmoidItem {
         onNewData: function (src, data) {
             disconnectSource(src);
             // The operation is encoded as the last word of the command.
-            var op = src.indexOf(" autosave") >= 0 ? "autosave" : src.indexOf(" autoload") >= 0 ? "autoload" : src.indexOf(" export") >= 0 ? "export" : "import";
+            // `autosave` and `seed` differ only in the precedence history-io
+            // merges them with, and are answered the same way here.
+            var op = src.indexOf(" autosave") >= 0 || src.indexOf(" seed") >= 0 ? "save" : src.indexOf(" autoload") >= 0 ? "autoload" : src.indexOf(" export") >= 0 ? "export" : "import";
             var out = (data["stdout"] || "").trim();
             try {
                 var res = JSON.parse(out);
@@ -1856,36 +1962,59 @@ PlasmoidItem {
                     // autosave/autoload are background ops — stay silent on their errors
                     if (op === "import" || op === "export")
                         root.historyIOMsg = "⚠ " + res.error;
+                    // A save that could not merge wrote nothing, so its batch is
+                    // still this widget's to retry.
+                    if (op === "save")
+                        root.failHistorySave();
+                    // A failed autoload still has to release the mirror, or the
+                    // widget would never write its history to disk again.
+                    if (op === "autoload")
+                        root.releaseHistoryMirror();
 
                     return;
                 }
-                if (op === "autosave")
+                if (op === "save") {
+                    // The merged file comes back, so the other frontend's points
+                    // arrive without a separate read. The degraded write answers
+                    // {"ok":true} with no series, leaving nothing to adopt.
+                    root.finishHistorySave(res.data);
                     return;
-                // silent mirror, nothing to do
+                }
                 if (res.path) {
                     root.historyIOMsg = "Exported to " + res.path;
                     return;
                 }
+                if (op === "autoload") {
+                    // The file wins for everything it knows; the config's own
+                    // points survive either way and go back through the seed
+                    // lane. A no-op on a fresh install, where there is no file.
+                    UsageHistory.adopt(root.historyStore, res.data);
+                    root.syncUsageHistory();
+                    root.releaseHistoryMirror();
+                    return;
+                }
                 if (res.data) {
-                    // array of {t,s,w} (or legacy {t,v}); normalize + persist
-                    var norm = UsageHistory.normalize(res.data, root.historyLimit);
-                    // Merge autoload data with any points already recorded since startup
-                    // (poll timer fires immediately and may beat the async shell).
-                    if (op === "autoload" && root.usageHistory.length > 0) {
-                        // The file is the base; points recorded since startup win.
-                        var merged = UsageHistory.union(norm, root.usageHistory, root.historyLimit);
-                        root.usageHistory = merged;
-                        Plasmoid.configuration.usageHistory = JSON.stringify(merged);
-                        root.autosaveHistory(JSON.stringify(merged));
-                        return;
-                    }
-                    root.usageHistory = norm;
-                    Plasmoid.configuration.usageHistory = JSON.stringify(norm);
+                    // array of {t,s,w} (or legacy {t,v})
+                    var imported = UsageHistory.normalize(res.data, root.historyLimit);
+                    // A snapshot, not a reading: restore() puts it under the
+                    // running series and into the seed lane, so the file keeps
+                    // its own values for anything it already has.
+                    UsageHistory.restore(root.historyStore, imported);
+                    root.syncUsageHistory();
+                    root.saveHistory();
+                    // An explicit Import is worth persisting straight away.
+                    root.flushHistoryConfig();
                     // Only the manual Import button announces a count; autoload is silent.
                     if (op === "import")
-                        root.historyIOMsg = "Imported " + norm.length + " points";
+                        root.historyIOMsg = "Imported " + imported.length + " points";
                 }
             } catch (e) {
+                if (op === "save")
+                    root.failHistorySave();
+
+                if (op === "autoload")
+                    root.releaseHistoryMirror();
+
                 if (op === "import" || op === "export")
                     root.historyIOMsg = "⚠ history I/O failed";
             }

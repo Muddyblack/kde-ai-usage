@@ -29,14 +29,6 @@ ShellRoot {
         return file === "" ? "" : root.iconDir + file;
     }
 
-    // Shared with the Plasma widget: both variants mirror history to this file.
-    readonly property string historyDir: {
-        var xdg = Quickshell.env("XDG_DATA_HOME");
-        var base = (xdg && xdg !== "") ? xdg : (Quickshell.env("HOME") + "/.local/share");
-        return base + "/ai-usage-widget";
-    }
-    readonly property string historyPath: historyDir + "/usage-history-latest.json"
-
     // Settings the in-popup page writes; the backend reads the same file
     // (AI_USAGE_CONFIG / XDG_CONFIG_HOME) for provider toggles + API keys.
     readonly property string configDir: {
@@ -277,9 +269,8 @@ ShellRoot {
 
     // Export a timestamped copy of the shared history via history-io.
     function exportHistory() {
-        var tool = root.baseDir + "/../package/contents/tools/sh/history-io";
         exportProcess.exec({
-            command: ["sh", "-c", "PYTHON3=\"$1\" WIDGET_HISTORY_JSON=\"$2\" exec \"$3\" export", "ai-usage", root.settings.pythonPath || "", JSON.stringify(root.usageHistory), tool]
+            command: ["sh", "-c", "PYTHON3=\"$1\" WIDGET_HISTORY_JSON=\"$2\" exec \"$3\" export", "ai-usage", root.settings.pythonPath || "", JSON.stringify(root.usageHistory), root.historyTool()]
         });
     }
 
@@ -401,31 +392,122 @@ ShellRoot {
     }
 
     // ── History persistence ──────────────────────────────────────────────────
+    // Both frontends go through tools/sh/history-io, which owns the shared file:
+    // it takes a lock, unions the payload into whatever is on disk, replaces the
+    // file by rename and hands the merged series back. So a save is also how the
+    // Plasma widget's points reach this panel while both are running.
+    //
+    // What goes out, when, and what comes back is the state machine in
+    // UsageHistory.js, shared with the Plasma widget. Left here: the transport,
+    // the clock and the watchdog.
+    //
+    // The file is still never written before it has been read, because the
+    // startup read is async while the poll timer fires immediately.
+    property var historyStore: UsageHistory.newStore(root.historyLimit)
+
+    function historyTool() {
+        return root.baseDir + "/../package/contents/tools/sh/history-io";
+    }
+
+    // The store replaces `history` rather than patching it in place, so an
+    // unchanged reference means there is nothing to repaint.
+    function syncUsageHistory() {
+        if (root.usageHistory !== root.historyStore.history)
+            root.usageHistory = root.historyStore.history;
+    }
+
+    // Recorded on every poll even when no provider reported, which is what
+    // releases a save that failed.
     function recordHistory() {
-        var history = UsageHistory.merge(root.usageHistory, UsageHistory.collect(root.providers), new Date().getTime(), root.historyLimit);
-        if (history === root.usageHistory)
+        UsageHistory.record(root.historyStore, UsageHistory.collect(root.providers), new Date().getTime());
+        root.syncUsageHistory();
+        root.saveHistory();
+    }
+
+    // take() decides whether there is anything to send, and what. The process
+    // check is on top of that: exec() cannot start the next one until this one
+    // has been reaped.
+    function saveHistory() {
+        if (saveProcess.running)
             return;
-        root.usageHistory = history;
+
+        var batch = UsageHistory.take(root.historyStore);
+        if (!batch)
+            return;
+
+        historySaveTimeout.restart();
         saveProcess.exec({
-            command: ["sh", "-c", "mkdir -p \"$(dirname \"$2\")\"; printf '%s' \"$1\" > \"$2\"", "ai-usage", JSON.stringify(history), root.historyPath]
+            command: ["sh", "-c", "PYTHON3=\"$1\" WIDGET_HISTORY_JSON=\"$2\" exec \"$3\" \"$4\"", "ai-usage", root.settings.pythonPath || "", JSON.stringify(batch.points), root.historyTool(), batch.op]
         });
+    }
+
+    function finishHistorySave(merged) {
+        historySaveTimeout.stop();
+        UsageHistory.done(root.historyStore, merged);
+        root.syncUsageHistory();
+        // Goes now if the process is already reaped; onExited covers the rest.
+        root.saveHistory();
+    }
+
+    function failHistorySave() {
+        historySaveTimeout.stop();
+        UsageHistory.failed(root.historyStore);
+    }
+
+    // A save that never answers would otherwise hold its batch in flight for the
+    // rest of the session and stop this panel mirroring at all. Kill it, and
+    // unwind whether or not the kill produces a last empty answer to unwind on —
+    // failed() is idempotent, so whichever happens first is the one that counts.
+    Timer {
+        id: historySaveTimeout
+        interval: 30000
+        onTriggered: {
+            saveProcess.running = false;
+            root.failHistorySave();
+        }
     }
 
     Process {
         id: saveProcess
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var res = null;
+                try {
+                    res = JSON.parse(this.text.trim());
+                } catch (e) {}
+                if (!res || res.error) {
+                    root.failHistorySave();
+                    return;
+                }
+                // The degraded write answers {"ok":true} with no series, which
+                // leaves nothing to adopt.
+                root.finishHistorySave(res.data);
+            }
+        }
+        // The answer and the exit arrive in either order and the next batch needs
+        // both, so both ends try and take() ignores whichever is early. take()
+        // also hands out nothing after a failure — without that, unwinding the
+        // batch and starting it again here is a loop of failing saves.
+        onExited: root.saveHistory()
     }
 
     Process {
         id: loadProcess
-        command: ["sh", "-c", "cat \"$1\" 2>/dev/null || printf '[]'", "ai-usage", root.historyPath]
+        command: ["sh", "-c", "PYTHON3=\"$1\" exec \"$2\" autoload", "ai-usage", root.settings.pythonPath || "", root.historyTool()]
         running: true
         stdout: StdioCollector {
             onStreamFinished: {
                 try {
-                    var data = JSON.parse(this.text.trim());
-                    if (Array.isArray(data))
-                        root.usageHistory = UsageHistory.normalize(data, root.historyLimit);
+                    var r = JSON.parse(this.text.trim());
+                    if (r && Array.isArray(r.data)) {
+                        // Samples taken while this read was in flight are this
+                        // panel's own and stay on top of the file's.
+                        UsageHistory.adopt(root.historyStore, r.data);
+                        root.syncUsageHistory();
+                    }
                 } catch (e) {}
+                UsageHistory.opened(root.historyStore);
+                root.saveHistory();
             }
         }
     }

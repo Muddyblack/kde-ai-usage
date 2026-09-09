@@ -38,34 +38,60 @@ test("collects every provider's history values into one patch", () => {
     ]), { s: 12, w: 34, kr: 56 });
 });
 
-test("patches a recent point instead of appending", () => {
+test("patches its own recent point instead of appending", () => {
     const now = 1785000000000;
-    const history = [{ t: now - 30000, s: 10 }];
-    const merged = UsageHistory.merge(history, { s: 20, w: 5 }, now, 500);
-    assert.equal(merged.length, 1);
-    assert.deepEqual(merged[0], { t: now - 30000, s: 20, w: 5 });
+    const store = UsageHistory.newStore(500);
+    UsageHistory.record(store, { s: 10 }, now - 30000);
+    UsageHistory.record(store, { s: 20, w: 5 }, now);
+    assert.deepEqual(store.history, [{ t: now - 30000, s: 20, w: 5 }]);
+});
+
+test("leaves another writer's point alone however recent it is", () => {
+    // adopt(), not record(): that point came off the shared file, so this
+    // frontend is not its writer. Patching it would leave no way to tell which
+    // of the two values is the newer reading.
+    const now = 1785000000000;
+    const store = UsageHistory.newStore(500);
+    UsageHistory.adopt(store, [{ t: now - 30000, cp: 9 }]);
+    UsageHistory.record(store, { s: 20 }, now);
+    assert.deepEqual(store.history, [{ t: now - 30000, cp: 9 }, { t: now, s: 20 }]);
+});
+
+test("queues just the keys the sample carried", () => {
+    // That, and not the series, is what a save sends: the rest of the series is
+    // this frontend's copies of the other one's points.
+    const now = 1785000000000;
+    const store = UsageHistory.newStore(500);
+    UsageHistory.adopt(store, [{ t: now - 30000, s: 10, w: 40 }]);
+    UsageHistory.record(store, { s: 20 }, now - 30000 + 1);
+    assert.deepEqual(store.fresh, [{ t: now - 30000 + 1, s: 20 }]);
+    assert.deepEqual(store.history, [{ t: now - 30000, s: 10, w: 40 }, { t: now - 30000 + 1, s: 20 }]);
 });
 
 test("appends once the merge window has passed", () => {
     const now = 1785000000000;
-    const history = [{ t: now - UsageHistory.MERGE_WINDOW_MS - 1, s: 10 }];
-    const merged = UsageHistory.merge(history, { s: 20 }, now, 500);
-    assert.equal(merged.length, 2);
-    assert.deepEqual(merged[1], { t: now, s: 20 });
+    const store = UsageHistory.newStore(500);
+    UsageHistory.record(store, { s: 10 }, now - UsageHistory.MERGE_WINDOW_MS - 1);
+    UsageHistory.record(store, { s: 20 }, now);
+    assert.equal(store.history.length, 2);
+    assert.deepEqual(store.history[1], { t: now, s: 20 });
 });
 
-test("returns the input untouched when a provider reports nothing", () => {
-    const history = [{ t: 1, s: 10 }];
-    assert.equal(UsageHistory.merge(history, {}, 2, 500), history);
+test("records nothing when a provider reports nothing", () => {
+    const store = UsageHistory.newStore(500);
+    UsageHistory.record(store, { s: 10 }, 1000);
+    const before = store.history;
+    assert.equal(UsageHistory.record(store, {}, 2000), false);
+    // Same array back, which is how a frontend knows there is nothing to repaint.
+    assert.equal(store.history, before);
 });
 
 test("trims to the history limit", () => {
-    const points = [];
+    const store = UsageHistory.newStore(5);
     for (let i = 0; i < 12; i++)
-        points.push({ t: i * 1000000, s: i });
-    const merged = UsageHistory.merge(points, { s: 99 }, 99000000, 5);
-    assert.equal(merged.length, 5);
-    assert.equal(merged[merged.length - 1].s, 99);
+        UsageHistory.record(store, { s: i }, i * 1000000);
+    assert.equal(store.history.length, 5);
+    assert.equal(store.history[store.history.length - 1].s, 11);
 });
 
 test("unions the mirror file with points recorded since startup", () => {
@@ -96,6 +122,423 @@ test("migrates legacy weekly-only points and drops junk", () => {
         { v: 60 },
         null
     ], 500), [{ t: 1, w: 40 }, { t: 2, w: 50 }]);
+});
+
+test("keeps a failed provider's null out of the series", () => {
+    // historyValues comes back null when a provider errored; recording it would
+    // blank the last good sample instead of leaving a gap in the chart.
+    const now = 1785000000000;
+    const store = UsageHistory.newStore(500);
+    UsageHistory.record(store, { s: 10, w: 40 }, now - 30000);
+    assert.equal(UsageHistory.record(store, { s: null, w: undefined }, now), false);
+    UsageHistory.record(store, { s: null, w: 41 }, now);
+    assert.deepEqual(store.history, [{ t: now - 30000, s: 10, w: 41 }]);
+    assert.deepEqual(store.fresh, [{ t: now - 30000, s: 10, w: 41 }]);
+});
+
+test("never patches a point in place", () => {
+    // slice() is shallow — the array the frontend still holds must not change
+    // under it, because QML never signals a change made that way and the file
+    // has not seen it either.
+    const now = 1785000000000;
+    const store = UsageHistory.newStore(500);
+    UsageHistory.record(store, { s: 10 }, now - 30000);
+    const before = store.history;
+    UsageHistory.record(store, { s: 20 }, now);
+    assert.deepEqual(before, [{ t: now - 30000, s: 10 }]);
+    assert.deepEqual(store.history, [{ t: now - 30000, s: 20 }]);
+});
+
+test("combines repeated timestamps inside one side of the union", () => {
+    // Two half-filled points at the same instant — one frontend's mirror write
+    // raced its own poll — must not cost each other their series.
+    assert.deepEqual(UsageHistory.union([{ t: 1, w: 1 }, { t: 1, cp: 2 }], [], 500), [{ t: 1, w: 1, cp: 2 }]);
+});
+
+test("drops points the chart cannot place on a time axis", () => {
+    // The mirror file is written by the other frontend and can be hand-edited;
+    // a null or non-numeric t sorts as NaN and drags the whole range with it.
+    assert.deepEqual(UsageHistory.normalize([{ t: null, w: 1 }, { t: "abc", w: 2 }, { t: NaN, w: 3 }, { t: 5, w: 4 }], 500), [{ t: 5, w: 4 }]);
+    assert.deepEqual(UsageHistory.union([{ t: null, w: 1 }], [{ t: 5, w: 4 }], 500), [{ t: 5, w: 4 }]);
+});
+
+test("reads a numeric timestamp back out of a string", () => {
+    assert.deepEqual(UsageHistory.normalize([{ t: "1700000000000", w: 7 }], 500), [{ t: 1700000000000, w: 7 }]);
+    // ...and the string and number forms are then the same point, not two.
+    assert.deepEqual(UsageHistory.union([{ t: "1700000000000", w: 7 }], [{ t: 1700000000000, cp: 8 }], 500), [{ t: 1700000000000, w: 7, cp: 8 }]);
+});
+
+test("normalize copies, so a restored file cannot alias the live series", () => {
+    const file = [{ t: 1, w: 1 }];
+    const norm = UsageHistory.normalize(file, 500);
+    norm[0].w = 99;
+    assert.deepEqual(file, [{ t: 1, w: 1 }]);
+});
+
+test("normalize drops the legacy value key once it has been migrated", () => {
+    assert.deepEqual(UsageHistory.normalize([{ t: 1, v: 40 }], 500), [{ t: 1, w: 40 }]);
+    // An existing w wins; v is not carried forward either way.
+    assert.deepEqual(UsageHistory.normalize([{ t: 1, v: 40, w: 50 }], 500), [{ t: 1, w: 50 }]);
+});
+
+// The union runs in two places: in QML when a frontend restores at startup, and
+// in Python when history-io merges a save into the file on disk. They have to
+// agree exactly, or the series would change shape depending on which one last
+// touched it. Replay the same cases through both and compare the JSON.
+test("the QML and Python unions produce identical output", () => {
+    const cases = [
+        [[{ t: 1000, w: 40 }, { t: 2000, w: 50 }], [{ t: 2000, cp: 7 }, { t: 3000, w: 60 }]],
+        [[{ t: 1, w: 1 }, { t: 1, cp: 2 }], [{ t: 1, w: 3 }]],
+        [[{ t: 1, w: 1 }, null, { w: 9 }], [{ t: 1, w: 2 }]],
+        [[{ t: null, w: 1 }, { t: "abc", w: 2 }, { t: "1700000000000", w: 3 }], [{ t: 1700000000000, cp: 4 }]],
+        [[{ t: 5, w: null, s: 0 }], [{ t: 5, w: 7, cp: null }]],
+        [[], []],
+        [[{ t: 3, w: 3 }, { t: 1, w: 1 }, { t: 2, w: 2 }], [{ t: 4, w: 4 }]],
+        [[{ t: 1.5, w: 1 }, { t: -2, w: 2 }], [{ t: 0, w: 0 }]],
+        // Number() reads "0x10" and "Infinity"; float() reads "1_0" and "nan".
+        // Neither set is the other's, so both sides take plain decimals only.
+        [[{ t: "0x10", w: 1 }, { t: "1_0", w: 2 }, { t: "Infinity", w: 3 }, { t: "nan", w: 4 }, { t: "", w: 5 }], [{ t: " 12 ", w: 6 }, { t: "1e3", w: 7 }]]
+    ];
+    const limits = [500, 2];
+    const script = "import json,sys; sys.path.insert(0, sys.argv[1]); from aiusage import history;" +
+        " c = json.load(sys.stdin);" +
+        " print(json.dumps([history.union(b, o, l) for b, o, l in c], separators=(',', ':')))";
+    const payload = [];
+    for (const limit of limits)
+        for (const [base, overlay] of cases)
+            payload.push([base, overlay, limit]);
+
+    const py = execFileSync("python3", ["-B", "-c", script, "package/contents/tools"], {
+        input: JSON.stringify(payload),
+        encoding: "utf8",
+        cwd: __dirname + "/.."
+    });
+    const fromJs = payload.map(([base, overlay, limit]) => UsageHistory.union(base, overlay, limit));
+    assert.equal(py.trim(), JSON.stringify(fromJs));
+});
+
+test("the QML and Python normalize produce identical output", () => {
+    const cases = [
+        [{ t: 1, v: 40 }, { t: 2, w: 50 }, { v: 60 }, null],
+        [{ t: "1700000000000", w: 7 }, { t: null }, { t: NaN, w: 1 }],
+        [{ t: 1, v: 40, w: 50 }, { t: 2, w: null, s: 3 }],
+        [{ t: "0x10", w: 1 }, { t: "1_0", w: 2 }, { t: "Infinity", w: 3 }, { t: " 12 ", w: 4 }, { t: "+1e3", w: 5 }],
+        []
+    ];
+    const script = "import json,sys; sys.path.insert(0, sys.argv[1]); from aiusage import history;" +
+        " c = json.load(sys.stdin);" +
+        " print(json.dumps([history.normalize(p, 500) for p in c], separators=(',', ':')))";
+    // JSON has no NaN, and neither store can hold one; drop it the way a file
+    // round trip would before handing the cases to Python.
+    const py = execFileSync("python3", ["-B", "-c", script, "package/contents/tools"], {
+        input: JSON.stringify(cases).replace(/NaN/g, "null"),
+        encoding: "utf8",
+        cwd: __dirname + "/.."
+    });
+    const fromJs = cases.map(points => UsageHistory.normalize(points, 500));
+    assert.equal(py.trim(), JSON.stringify(fromJs));
+});
+
+// ── The save protocol ───────────────────────────────────────────────────────
+// Both frontends run this state machine — neither has a copy of the rules — so
+// these cover the shipped code rather than a model of it.
+
+test("a reading is asserted, a restored series is offered", () => {
+    const store = UsageHistory.newStore(500);
+    UsageHistory.opened(store);
+    UsageHistory.restore(store, [{ t: 1, w: 9 }]);
+    UsageHistory.record(store, { w: 20 }, 5000);
+
+    // The seed goes first and goes as a seed — a fresh install has to get its
+    // restored series on disk — and the reading follows behind it.
+    const first = UsageHistory.take(store);
+    assert.equal(first.op, "seed");
+    assert.deepEqual(first.points, [{ t: 1, w: 9 }]);
+    assert.equal(UsageHistory.take(store), null, "two batches must never be out at once");
+
+    UsageHistory.done(store, [{ t: 1, w: 9 }]);
+    const second = UsageHistory.take(store);
+    assert.equal(second.op, "autosave");
+    assert.deepEqual(second.points, [{ t: 5000, w: 20 }]);
+});
+
+test("a failed save is not retried until the next poll", () => {
+    // The Quickshell panel asks for the next batch on every process exit. Handing
+    // this one straight back would be a loop of failing saves as fast as the
+    // shell can fork.
+    const store = UsageHistory.newStore(500);
+    UsageHistory.opened(store);
+    UsageHistory.record(store, { w: 10 }, 1000);
+    assert.deepEqual(UsageHistory.take(store).points, [{ t: 1000, w: 10 }]);
+
+    UsageHistory.failed(store);
+    assert.deepEqual(store.fresh, [{ t: 1000, w: 10 }], "the batch is kept, not dropped");
+    assert.equal(UsageHistory.take(store), null);
+    assert.equal(UsageHistory.take(store), null, "however often it is asked");
+
+    UsageHistory.record(store, {}, 200000);
+    assert.deepEqual(UsageHistory.take(store).points, [{ t: 1000, w: 10 }]);
+});
+
+test("a failed batch goes back to the lane it came from", () => {
+    const store = UsageHistory.newStore(500);
+    UsageHistory.opened(store);
+    UsageHistory.restore(store, [{ t: 1, w: 9 }]);
+    UsageHistory.take(store);
+    UsageHistory.failed(store);
+    assert.deepEqual(store.seed, [{ t: 1, w: 9 }], "a seed must not come back as a reading");
+    assert.deepEqual(store.fresh, []);
+
+    // The Quickshell watchdog kills the process and unwinds, and the collector
+    // may then report the kill as an empty answer and unwind again. The second
+    // one has to be a no-op, not a second copy of the batch.
+    UsageHistory.failed(store);
+    assert.deepEqual(store.seed, [{ t: 1, w: 9 }]);
+});
+
+test("nothing is written before the startup read has answered", () => {
+    const store = UsageHistory.newStore(500);
+    UsageHistory.record(store, { w: 10 }, 1000);
+    assert.equal(UsageHistory.take(store), null);
+    UsageHistory.opened(store);
+    assert.deepEqual(UsageHistory.take(store).points, [{ t: 1000, w: 10 }]);
+});
+
+test("adopting keeps what only exists here and lets fresh readings win", () => {
+    const store = UsageHistory.newStore(500);
+    UsageHistory.opened(store);
+    UsageHistory.restore(store, [{ t: 1, w: 1 }]);
+    UsageHistory.record(store, { w: 50 }, 3000);
+    UsageHistory.adopt(store, [{ t: 2, cp: 7 }, { t: 3000, w: 12 }]);
+    // t=1 survives though the file has never had it, the file's t=2 arrives, and
+    // the reading at t=3000 is this frontend's own and is not rolled back.
+    assert.deepEqual(store.history, [{ t: 1, w: 1 }, { t: 2, cp: 7 }, { t: 3000, w: 50 }]);
+});
+
+// ── The two frontends against the real history-io ───────────────────────────
+// The Plasma widget and the Quickshell panel share one file and never
+// coordinate, so what each one *sends* decides what the other can lose. Both
+// compose the same three calls — record(), missing() and union() — around
+// history-io, and that composition is replayed here rather than only its parts.
+
+const os = require("node:os");
+const fs = require("node:fs");
+const path = require("node:path");
+
+const HISTORY_IO = path.join(__dirname, "..", "package", "contents", "tools", "sh", "history-io");
+
+function newHome() {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "ai-usage-history-"));
+    test.after(() => fs.rmSync(home, { recursive: true, force: true }));
+    return home;
+}
+
+function fileOf(home) {
+    return JSON.parse(fs.readFileSync(path.join(home, "ai-usage-widget", "usage-history-latest.json"), "utf8"));
+}
+
+// What is left of a frontend once the protocol moved into the store: run the
+// tool, hand the answer back. This is the whole of main.qml's and
+// AiUsageShell.qml's part, so the decisions under test here are the shipped
+// ones. `send` runs the tool — the file changes there and then — while `settle`
+// delivers the answer, which is the gap an asynchronous response opens and where
+// samples land.
+class Frontend {
+    constructor(home, limit = 500) {
+        this.home = home;
+        this.store = UsageHistory.newStore(limit);
+        this.answer = null;
+        this.env = {};
+    }
+
+    get history() {
+        return this.store.history;
+    }
+
+    run(op, json) {
+        const env = Object.assign({}, process.env, { XDG_DATA_HOME: this.home }, this.env);
+        if (json !== null)
+            env.WIDGET_HISTORY_JSON = json;
+        return JSON.parse(execFileSync(HISTORY_IO, [op], { env, encoding: "utf8" }).trim());
+    }
+
+    // loadUsageHistory(): the widget config, or a snapshot the user imported.
+    restore(points) {
+        UsageHistory.restore(this.store, points);
+    }
+
+    // the startup autoload, and the release that follows it
+    load() {
+        UsageHistory.adopt(this.store, this.run("autoload", null).data);
+        UsageHistory.opened(this.store);
+        this.send();
+        this.settle();
+    }
+
+    // recordHistoryValues() / recordHistory()
+    record(values, nowMs) {
+        UsageHistory.record(this.store, values, nowMs);
+        this.send();
+    }
+
+    // saveHistory()
+    send() {
+        const batch = UsageHistory.take(this.store);
+        if (batch)
+            this.answer = this.run(batch.op, JSON.stringify(batch.points));
+    }
+
+    // finishHistorySave() / failHistorySave()
+    settle() {
+        if (!this.store.sending)
+            return;
+
+        const res = this.answer;
+        this.answer = null;
+        if (!res || res.error) {
+            UsageHistory.failed(this.store);
+            return;
+        }
+        UsageHistory.done(this.store, res.data);
+        this.send();
+    }
+}
+
+test("a save never rolls back a reading the other frontend recorded", () => {
+    const home = newHome();
+    const plasma = new Frontend(home);
+    const quick = new Frontend(home);
+    plasma.load();
+    quick.load();
+
+    plasma.record({ w: 10 }, 1000);
+    plasma.settle();
+    quick.record({ cp: 5 }, 2000);
+    quick.settle();
+    // The widget patches its own point; the panel is still holding the w: 10 it
+    // adopted a moment ago.
+    plasma.record({ w: 11 }, 3000);
+    plasma.settle();
+    assert.deepEqual(quick.history, [{ t: 1000, w: 10 }, { t: 2000, cp: 5 }]);
+
+    // The panel's next save must carry its own sample and not that stale copy.
+    quick.record({ cp: 6 }, 4000);
+    quick.settle();
+    assert.deepEqual(fileOf(home), [{ t: 1000, w: 11 }, { t: 2000, cp: 6 }]);
+
+    // A save is also the read: each frontend catches up with whatever the other
+    // recorded on its own next one, without polling the file separately.
+    plasma.record({ w: 12 }, 5000);
+    plasma.settle();
+    assert.deepEqual(plasma.history, fileOf(home));
+    quick.record({ cp: 7 }, 6000);
+    quick.settle();
+    assert.deepEqual(quick.history, fileOf(home));
+});
+
+test("a save in flight cannot replace a sample recorded while it ran", () => {
+    const home = newHome();
+    const f = new Frontend(home);
+    f.load();
+
+    f.record({ w: 10 }, 1000);
+    // Still waiting on that answer, and the merge window has passed, so this is
+    // a point of its own that the file has not heard about yet.
+    f.record({ w: 20 }, 1000 + UsageHistory.MERGE_WINDOW_MS + 1);
+    f.settle();
+    assert.deepEqual(f.history, [{ t: 1000, w: 10 }, { t: 121001, w: 20 }]);
+
+    // The batch held back while the first save ran goes out with the next one.
+    f.settle();
+    assert.deepEqual(fileOf(home), [{ t: 1000, w: 10 }, { t: 121001, w: 20 }]);
+});
+
+test("a startup restore adds what the file lacks and adopts the rest", () => {
+    const home = newHome();
+    const quick = new Frontend(home);
+    quick.load();
+    quick.record({ cp: 5 }, 2000);
+    quick.settle();
+
+    // The widget comes back with a config written before the panel ever ran, and
+    // with its own stale copy of a point the panel has since patched.
+    const plasma = new Frontend(home);
+    plasma.restore([{ t: 500, w: 1 }, { t: 2000, cp: 4 }]);
+    plasma.load();
+    plasma.settle();
+    assert.deepEqual(plasma.history, [{ t: 500, w: 1 }, { t: 2000, cp: 5 }]);
+    assert.deepEqual(fileOf(home), [{ t: 500, w: 1 }, { t: 2000, cp: 5 }]);
+});
+
+test("a seed cannot override the file, not even one written since it was read", () => {
+    // The window a frontend that worked the difference out for itself would be
+    // deciding in: its copy of the file is from before the other frontend wrote.
+    // Only history-io sees both sides at once, and only under the lock.
+    const home = newHome();
+    const f = new Frontend(home);
+    f.restore([{ t: 500, s: 1 }, { t: 1000, w: 10 }]);
+    UsageHistory.adopt(f.store, f.run("autoload", null).data);
+
+    const peer = new Frontend(home);
+    peer.load();
+    peer.record({ w: 20 }, 1000);
+    peer.settle();
+
+    UsageHistory.opened(f.store);
+    f.send();
+    f.settle();
+    assert.deepEqual(fileOf(home), [{ t: 500, s: 1 }, { t: 1000, w: 20 }]);
+    assert.deepEqual(f.history, [{ t: 500, s: 1 }, { t: 1000, w: 20 }]);
+});
+
+test("an import cannot override a reading the file has since taken", () => {
+    const home = newHome();
+    const f = new Frontend(home);
+    f.load();
+
+    // The other frontend records while this one is not looking, so this one's
+    // copy of the file has never held w: 20.
+    const peer = new Frontend(home);
+    peer.load();
+    peer.record({ w: 20 }, 1000);
+    peer.settle();
+
+    // A snapshot from when the series was younger: it holds an older value for
+    // that very point, and a point the running series has lost.
+    f.restore([{ t: 500, s: 3 }, { t: 1000, w: 10 }]);
+    f.send();
+    f.settle();
+
+    assert.deepEqual(fileOf(home), [{ t: 500, s: 3 }, { t: 1000, w: 20 }]);
+    assert.deepEqual(f.history, [{ t: 500, s: 3 }, { t: 1000, w: 20 }]);
+});
+
+test("a save that could not merge keeps its batch for the next poll", () => {
+    const home = newHome();
+    const f = new Frontend(home);
+    f.load();
+    f.record({ w: 10 }, 1000);
+    f.settle();
+
+    // An interpreter that cannot run the merge: history-io reports it rather than
+    // writing over the file, and the batch comes back to the outbox.
+    f.env = { PYTHON3: "/nonexistent/python3" };
+    f.record({ w: 20 }, 200000);
+    f.settle();
+    assert.deepEqual(fileOf(home), [{ t: 1000, w: 10 }]);
+    assert.deepEqual(f.store.fresh, [{ t: 200000, w: 20 }]);
+    // The sample is still on screen either way — only the mirror is behind.
+    assert.deepEqual(f.history, [{ t: 1000, w: 10 }, { t: 200000, w: 20 }]);
+
+    // ...and it is not thrown straight back at a tool that just failed.
+    f.send();
+    assert.equal(f.store.sending, null);
+
+    // With the interpreter back, the next poll lands it.
+    f.env = {};
+    f.record({}, 200001);
+    f.settle();
+    assert.deepEqual(fileOf(home), [{ t: 1000, w: 10 }, { t: 200000, w: 20 }]);
 });
 
 test("replays a reset that happened while nothing was recorded", () => {
