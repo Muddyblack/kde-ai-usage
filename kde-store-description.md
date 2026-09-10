@@ -15,14 +15,14 @@ Switch between tabs in the popup for each service:
 [*] [b]OpenAI API[/b]
 [*] [b]Grok / xAI[/b]
 [*] [b]Mistral AI[/b]   
-[*] [b]Kiro[/b] — monthly credits, from the kiro-cli login or the Kiro IDE
+[*] [b]Kiro[/b] — Monthly credits, from the kiro-cli login or the Kiro IDE
 [*] [b]OpenRouter[/b]
-[*] [b]Z.AI[/b] [i](untested)[/i] — 5-hour token quota + monthly tools quota
-[*] [b]GitHub Copilot[/b] — premium request usage for personally billed plans, plus local Copilot CLI activity stats
-[*] [b]DeepSeek[/b] [i](untested)[/i] — current account balance + granted/topped-up split
+[*] [b]Z.AI[/b] — 5-hour token quota + monthly tools quota
+[*] [b]GitHub Copilot[/b] — Premium request usage for personally billed plans, plus local Copilot CLI activity stats
+[*] [b]DeepSeek[/b] — Current account balance + granted/topped-up split
 [*] [b]Kimi[/b] — Kimi Code plan windows from the kimi CLI login, and/or the Moonshot API balance
-[*] [b]Muse[/b] — local Muse Code session stats with an offline spend estimate; plan windows behind an opt-in switch (Meta reports them only on a billed call, so it is off by default)
-[*] [b]Cursor[/b] [i](free plan tested)[/i] — included usage, Auto/API split and on-demand spend, via the cursor-agent or Cursor IDE login
+[*] [b]Muse[/b] — Local Muse Code session stats with an offline spend estimate; plan windows behind an opt-in switch (Meta reports them only on a billed call, so it is off by default)
+[*] [b]Cursor[/b] [i](free plan tested)[/i] — Included usage, Auto/API split and on-demand spend, via the cursor-agent or Cursor IDE login
 [/list]
 
 [b]Why I like using it[/b]
