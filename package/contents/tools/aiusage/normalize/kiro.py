@@ -49,5 +49,7 @@ def normalize_kiro(raw):
         "currencyCode": res.get("currencyCode") or "USD",
         "currencySymbol": res.get("currencySymbol") or "$",
         "resetAt": reset_at,
+        # "cli" = live from kiro-cli's login, "ide" = the Kiro IDE's snapshot.
+        "source": res.get("source") if res.get("source") in ("cli", "ide") else "ide",
     }
     return r

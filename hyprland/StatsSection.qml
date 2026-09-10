@@ -19,6 +19,9 @@ ColumnLayout {
     readonly property string topGroupsLabel: stats.topRepositories ? "Top repositories" : "Top workspaces"
     readonly property var dailySeries: stats.dailySeries || stats.dailyTokens || []
     readonly property string dailyUnit: stats.dailyUnit || "tokens"
+    // Cursor reports its dashboard figures for the billing cycle, not a lifetime
+    // total like the local CLI logs.
+    readonly property string periodLabel: providerId === "cursor" ? "this billing cycle" : "all time"
 
     function formatTokens(n) {
         if (!n || n <= 0)
@@ -77,6 +80,8 @@ ColumnLayout {
                     return "No local activity stats yet.\nRun the Copilot CLI to fill ~/.copilot/session-store.db";
                 if (statsSectionRoot.providerId === "muse")
                     return "No Muse sessions yet.\nRun Muse Code and its own logs will appear here.";
+                if (statsSectionRoot.providerId === "cursor")
+                    return "No Cursor usage this billing cycle yet.\nRequests made with Cursor or cursor-agent will appear here.";
                 return "No local activity stats yet.\nRun Claude Code to generate ~/.claude/stats-cache.json";
             }
             font.pixelSize: 11
@@ -141,7 +146,7 @@ ColumnLayout {
                 visible: (statsSectionRoot.stats.totalTokens || 0) > 0
                 tileValue: statsSectionRoot.formatTokens(statsSectionRoot.stats.totalTokens || 0)
                 tileLabel: "tokens"
-                tileTip: "Total tokens across all models (all time)"
+                tileTip: "Total tokens across all models (" + statsSectionRoot.periodLabel + ")"
                 accentColor: statsSectionRoot.accent
             }
 
@@ -213,7 +218,7 @@ ColumnLayout {
                     return amount + " " + cur;
                 }
                 tileLabel: "spend"
-                tileTip: "Total cost across all models (all time)"
+                tileTip: "Total cost across all models (" + statsSectionRoot.periodLabel + ")"
                 accentColor: statsSectionRoot.accent
             }
 
@@ -252,7 +257,7 @@ ColumnLayout {
             visible: statsSectionRoot.dailySeries.length > 1
 
             Text {
-                text: statsSectionRoot.dailyUnit === "tokens" ? "Tokens / day" : "Messages / day"
+                text: statsSectionRoot.dailyUnit === "tokens" ? "Tokens / day" : (statsSectionRoot.dailyUnit === "requests" ? "Requests / day" : "Messages / day")
                 font.pixelSize: 9
                 color: "#94a3b8"
                 opacity: 0.8
@@ -491,22 +496,22 @@ ColumnLayout {
             }
 
             Text {
-                visible: statsSectionRoot.providerId === "openai"
-                text: "Codex analytics ↗"
+                visible: statsSectionRoot.providerId === "openai" || statsSectionRoot.providerId === "cursor"
+                text: statsSectionRoot.providerId === "cursor" ? "Cursor dashboard ↗" : "Codex analytics ↗"
                 font.pixelSize: 8
                 font.underline: analyticsMA.containsMouse
                 color: statsSectionRoot.accent
                 opacity: analyticsMA.containsMouse ? 1.0 : 0.7
 
                 QQC2.ToolTip.visible: analyticsMA.containsMouse
-                QQC2.ToolTip.text: "Open chatgpt.com Codex usage analytics in your browser"
+                QQC2.ToolTip.text: statsSectionRoot.providerId === "cursor" ? "Open the cursor.com usage dashboard in your browser" : "Open chatgpt.com Codex usage analytics in your browser"
 
                 MouseArea {
                     id: analyticsMA
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: Qt.openUrlExternally("https://chatgpt.com/codex/cloud/settings/analytics#usage")
+                    onClicked: Qt.openUrlExternally(statsSectionRoot.providerId === "cursor" ? "https://cursor.com/dashboard?tab=usage" : "https://chatgpt.com/codex/cloud/settings/analytics#usage")
                 }
             }
         }

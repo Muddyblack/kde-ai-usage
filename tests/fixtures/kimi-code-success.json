@@ -1,0 +1,24 @@
+{
+  "id": "kimi",
+  "now": 1785000000,
+  "inputs": {
+    "usage": {},
+    "codePlan": {
+      "loggedIn": true,
+      "exhausted": false,
+      "windows": [
+        { "name": "", "seconds": 18000, "used": 30, "limit": 100, "resetAt": 1785010000 },
+        { "name": "", "seconds": 604800, "used": 450, "limit": 1000, "resetAt": 1785500000 }
+      ],
+      "booster": {
+        "balanceCents": 250,
+        "totalCents": 1000,
+        "monthlyChargeLimitEnabled": false,
+        "monthlyChargeLimitCents": 0,
+        "monthlyUsedCents": 750,
+        "currency": "USD"
+      }
+    },
+    "status": null
+  }
+}

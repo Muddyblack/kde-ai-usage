@@ -2,6 +2,7 @@ from ..contract import provider_error
 from .antigravity import normalize_antigravity
 from .claude import normalize_claude
 from .copilot import normalize_copilot
+from .cursor import normalize_cursor
 from .deepseek import normalize_deepseek
 from .grok import normalize_grok
 from .kiro import normalize_kiro
@@ -25,6 +26,7 @@ _DISPATCH = {
     "copilot": normalize_copilot,
     "deepseek": normalize_deepseek,
     "kimi": normalize_moonshot,
+    "cursor": normalize_cursor,
 }
 
 

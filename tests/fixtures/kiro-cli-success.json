@@ -1,0 +1,27 @@
+{
+  "id": "kiro",
+  "now": 1785000000,
+  "inputs": {
+    "usage": {
+      "planType": "free",
+      "usageType": "CREDIT",
+      "usageUnit": "INVOCATIONS",
+      "displayName": "Credit",
+      "displayNamePlural": "Credits",
+      "currentUsage": 0.13,
+      "usageLimit": 50,
+      "percentageUsed": 0.26,
+      "remaining": 49.87,
+      "currentOverages": 0,
+      "overageCap": 10000,
+      "overageCharges": 0,
+      "overageRate": 0.04,
+      "resetDate": 1790812800,
+      "currencyCode": "USD",
+      "currencySymbol": "$",
+      "timestamp": 0,
+      "source": "cli"
+    },
+    "status": null
+  }
+}

@@ -98,9 +98,10 @@ def http_error_json(label, status, auth_message=None):
     return error_json(f"{label} HTTP {status}")
 
 
-def fetch_json(url, headers=None, timeout=10, fixture_path=None):
+def fetch_json(url, headers=None, timeout=10, fixture_path=None, data=None):
     """Returns an HttpResult. `fixture_path` replays a recorded response as a
-    200 so tests never touch the network — the *_RESPONSE_FILE hooks."""
+    200 so tests never touch the network — the *_RESPONSE_FILE hooks. `data`
+    (bytes) turns the request into a POST, for RPC-style endpoints."""
     if fixture_path and os.path.isfile(fixture_path):
         try:
             with open(fixture_path) as f:
@@ -111,7 +112,7 @@ def fetch_json(url, headers=None, timeout=10, fixture_path=None):
     import urllib.error
     import urllib.request
 
-    req = urllib.request.Request(url, headers=headers or {})
+    req = urllib.request.Request(url, data=data, headers=headers or {})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return HttpResult(resp.status, resp.read().decode("utf-8", "replace"))

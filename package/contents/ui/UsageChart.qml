@@ -156,7 +156,8 @@ Rectangle {
                     text: modelData.label
                     font.pixelSize: 9
                     font.bold: rootItem.chartWindow === modelData.id
-                    color: rootItem.chartWindow === modelData.id ? "#ffffff" : Kirigami.Theme.textColor
+                    // Near-white accents (Grok, Cursor) would swallow white text.
+                    color: rootItem.chartWindow === modelData.id ? ((0.299 * rootItem.activeAccent.r + 0.587 * rootItem.activeAccent.g + 0.114 * rootItem.activeAccent.b) > 0.6 ? "#1a1a1a" : "#ffffff") : Kirigami.Theme.textColor
                     opacity: rootItem.chartWindow === modelData.id ? 1.0 : 0.6
                 }
                 MouseArea {
@@ -354,6 +355,10 @@ Rectangle {
         onAccentColorChanged: requestPaint()
         onPulseChanged: requestPaint()
         onScrubIndexChanged: requestPaint()
+        // Both mode keeps scrubIndex at 0 while the selected points move.
+        onScrubGeminiPtChanged: requestPaint()
+        onScrubRestPtChanged: requestPaint()
+        onScrubTimestampChanged: requestPaint()
         onVisibleChanged: if (visible)
             requestPaint()
         onWidthChanged: requestPaint()

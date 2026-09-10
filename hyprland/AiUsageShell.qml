@@ -107,11 +107,23 @@ ShellRoot {
             keyPlaceholder: "or $DEEPSEEK_API_KEY"
         },
         {
+            id: "kimi",
+            label: "Kimi",
+            accent: "#1e3a8a",
+            keySetting: "moonshot",
+            keyPlaceholder: "optional — the kimi CLI login is used"
+        },
+        {
             id: "muse",
             label: "Muse",
             accent: "#0064e0",
             keySetting: "muse",
             keyPlaceholder: "optional — the CLI login is used"
+        },
+        {
+            id: "cursor",
+            label: "Cursor",
+            accent: "#e6e6e6"
         }
     ]
 
@@ -207,7 +219,8 @@ ShellRoot {
     }
 
     function providerEnabled(id) {
-        if (id === "zai" || id === "copilot" || id === "deepseek")
+        // Mirrors OPT_IN_PROVIDERS in aiusage/config.py.
+        if (id === "zai" || id === "copilot" || id === "deepseek" || id === "kimi" || id === "muse" || id === "cursor")
             return root.settings.providers[id] === true;
         return root.settings.providers[id] !== false;
     }
@@ -322,7 +335,7 @@ ShellRoot {
     property string activeSubTab: "usage"
     readonly property bool activeHasStats: {
         var p = activeProvider();
-        return p && (p.id === "claude" || p.id === "openai" || p.id === "copilot" || p.id === "muse");
+        return p && (p.id === "claude" || p.id === "openai" || p.id === "copilot" || p.id === "muse" || p.id === "cursor");
     }
 
     function activeProvider() {

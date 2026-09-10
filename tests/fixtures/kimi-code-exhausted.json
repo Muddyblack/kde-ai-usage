@@ -1,0 +1,15 @@
+{
+  "id": "kimi",
+  "now": 1785000000,
+  "inputs": {
+    "usage": {},
+    "codePlan": {
+      "loggedIn": true,
+      "exhausted": true,
+      "message": "Credits used up",
+      "windows": [],
+      "booster": null
+    },
+    "status": null
+  }
+}

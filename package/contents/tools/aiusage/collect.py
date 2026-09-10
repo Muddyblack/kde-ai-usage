@@ -17,8 +17,10 @@ from .providers.codex_rate_limits import get_codex_rate_limits
 from .providers.codex_stats import get_codex_stats
 from .providers.copilot import get_copilot_usage
 from .providers.copilot_stats import get_copilot_stats
+from .providers.cursor import get_cursor_usage
 from .providers.deepseek import get_deepseek_balance
 from .providers.grok import get_grok_usage
+from .providers.kimi_code import get_kimi_code_usage
 from .providers.kiro import get_kiro_usage
 from .providers.mistral import get_mistral_usage
 from .providers.moonshot import get_moonshot_balance
@@ -205,6 +207,16 @@ def collect_copilot(now):
     }
 
 
+def collect_kimi(now):
+    """Two unrelated Kimi sources that either stand alone: the Moonshot API
+    balance (an API key) and the Kimi Code plan quota (the CLI login)."""
+    return {
+        "id": "kimi",
+        "now": now,
+        "inputs": {"usage": get_moonshot_balance() or {}, "codePlan": get_kimi_code_usage() or {}, "status": None},
+    }
+
+
 _SIMPLE = {
     "antigravity": (get_antigravity_usage, None, None),
     "kiro": (get_kiro_usage, None, None),
@@ -213,7 +225,7 @@ _SIMPLE = {
     "grok": (get_grok_usage, None, None),
     "zai": (get_zai_usage, None, None),
     "deepseek": (get_deepseek_balance, None, None),
-    "kimi": (get_moonshot_balance, None, None),
+    "cursor": (get_cursor_usage, None, None),
 }
 
 
@@ -226,6 +238,8 @@ def collect(id_, now):
         return collect_copilot(now)
     if id_ == "muse":
         return collect_muse(now)
+    if id_ == "kimi":
+        return collect_kimi(now)
     if id_ in _SIMPLE:
         fn, status_name, status_url = _SIMPLE[id_]
         usage = fn() or {}

@@ -23,6 +23,7 @@ PROVIDER_ICONS = {
     "antigravity": "antigravity-color.svg",
     "claude": "claude-color.svg",
     "copilot": "copilot-color.svg",
+    "cursor": "cursor.svg",
     "deepseek": "deepseek-color.svg",
     "grok": "grok.svg",
     "kimi": "kimi.svg",

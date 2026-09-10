@@ -1,0 +1,37 @@
+{
+  "id": "cursor",
+  "now": 1785000000,
+  "inputs": {
+    "usage": {
+      "loggedIn": true,
+      "source": "cli",
+      "usage": {
+        "billingCycleStart": "1787817247821",
+        "billingCycleEnd": "1790495647821",
+        "planUsage": {
+          "remainingBonus": false,
+          "bonusTooltip": "We work with model providers to give you free usage beyond what you've purchased. Amounts may vary.",
+          "autoPercentUsed": 0,
+          "apiPercentUsed": 0,
+          "totalPercentUsed": 0
+        },
+        "spendLimitUsage": {
+          "pooledLimit": 0,
+          "pooledRemaining": 0,
+          "individualLimit": 0,
+          "limitType": "user",
+          "overallLimit": 0,
+          "overallRemaining": 0
+        },
+        "displayThreshold": 200,
+        "displayMessage": "You've used 0% of your included usage",
+        "autoBucketModels": ["default"]
+      },
+      "plan": {
+        "planInfo": { "planName": "Free", "price": "Free", "billingCycleEnd": "1790495647821" },
+        "nextUpgrade": { "tier": "pro", "name": "Pro", "includedAmountCents": 2000, "price": "$20/mo", "description": "Upgrade to Cursor Pro" }
+      }
+    },
+    "status": null
+  }
+}

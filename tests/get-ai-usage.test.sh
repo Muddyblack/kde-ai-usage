@@ -203,6 +203,11 @@ check kiro-missing "reports no local snapshot" '
     (.ok | not) and .error == "Kiro: no local usage data found"'
 check kiro-error "passes the tool error through" '
     (.ok | not) and (.error | startswith("Kiro: No Kiro state found"))'
+check kiro-success "labels an IDE snapshot as such" '.details.source == "ide"'
+check kiro-cli-success "reads the live kiro-cli numbers" '
+    .ok and .details.source == "cli" and .details.planType == "free"
+    and .details.currentUsage == 0.13 and .details.usageLimit == 50
+    and .details.resetAt == 1790812800 and .quotaWindows[0].detail == "0.13 / 50 credits"'
 
 # ── Mistral ─────────────────────────────────────────────────────────────────
 
@@ -349,8 +354,46 @@ check kimi-success "reports the Moonshot balance split" '
     and ((.details.voucherBalance - 46.58893) | fabs) < 0.00001
     and ((.details.cashBalance - 3.00001) | fabs) < 0.00001
     and .historyValues == {km: 49.58894}'
-check kimi-missing "reports a missing Moonshot API key" '
-    (.ok | not) and .error == "Kimi: no Moonshot API key configured"'
+check kimi-missing "reports that neither Kimi source is set up" '
+    (.ok | not) and .error == "Kimi: no Moonshot API key or Kimi Code login"'
+check kimi-success "keeps the balance-only view without a Kimi Code login" '
+    .summary.detail == "Moonshot API" and .details.codePlan.available == false'
+check kimi-code-success "shows the Kimi Code windows without a Moonshot key" '
+    .ok and .summary.detail == "Kimi Code" and .summary.pct == 45
+    and ([.quotaWindows[].label] == ["5-hour limit", "Weekly limit", "Extra usage"])
+    and .quotaWindows[0].detail == "30 / 100" and .quotaWindows[2].detail == "$2.5 left"
+    and .historyValues == {kc: 30, kcw: 45}
+    and (.chartWindows | map(.label)) == ["5H", "24H", "7D", "30D"]
+    and .details.codePlan.booster.balance == 2.5 and (.details.keyValid | not)'
+check kimi-code-exhausted "reports a used-up plan as full rather than as an error" '
+    .ok and .summary.pct == 100 and .quotaWindows[0].detail == "Credits used up"
+    and .summary.hasChart == false and .chartWindows == [] and .details.codePlan.exhausted'
+
+# ── Cursor ──────────────────────────────────────────────────────────────────
+
+check cursor-success "reads included usage, the auto/API split and on-demand spend" '
+    .ok and .summary.detail == "Pro" and .summary.pct == 62.5
+    and ([.quotaWindows[].key] == ["cursor_total", "cursor_auto", "cursor_api", "cursor_on_demand"])
+    and .quotaWindows[0].detail == "$12.5 / $20" and .quotaWindows[3].detail == "$3 / $10"
+    and .quotaWindows[0].resetAt == 1790495647 and .details.resetAt == 1790495647
+    and .historyValues == {cu: 62.5}'
+check cursor-free "handles a free plan that reports percentages only" '
+    .ok and .summary.detail == "Free" and .summary.pct == 0
+    and .quotaWindows[0].detail == "0% of included usage" and (.quotaWindows | length) == 3
+    and .details.nextUpgrade.name == "Pro" and .details.source == "cli"'
+check cursor-success "turns the dashboard usage into the shared stats shape" '
+    .details.stats.available and .details.stats.totalTokens == 198998
+    and ((.details.stats.totalCostUSD - 1.56585075) | fabs) < 0.000001
+    and .details.stats.favoriteModel == "claude-4.5-sonnet"
+    and .details.stats.totalSessions == 2 and .details.stats.totalRequests == 3
+    and .details.stats.longestSessionMs == 600000 and .details.stats.longestSessionMessages == 2
+    and .details.stats.models.default.requests == 1 and .details.stats.dailyUnit == "tokens"
+    and (.details.stats.partial | not)'
+check cursor-free "has no stats without a stats blob" '.details.stats.available == false'
+check cursor-missing "reports a missing login" '
+    (.ok | not) and .error == "Cursor: not signed in — run cursor-agent login"'
+check cursor-expired "passes the login error through" '
+    (.ok | not) and .error == "Cursor: login expired — run cursor-agent login"'
 
 # ── Muse ────────────────────────────────────────────────────────────────────
 #
@@ -453,7 +496,12 @@ cat >"$TEST_TMP/deepseek.json" <<'JSON'
 JSON
 
 run_backend() {
-    HOME="$TEST_TMP/home" \
+    # The CLI-login providers (kiro-cli, Kimi Code, Cursor) follow the XDG
+    # variables, so a developer's own would otherwise leak real logins in.
+    env -u KIRO_CLI_DB -u KIRO_IDE_DB -u KIMI_CODE_HOME -u CURSOR_AUTH_PATH -u CURSOR_IDE_DB \
+        XDG_CONFIG_HOME="$TEST_TMP/home/.config" \
+        XDG_DATA_HOME="$TEST_TMP/home/.local/share" \
+        HOME="$TEST_TMP/home" \
         AI_USAGE_CONFIG="$TEST_TMP/config.json" \
         AI_USAGE_CACHE_DIR="$TEST_TMP/cache" \
         ZAI_RESPONSE_FILE="$TEST_TMP/zai.json" \
@@ -517,6 +565,144 @@ assert_backend "--provider fetches exactly what was asked for" '
 
 assert_backend "--provider ignores the enabled toggles" '
     (.providers | length) == 1 and .providers[0].id == "kiro"' --provider kiro
+
+# ── kiro-cli, Kimi Code and Cursor: the CLI logins, end to end ──────────────
+#
+# Each login is planted where the vendor's own CLI writes it, and each answer
+# is a recorded one — the Kiro and Cursor bodies are live payloads of a free
+# account, identifiers removed — so the real readers run without a socket.
+CLI_HOME="$TEST_TMP/cli-home"
+mkdir -p "$CLI_HOME/.config/cursor" "$CLI_HOME/.kimi-code/credentials" "$CLI_HOME/.local/share/kiro-cli"
+CLI_HOME="$CLI_HOME" python3 - <<'PY'
+import base64, json, os, sqlite3
+home = os.environ["CLI_HOME"]
+db = sqlite3.connect(os.path.join(home, ".local/share/kiro-cli/data.sqlite3"))
+db.execute("CREATE TABLE auth_kv (key TEXT PRIMARY KEY, value TEXT)")
+db.execute("CREATE TABLE state (key TEXT PRIMARY KEY, value BLOB)")
+db.execute("INSERT INTO auth_kv VALUES (?, ?)", ("kirocli:social:token", json.dumps({
+    "access_token": "kiro-secret-token", "refresh_token": "kiro-secret-refresh",
+    "expires_at": "2099-01-01T00:00:00.123456789Z", "provider": "google",
+    "profile_arn": "arn:aws:codewhisperer:us-east-1:000000000000:profile/TEST"})))
+db.commit()
+payload = base64.urlsafe_b64encode(json.dumps({"exp": 4102444800}).encode()).decode().rstrip("=")
+with open(os.path.join(home, ".config/cursor/auth.json"), "w") as f:
+    json.dump({"accessToken": f"eyJhbGciOiJIUzI1NiJ9.{payload}.cursor-secret-sig", "refreshToken": "cursor-secret-refresh"}, f)
+with open(os.path.join(home, ".kimi-code/credentials/kimi-code.json"), "w") as f:
+    json.dump({"access_token": "kimi-secret-token", "refresh_token": "kimi-secret-refresh", "expires_at": 4102444800,
+               "scope": "", "token_type": "Bearer", "expires_in": 900}, f)
+PY
+cat >"$TEST_TMP/kiro-cli.json" <<'JSON'
+{"daysUntilReset":0,"limits":[],"nextDateReset":1790812800.0,
+ "overageConfiguration":{"overageLimit":null,"overageStatus":"DISABLED"},
+ "subscriptionInfo":{"subscriptionTitle":"KIRO FREE"},
+ "usageBreakdownList":[{"bonuses":[],"currency":"USD","currentOverages":0,"currentOveragesWithPrecision":0.0,
+   "currentUsage":0,"currentUsageWithPrecision":0.13,"displayName":"Credit","displayNamePlural":"Credits",
+   "freeTrialInfo":{"currentUsage":23,"currentUsageWithPrecision":23.07,"freeTrialExpiry":1770928838.6,
+     "freeTrialStatus":"EXPIRED","usageLimit":500,"usageLimitWithPrecision":500.0},
+   "nextDateReset":1790812800.0,"overageCap":10000,"overageCapWithPrecision":10000.0,"overageCharges":0.0,
+   "overageCredits":[],"overageRate":0.04,"resourceType":"CREDIT","unit":"INVOCATIONS",
+   "usageLimit":50,"usageLimitWithPrecision":50.0}],
+ "userInfo":{"email":"test@example.com","userId":"test"}}
+JSON
+cat >"$TEST_TMP/cursor-usage.json" <<'JSON'
+{"billingCycleStart":"1787817247821","billingCycleEnd":"1790495647821",
+ "planUsage":{"remainingBonus":false,"autoPercentUsed":0,"apiPercentUsed":0,"totalPercentUsed":0},
+ "spendLimitUsage":{"pooledLimit":0,"pooledRemaining":0,"individualLimit":0,"limitType":"user","overallLimit":0,"overallRemaining":0},
+ "displayMessage":"You've used 0% of your included usage","autoBucketModels":["default"]}
+JSON
+cat >"$TEST_TMP/cursor-plan.json" <<'JSON'
+{"planInfo":{"planName":"Free","price":"Free","billingCycleEnd":"1790495647821"},
+ "nextUpgrade":{"tier":"pro","name":"Pro","includedAmountCents":2000,"price":"$20/mo","description":"Upgrade to Cursor Pro"}}
+JSON
+# The dashboard's two usage RPCs, as a personal account answers them. The
+# per-request list names the account and the conversation; neither may reach
+# the envelope.
+cat >"$TEST_TMP/cursor-aggregated.json" <<'JSON'
+{"aggregations":[{"modelIntent":"default","inputTokens":"31047","outputTokens":"879","cacheReadTokens":"67072","totalCents":6.085075,"tier":0}],
+ "totalInputTokens":"31047","totalOutputTokens":"879","totalCacheReadTokens":"67072","totalCostCents":6.085075}
+JSON
+cat >"$TEST_TMP/cursor-events.json" <<'JSON'
+{"totalUsageEventsCount":2,"usageEventsDisplay":[
+ {"timestamp":"1789047292738","model":"default","kind":"USAGE_EVENT_KIND_CUSTOM_SUBSCRIPTION","customSubscriptionName":"free",
+  "requestsCosts":1.6,"usageBasedCosts":"-","isTokenBasedCall":true,
+  "tokenUsage":{"inputTokens":20000,"outputTokens":500,"cacheReadTokens":40000,"totalCents":3.925475},
+  "owningUser":"123456","userEmail":"test@example.com","isChargeable":true,"isHeadless":false,
+  "chargedCents":3.925475,"conversationId":"conv-secret-1","subscriptionProductId":"free"},
+ {"timestamp":"1789047269035","model":"default","kind":"USAGE_EVENT_KIND_CUSTOM_SUBSCRIPTION","customSubscriptionName":"free",
+  "requestsCosts":0.9,"usageBasedCosts":"-","isTokenBasedCall":true,
+  "tokenUsage":{"inputTokens":11047,"outputTokens":379,"cacheReadTokens":27072,"totalCents":2.1596},
+  "owningUser":"123456","userEmail":"test@example.com","isChargeable":true,"isHeadless":false,
+  "chargedCents":2.1596,"conversationId":"conv-secret-1","subscriptionProductId":"free"}]}
+JSON
+# Shaped after the Kimi CLI's own parser (parseManagedUsagePayload): numbers may
+# arrive as strings, and wallet amounts are cents × 10^6.
+cat >"$TEST_TMP/kimi-code.json" <<'JSON'
+{"usage":{"used":"450","limit":"1000","resetTime":"2026-09-14T00:00:00Z"},
+ "limits":[{"window":{"duration":300,"timeUnit":"TIME_UNIT_MINUTE"},
+            "detail":{"used":30,"limit":100,"resetTime":"2026-09-10T18:00:00.000Z"}}],
+ "boosterWallet":{"balance":{"type":"BOOSTER","amount":"1000000000","amountLeft":"250000000"},
+                  "monthlyUsed":{"priceInCents":750,"currency":"USD"}}}
+JSON
+
+cli_checks=$((checks + 1))
+checks=$cli_checks
+cli_out="$(env -u KIRO_CLI_DB -u KIRO_IDE_DB -u KIMI_CODE_HOME -u CURSOR_AUTH_PATH -u CURSOR_IDE_DB \
+    -u MOONSHOT_API_KEY -u KIMI_API_KEY -u WIDGET_MOONSHOT_API_KEY \
+    HOME="$CLI_HOME" XDG_CONFIG_HOME="$CLI_HOME/.config" XDG_DATA_HOME="$CLI_HOME/.local/share" \
+    AI_USAGE_CONFIG="$TEST_TMP/config.json" AI_USAGE_CACHE_DIR="$TEST_TMP/cache" \
+    KIRO_CLI_USAGE_RESPONSE_FILE="$TEST_TMP/kiro-cli.json" \
+    CURSOR_USAGE_RESPONSE_FILE="$TEST_TMP/cursor-usage.json" \
+    CURSOR_PLAN_RESPONSE_FILE="$TEST_TMP/cursor-plan.json" \
+    CURSOR_AGGREGATED_RESPONSE_FILE="$TEST_TMP/cursor-aggregated.json" \
+    CURSOR_EVENTS_RESPONSE_FILE="$TEST_TMP/cursor-events.json" \
+    KIMI_CODE_USAGE_RESPONSE_FILE="$TEST_TMP/kimi-code.json" \
+    "$BACKEND" --provider kiro,kimi,cursor)"
+if ! printf '%s' "$cli_out" | jq -e '
+    (.providers[] | select(.id == "kiro")
+        | .ok and .details.source == "cli" and .details.planType == "free"
+          and .details.currentUsage == 0.13 and .details.usageLimit == 50 and .details.resetAt == 1790812800
+          and .quotaWindows[0].detail == "0.13 / 50 credits")
+    and (.providers[] | select(.id == "cursor")
+        | .ok and .summary.detail == "Free" and .details.resetAt == 1790495647 and .details.source == "cli"
+          and .details.stats.available and .details.stats.totalTokens == 98998
+          and .details.stats.totalRequests == 2 and .details.stats.totalSessions == 1
+          and .details.stats.dailyUnit == "tokens" and (.details.stats.dailySeries | map(.total) | add) == 98998)
+    and (.providers[] | select(.id == "kimi")
+        | .ok and ([.quotaWindows[].label] == ["5-hour limit", "Weekly limit", "Extra usage"])
+          and .quotaWindows[0].resetAt == 1789063200 and .quotaWindows[1].resetAt == 1789344000
+          and .details.codePlan.booster.balance == 2.5
+          and .historyValues == {kc: 30, kcw: 45})
+    and (tojson | test("secret|test@example.com") | not)' >/dev/null 2>&1; then
+    printf 'FAIL the CLI logins are read end to end\n  got: %s\n' "$cli_out" >&2
+    failures=$((failures + 1))
+fi
+
+check_prog "a Kimi 429 for a used-up plan reads as exhausted" "True Credits used up" '
+from aiusage.providers.kimi_code import parse_usage_response
+r = parse_usage_response(429, """{"code":"resource_exhausted","message":"insufficient balance","details":[{"type":"common.error.v1.ErrorDetail","debug":{"reason":"REASON_QUOTA_EXCEEDED","localizedMessage":{"locale":"en-US","message":"Credits used up."}}}]}""")
+print(r["exhausted"], r["message"])'
+check_prog "a plain Kimi 429 is still rate limiting" "Kimi Code rate limited" '
+from aiusage.providers.kimi_code import parse_usage_response
+print(parse_usage_response(429, "{}")["error"])'
+check_prog "an expired Kimi Code login is reported, not refreshed" "Kimi Code login expired — run kimi once to refresh it" '
+import json, os
+home = os.path.join(os.environ["TEST_TMP"], "kimi-expired")
+os.makedirs(os.path.join(home, "credentials"), exist_ok=True)
+json.dump({"access_token": "kimi-secret-token", "expires_at": 1000}, open(os.path.join(home, "credentials", "kimi-code.json"), "w"))
+os.environ["KIMI_CODE_HOME"] = home
+from aiusage.providers.kimi_code import get_kimi_code_usage
+print(get_kimi_code_usage()["error"])'
+check_prog "an expired Cursor token is reported without a request" "login expired — run cursor-agent login" '
+import base64, json, os
+path = os.path.join(os.environ["TEST_TMP"], "cursor-expired-auth.json")
+payload = base64.urlsafe_b64encode(json.dumps({"exp": 1000}).encode()).decode().rstrip("=")
+json.dump({"accessToken": "h." + payload + ".s"}, open(path, "w"))
+os.environ["CURSOR_AUTH_PATH"] = path
+from aiusage.providers.cursor import get_cursor_usage
+print(get_cursor_usage()["error"])'
+check_prog "an unexpected ARN region never reaches the hostname" "us-east-1 eu-central-1" '
+from aiusage.providers.kiro import _region_of
+print(_region_of("arn:aws:codewhisperer:evil.example/x:1:profile/a"), _region_of("arn:aws:codewhisperer:eu-central-1:1:profile/a"))'
 
 # ── Muse, end to end: only local files, and never a socket ──────────────────
 #

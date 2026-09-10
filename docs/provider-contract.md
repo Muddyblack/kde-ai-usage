@@ -162,6 +162,9 @@ after wake-up (`UsageHistory.withResets`).
 | `za` | Z.AI tokens |
 | `gh` | Copilot premium requests |
 | `ds` | DeepSeek balance (absolute) |
+| `km` | Kimi / Moonshot balance (absolute) |
+| `kc` / `kcw` | Kimi Code 5-hour / weekly plan pct |
+| `cu` | Cursor included usage |
 | `mu` | Muse tokens (absolute) |
 | `mc` / `mw` | Muse Current / Weekly plan pct — only present when the opt-in quota is switched on |
 
@@ -208,7 +211,8 @@ rollout), `status`.
 **kiro** — `available`, `planType`, `displayName`, `displayNamePlural`,
 `currentUsage`, `usageLimit`, `pct`, `remaining`, `currentOverages`,
 `overageCap`, `overageCharges`, `overageRate`, `currencyCode`,
-`currencySymbol`, `resetAt`.
+`currencySymbol`, `resetAt`, `source` (`cli` = live from the kiro-cli login,
+`ide` = the Kiro IDE's cached snapshot).
 
 **mistral** — `hasKey`, `keyValid`, `availableModels`, `vibe` (`sessionCount`,
 `totalCost`, `totalTokens`, `promptTokens`, `completionTokens`, `totalSteps`,
@@ -250,6 +254,28 @@ configured quota and a guessed first-of-next-month reset apply.
 **deepseek** — `hasKey`, `keyValid`, `isAvailable`, `balances`,
 `primaryCurrency`, `primaryTotal`, `primaryGranted`, `primaryToppedUp`,
 `currency`, `symbol`.
+
+**kimi** — `hasKey`, `keyValid`, `balanceError`, `availableBalance`,
+`voucherBalance`, `cashBalance`, `currency`, `codePlan` (`loggedIn`,
+`available`, `exhausted`, `message`, `error`, `windows[]` with `label`, `pct`,
+`used`, `limit`, `resetAt`, and `booster` — `balance`, `total`,
+`monthlyLimit`, `monthlyUsed`, `currency` — or null). The Moonshot balance
+and the Kimi Code plan are independent; the provider is healthy when either
+answers, and a plan Kimi reports as used up (HTTP 429 `resource_exhausted`)
+is a full window, not an error.
+
+**cursor** — `loggedIn`, `source` (`cli` / `ide`), `planName`, `price`,
+`totalPct`, `autoPct`, `apiPct`, `hasSplit`, `includedSpend`, `limit`,
+`bonusSpend`, `remaining` (USD), `resetAt`, `cycleStartAt`, `onDemandUsed`,
+`onDemandLimit`, `displayMessage`, `nextUpgrade` (`name`, `price`), `stats`
+(the shared stats shape, for the current billing cycle: `totalTokens`,
+`totalCostUSD`, `totalRequests`, `totalSessions` = distinct conversations,
+`models` keyed by model with `input`/`output`/`cached`/`cacheWrite`/`total`/
+`cost`/`requests`, `dailySeries` with `dailyUnit` `tokens` or `requests`, and
+`partial` when the paged request list stopped short). It comes from the
+dashboard's `GetAggregatedUsageEvents` and `GetFilteredUsageEvents`; the
+backend reduces each request to model, tokens, cost, time and a conversation
+ordinal, so no account or conversation identifier reaches the envelope.
 
 **muse** — `hasLogin`, `email`, `fullName` (display identity from the CLI
 login store), `current` / `weekly` (`available`, `pct`, `resetAt`),

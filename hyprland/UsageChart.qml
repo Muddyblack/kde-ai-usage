@@ -321,7 +321,8 @@ Rectangle {
                     text: modelData.label
                     font.pixelSize: 9
                     font.bold: chart.chartWindow === modelData.id
-                    color: chart.chartWindow === modelData.id ? "#ffffff" : "#f8fafc"
+                    // Near-white accents (Grok, Cursor) would swallow white text.
+                    color: chart.chartWindow === modelData.id ? ((0.299 * chart.accent.r + 0.587 * chart.accent.g + 0.114 * chart.accent.b) > 0.6 ? "#1a1a1a" : "#ffffff") : "#f8fafc"
                     opacity: chart.chartWindow === modelData.id ? 1.0 : 0.6
                 }
                 MouseArea {
@@ -469,6 +470,10 @@ Rectangle {
         onAccentColorChanged: requestPaint()
         onPulseChanged: requestPaint()
         onScrubIndexChanged: requestPaint()
+        // Both mode keeps scrubIndex at 0 while the selected points move.
+        onScrubGeminiPtChanged: requestPaint()
+        onScrubRestPtChanged: requestPaint()
+        onScrubTimestampChanged: requestPaint()
         onVisibleChanged: if (visible)
             requestPaint()
         onWidthChanged: requestPaint()

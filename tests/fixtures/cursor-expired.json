@@ -1,0 +1,12 @@
+{
+  "id": "cursor",
+  "now": 1785000000,
+  "inputs": {
+    "usage": {
+      "loggedIn": true,
+      "source": "cli",
+      "error": "login expired — run cursor-agent login"
+    },
+    "status": null
+  }
+}

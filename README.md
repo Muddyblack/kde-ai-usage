@@ -50,7 +50,7 @@ A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple serv
 
 ## Features
 
-- **Multi-service support** — Switch between Claude, Antigravity, OpenAI, Grok, Kiro, Mistral, OpenRouter, Z.AI, GitHub Copilot, DeepSeek, Kimi, and Muse tabs in the popup
+- **Multi-service support** — Switch between Claude, Antigravity, OpenAI, Grok, Kiro, Mistral, OpenRouter, Z.AI, GitHub Copilot, DeepSeek, Kimi, Muse, and Cursor tabs in the popup
 - **Balance tracking** — DeepSeek current balance with granted / topped-up breakdown
 - **Panel view** — Compact percentage readouts in the taskbar, color-coded by usage level, with an inline spark-line trend
 - **Popup view** — Segmented bars showing exact fill level with reset times and countdowns
@@ -81,14 +81,15 @@ A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple serv
 | Antigravity / Google AI Studio | Overall quota, per-model Gemini usage, and reset times | Supported |
 | OpenAI | 30-day API token/cost usage plus Codex/ChatGPT plan limits and account status | Supported |
 | Grok (xAI) | CLI billing credits when exposed, free-tier exhaustion, and local session totals | Free tier tested; paid plans unverified |
-| Kiro | Monthly credits, remaining balance, reset date, overage, and inferred plan | Supported |
+| Kiro | Monthly credits, remaining balance, reset date, overage, and plan — from kiro-cli's login or the Kiro IDE | Supported |
 | Mistral AI | Key status, available models, and local vibe CLI cost/token statistics | Supported |
 | OpenRouter | Spend, credit limit, usage percentage, and account label | Untested |
 | Z.AI | 5-hour token quota, monthly tools quota, reset countdowns, model details, and today's token consumption | Supported |
 | GitHub Copilot | Premium request usage against the plan's own entitlement, the real reset day, and local Copilot CLI activity stats | Personal billing supported; organization/enterprise billing not yet supported |
 | DeepSeek | Available balance with granted and topped-up breakdown | Supported |
-| Kimi / Moonshot AI | Available balance with voucher and cash breakdown | Supported |
+| Kimi / Moonshot AI | Kimi Code plan windows (5-hour and weekly) and extra-usage wallet; Moonshot API balance with voucher and cash breakdown | Moonshot balance supported; Kimi Code quota tested on a used-up plan only |
 | Muse | Local session stats: tokens, offline spend estimate, sessions, tool calls, workspaces, streaks. Plan windows available behind an opt-in switch | Supported (the plan quota costs tokens to read — off by default) |
+| Cursor | Included usage for the billing cycle, the Auto/API split, on-demand spend, and plan name | Free plan tested; paid plans unverified |
 
 Provider APIs do not all expose the same information. In particular, Codex/ChatGPT
 plan limits are separate from OpenAI API organization usage, DeepSeek reports a
@@ -114,14 +115,15 @@ Enable only the services you use. Each one has its own setup requirement:
 | Antigravity | Node.js 18+, the `antigravity-usage` CLI, and a Google account with access |
 | OpenAI | An OpenAI API key for organization API usage; a Codex CLI login provides Codex/ChatGPT plan limits and account status |
 | Grok | Grok CLI authenticated with `grok --oauth`; an xAI API key is optional |
-| Kiro | Kiro IDE, signed in at least once |
+| Kiro | kiro-cli signed in (`kiro-cli login`), or the Kiro IDE signed in at least once |
 | Mistral AI | A Mistral API key; vibe CLI is optional and adds local session statistics |
 | OpenRouter | An OpenRouter API key entered in widget settings |
 | Z.AI | A Z.AI token from widget settings, `$ZAI_TOKEN`, `$Z_AI_API_KEY`, `~/.config/zai/token`, `~/.zai/token`, or the one `glm-acp-agent --setup` already stored |
 | GitHub Copilot | Usually nothing to configure: the Copilot editor login (`~/.config/github-copilot/apps.json`), the Copilot CLI login, or `gh auth token` is picked up automatically. Widget settings, `$GITHUB_TOKEN` and `$GH_TOKEN` still win when set; a token with fine-grained **Plan: read** permission additionally unlocks the documented billing endpoint. Personal billing only |
 | DeepSeek | A DeepSeek API key from widget settings, `$DEEPSEEK_API_KEY`, or `~/.config/deepseek/api-key` |
-| Kimi / Moonshot AI | A Moonshot API key from widget settings, `$MOONSHOT_API_KEY`, `$KIMI_API_KEY`, or `~/.config/moonshot/api-key` |
+| Kimi / Moonshot AI | A Kimi Code login (`kimi`, then `/login`) for the plan quota, and/or a Moonshot API key from widget settings, `$MOONSHOT_API_KEY`, `$KIMI_API_KEY`, or `~/.config/moonshot/api-key` for the API balance |
 | Muse | Nothing to configure for the local stats — `muse login` is enough. The optional plan quota additionally uses `$META_API_KEY` or the key `muse login` stored |
+| Cursor | cursor-agent signed in (`cursor-agent login`), or the Cursor IDE signed in. No API key |
 
 All configuration is done in the widget's settings panel (right-click the widget → *Configure*). See [How it works](#how-it-works) below for what each tab reads and where credentials are resolved from.
 
@@ -330,7 +332,12 @@ The OpenAI tab has two independent sections. API usage is fetched from the offic
 The Grok tab reads the Grok CLI login from `~/.grok/auth.json`, fetches the same credit/billing data used by the CLI, and summarizes local CLI sessions from `~/.grok/sessions`. For the tested free tier, the CLI only records the exact token allowance after it returns `free-usage-exhausted`, so the widget can show the confirmed exhausted amount and rolling 24-hour window but cannot infer progressive usage before that event. Paid-plan billing parsing is implemented but remains unverified. An xAI API key is optional; CLI OAuth is the primary source for quota data.
 
 ### Kiro
-The Kiro tab reads Kiro's locally cached usage state from `~/.config/Kiro/User/globalStorage/state.vscdb`. No API key is needed. The widget extracts the stored credit breakdown, usage percentage, reset date, overage information, and inferred plan tier from that local snapshot, then feeds the percentage into the 30-day chart history.
+The Kiro tab needs no API key and works with either Kiro tool:
+
+- **kiro-cli** — kiro-cli stores no usage snapshot, but it keeps its login in `~/.local/share/kiro-cli/data.sqlite3`. The widget opens that store read-only and asks the same `getUsageLimits` endpoint the CLI's own `/usage` screen shows. This live figure wins whenever it answers. The CLI's access token lasts about an hour after kiro-cli last ran and the widget deliberately does not renew it (a second refresher could sign the CLI out), so an expired login reports as such until kiro-cli runs again.
+- **Kiro IDE** — the IDE caches its last usage payload in `~/.config/Kiro/User/globalStorage/state.vscdb`, read with no network request. It is the fallback, and the only source on a machine without kiro-cli.
+
+Either way the tab shows the credit breakdown, usage percentage, reset date, overage information and plan tier, and feeds the percentage into the 30-day chart history.
 
 ### Mistral AI
 The widget validates the configured API key against the Mistral API and lists available models, highlighting the one currently active in vibe CLI. Since Mistral exposes no public billing REST API, cost data is sourced locally from vibe CLI session logs (`~/.vibe/logs/session/*/meta.json`): cumulative spend, session count, total tokens, and the last session title are shown in a stats card. The spend bar is scaled against a $50 soft cap and feeds into a 30-day chart. The key is resolved from widget settings → `$MISTRAL_API_KEY` → `~/.vibe/.env` → `~/.config/mistral/api-key`.
@@ -354,7 +361,13 @@ Stats aggregates the Copilot CLI's own history from `~/.copilot/session-store.db
 The DeepSeek tab calls `GET https://api.deepseek.com/user/balance` with the configured API key. It shows whether the account has sufficient balance for API calls, the primary total balance, and the granted / topped-up split. The key is resolved from widget settings → `$DEEPSEEK_API_KEY` → `~/.config/deepseek/api-key`.
 
 ### Kimi / Moonshot AI
-The Kimi tab calls `GET https://api.moonshot.ai/v1/users/me/balance` and shows the available, voucher, and cash balances. The key is resolved from widget settings → `$MOONSHOT_API_KEY` / `$KIMI_API_KEY` → `~/.config/moonshot/api-key`.
+The Kimi tab combines two independent sources; either one is enough.
+
+- **Kimi Code plan** — read with the login the `kimi` CLI stores in `~/.kimi-code/credentials/kimi-code.json` (`$KIMI_CODE_HOME` is honoured), from the same `GET https://api.kimi.com/coding/v1/usages` endpoint its `/usage` panel shows (`$KIMI_CODE_BASE_URL` is honoured). It shows each plan window with its reset countdown — the 5-hour and weekly windows are charted — plus the extra-usage wallet when there is one. A plan that is used up is shown as full rather than as an error. The access token is short-lived and the widget does not refresh it (the CLI rotates the pair itself and a second refresher could sign it out), so run `kimi` once when the tab reports an expired login.
+- **Moonshot API balance** — `GET https://api.moonshot.ai/v1/users/me/balance` with the available, voucher and cash balances. The key is resolved from widget settings → `$MOONSHOT_API_KEY` / `$KIMI_API_KEY` → `~/.config/moonshot/api-key`.
+
+### Cursor *(free plan tested; paid plans untested)*
+The Cursor tab needs no API key and no Cursor IDE: it uses the login `cursor-agent login` stores in `~/.config/cursor/auth.json`, falling back to the Cursor IDE's own login in its `state.vscdb`. With it, the widget calls the two dashboard RPCs the CLI's `/usage` screen uses (`aiserver.v1.DashboardService/GetCurrentPeriodUsage` and `GetPlanInfo` on `api2.cursor.sh`) and shows the included usage for the billing cycle, how much of it went to Auto/Composer versus hand-picked API models, on-demand spend against its limit, the plan name and the cycle's end. Enterprise seats get no plan block from Cursor — the CLI says the same — and the tab reports that instead of a number. A **Stats** sub-tab mirrors the Usage page of cursor.com/dashboard for the current billing cycle: tokens, the usage value Cursor prices it at, requests, conversations, active days, peak hour, a per-day sparkline and a per-model breakdown, from the same `GetAggregatedUsageEvents` / `GetFilteredUsageEvents` calls the dashboard makes (the request list is capped at 500 per refresh; beyond that the per-day figures cover the newest requests). Cursor is opt-in, so enable it under **Settings → Providers**.
 
 ### Muse
 The Muse tab is **fully offline** — it opens no socket, and a test enforces that against the provider's import graph. It reads what Muse Code writes to disk anyway:

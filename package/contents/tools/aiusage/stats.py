@@ -221,6 +221,104 @@ def muse_stats(s, now):
     return r
 
 
+def cursor_stats(s, now):
+    """Normalize the providers/cursor.py stats blob: the dashboard's per-model
+    aggregate plus the (slimmed) per-request list, for the current billing
+    cycle — the same numbers cursor.com/dashboard shows on its Usage page.
+
+    Days and hours are local: the requests carry millisecond timestamps, and
+    "which day was busy" is a question about the user's own calendar.
+    """
+    if not isinstance(s, dict) or not s:
+        return {"available": False}
+    agg = s.get("aggregated") if isinstance(s.get("aggregated"), dict) else {}
+    events = [e for e in s.get("events") or [] if isinstance(e, dict)]
+
+    requests_by_model = {}
+    for e in events:
+        requests_by_model[e.get("model") or ""] = requests_by_model.get(e.get("model") or "", 0) + 1
+
+    models = {}
+    favorite, favorite_out = "", 0
+    for a in agg.get("aggregations") or []:
+        if not isinstance(a, dict):
+            continue
+        name = a.get("modelIntent") or "unknown"
+        inp, out = num(a.get("inputTokens")), num(a.get("outputTokens"))
+        write, read = num(a.get("cacheWriteTokens")), num(a.get("cacheReadTokens"))
+        models[name] = {
+            "input": inp,
+            "output": out,
+            "cached": read,
+            "cacheWrite": write,
+            "total": inp + out + write + read,
+            "cost": num(a.get("totalCents")) / 100,
+            "requests": requests_by_model.get(name, 0),
+        }
+        if out > favorite_out:
+            favorite, favorite_out = name, out
+
+    total_tokens = sum(m["total"] for m in models.values())
+    if total_tokens == 0 and not events:
+        return {"available": False}
+
+    daily, hours, spans = {}, {}, {}
+    for e in events:
+        ts = num(e.get("timestamp")) / 1000
+        if ts <= 0:
+            continue
+        local = datetime.datetime.fromtimestamp(ts)
+        day = local.strftime("%Y-%m-%d")
+        tokens = num(e.get("input")) + num(e.get("output")) + num(e.get("cacheWrite")) + num(e.get("cacheRead"))
+        tally = daily.setdefault(day, {"tokens": 0, "requests": 0})
+        tally["tokens"] += tokens
+        tally["requests"] += 1
+        hours[str(local.hour)] = hours.get(str(local.hour), 0) + 1
+        conversation = e.get("conversation")
+        if isinstance(conversation, int) and conversation >= 0:
+            first, last, count = spans.get(conversation, (ts, ts, 0))
+            spans[conversation] = (min(first, ts), max(last, ts), count + 1)
+
+    # Older requests may carry no token breakdown; a sparkline of zeros would
+    # read as "idle", so fall back to counting requests.
+    by_tokens = any(t["tokens"] > 0 for t in daily.values())
+    unit = "tokens" if by_tokens else "requests"
+    series = [{"date": d, "total": t["tokens"] if by_tokens else t["requests"]} for d, t in sorted(daily.items())]
+
+    longest = max(spans.values(), key=lambda v: v[1] - v[0], default=None)
+    blob = {
+        "dailyActivity": [{"date": d} for d in daily],
+        "totalSessions": len(spans),
+        "totalMessages": len(events),
+        "firstSessionDate": min(daily) if daily else "",
+        "lastComputedDate": datetime.datetime.fromtimestamp(now).strftime("%Y-%m-%dT%H:%M:%S"),
+        "longestSession": {"duration": (longest[1] - longest[0]) * 1000, "messageCount": longest[2]} if longest else {},
+        "hourCounts": hours,
+    }
+    r = activity_base(blob, now, series, unit)
+    event_count = int(num(s.get("eventCount")))
+    r.update(
+        {
+            "totalTokens": total_tokens,
+            "totalInputTokens": num(agg.get("totalInputTokens")),
+            "totalOutputTokens": num(agg.get("totalOutputTokens")),
+            "totalCachedTokens": num(agg.get("totalCacheReadTokens")),
+            "totalCacheWriteTokens": num(agg.get("totalCacheWriteTokens")),
+            "totalCostUSD": num(agg.get("totalCostCents")) / 100,
+            "totalRequests": max(event_count, len(events)),
+            # More requests than the paged fetch brought back: the per-day and
+            # per-hour figures cover only the newest ones.
+            "partial": event_count > len(events),
+            "favoriteModel": favorite,
+            "models": models,
+            "dailyTokens": series if by_tokens else [],
+            "periodStart": int(num(s.get("startMs")) // 1000),
+            "currency": "USD",
+        }
+    )
+    return r
+
+
 def codex_stats(s, now):
     if not isinstance(s, dict) or num(s.get("totalSessions")) == 0:
         return {"available": False}

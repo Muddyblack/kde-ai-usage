@@ -194,6 +194,7 @@ PlasmoidItem {
     property string kiroResetTime: ""
     property var kiroResetDate: null
     property string kiroCountdown: ""
+    property string kiroSource: ""
     // ── Codex / ChatGPT-plan usage ────────────────────────────────────────────
     // Windows are classified by their actual duration, never by response order.
     property bool codexUsageAvailable: false
@@ -321,6 +322,36 @@ PlasmoidItem {
     property real kimiVoucherBalance: 0
     property real kimiCashBalance: 0
     property string kimiError: ""
+    // Kimi Code plan quota (the `kimi` CLI login) — independent of the key above
+    property bool kimiPlanAvailable: false
+    property bool kimiPlanExhausted: false
+    property string kimiPlanMessage: ""
+    property string kimiPlanError: ""
+    property var kimiPlanWindows: []
+    property real kimiPlanPct: 0
+    property var kimiBooster: null
+
+    // ── Cursor data ──────────────────────────────────────────────────────────
+    property bool cursorLoggedIn: false
+    property bool cursorAvailable: false
+    property string cursorSource: ""
+    property string cursorPlanName: ""
+    property real cursorTotalPct: 0
+    property real cursorAutoPct: 0
+    property real cursorApiPct: 0
+    property bool cursorHasSplit: false
+    property real cursorIncludedSpend: 0
+    property real cursorLimit: 0
+    property real cursorOnDemandUsed: 0
+    property real cursorOnDemandLimit: 0
+    property var cursorResetDate: null
+    property string cursorResetTime: ""
+    property string cursorCountdown: ""
+    property string cursorError: ""
+    // Dashboard usage for the billing cycle, in the shared stats shape (stats.py)
+    property var cursorStats: ({})
+    // Bumped by updateCountdowns() so Repeater rows can re-read their own countdown
+    property int countdownTick: 0
     // ── Muse data ───────────────────────────────────────────────────────────
     // Muse Code. No quota properties: Meta reports the plan windows only on a
     // billed model call, so the widget never asks (see providers/muse.py).
@@ -475,6 +506,7 @@ PlasmoidItem {
     readonly property color copilotPurple: "#8b5cf6"
     readonly property color deepseekBlue: "#4f8cff"
     readonly property color kimiBlue: "#1e3a8a"
+    readonly property color cursorWhite: "#e6e6e6"
     readonly property color museBlue: "#0064e0"
     readonly property color sessionColor: "#e05252"
     readonly property color weeklyColor: "#f5a623"
@@ -580,6 +612,12 @@ PlasmoidItem {
             icon: "muse-color.svg",
             keyConfig: "museApiKey",
             keyPlaceholder: "optional — the CLI login is used"
+        },
+        {
+            id: "cursor",
+            label: "Cursor",
+            color: root.cursorWhite,
+            icon: "cursor.svg"
         }
     ]
 
@@ -1180,6 +1218,8 @@ PlasmoidItem {
         root.copilotCountdown = root.formatCountdown(root.copilotResetDate);
         root.museCurrentCountdown = root.formatCountdown(root.museCurrentResetDate);
         root.museWeeklyCountdown = root.formatCountdown(root.museWeeklyResetDate);
+        root.cursorCountdown = root.formatCountdown(root.cursorResetDate);
+        root.countdownTick++;
     }
 
     function usageColor(pct) {
@@ -1341,6 +1381,8 @@ PlasmoidItem {
             root.applyKimi(details, provider.error || "");
         else if (provider.id === "muse")
             root.applyMuse(details, provider.error || "");
+        else if (provider.id === "cursor")
+            root.applyCursor(details, provider.error || "");
     }
 
     function applyClaude(d) {
@@ -1520,6 +1562,7 @@ PlasmoidItem {
         root.kiroCurrencySymbol = d.currencySymbol || "$";
         root.kiroResetDate = root.dateFromEpoch(d.resetAt);
         root.kiroResetTime = root.kiroResetDate ? Qt.formatDateTime(root.kiroResetDate, "MMM d, hh:mm") : "";
+        root.kiroSource = d.source || "";
     }
 
     function applyMistral(d, error) {
@@ -1640,6 +1683,36 @@ PlasmoidItem {
         root.kimiVoucherBalance = d.voucherBalance || 0;
         root.kimiCashBalance = d.cashBalance || 0;
         root.kimiError = error;
+        var plan = d.codePlan || {};
+        root.kimiPlanAvailable = plan.available === true;
+        root.kimiPlanExhausted = plan.exhausted === true;
+        root.kimiPlanMessage = plan.message || "";
+        root.kimiPlanError = plan.error || "";
+        root.kimiPlanWindows = plan.windows || [];
+        root.kimiBooster = plan.booster || null;
+        var pct = root.kimiPlanExhausted && root.kimiPlanWindows.length === 0 ? 100 : 0;
+        for (var i = 0; i < root.kimiPlanWindows.length; i++)
+            pct = Math.max(pct, root.kimiPlanWindows[i].pct || 0);
+        root.kimiPlanPct = pct;
+    }
+
+    function applyCursor(d, error) {
+        root.cursorLoggedIn = d.loggedIn === true;
+        root.cursorAvailable = error === "";
+        root.cursorSource = d.source || "";
+        root.cursorPlanName = d.planName || "";
+        root.cursorTotalPct = d.totalPct || 0;
+        root.cursorAutoPct = d.autoPct || 0;
+        root.cursorApiPct = d.apiPct || 0;
+        root.cursorHasSplit = d.hasSplit === true;
+        root.cursorIncludedSpend = d.includedSpend || 0;
+        root.cursorLimit = d.limit || 0;
+        root.cursorOnDemandUsed = d.onDemandUsed || 0;
+        root.cursorOnDemandLimit = d.onDemandLimit || 0;
+        root.cursorResetDate = root.dateFromEpoch(d.resetAt);
+        root.cursorResetTime = root.cursorResetDate ? Qt.formatDateTime(root.cursorResetDate, "MMM d, hh:mm") : "";
+        root.cursorError = error;
+        root.cursorStats = d.stats || ({});
     }
 
     function applyMuse(d, error) {
@@ -1843,6 +1916,33 @@ PlasmoidItem {
             }
             if (root.deepseekError)
                 lines.push("⚠ " + root.deepseekError);
+        } else if (tab === "kimi") {
+            for (var k = 0; k < root.kimiPlanWindows.length; k++)
+                lines.push(root.kimiPlanWindows[k].label + ": " + Math.round(root.kimiPlanWindows[k].pct) + "%");
+
+            if (root.kimiPlanExhausted)
+                lines.push("Kimi Code: " + (root.kimiPlanMessage || "plan quota used up"));
+
+            if (root.kimiKeyValid)
+                lines.push("Moonshot balance: " + root.formatMoney(root.kimiAvailableBalance, "USD"));
+
+            if (root.kimiError)
+                lines.push("⚠ " + root.kimiError);
+        } else if (tab === "cursor") {
+            if (root.cursorPlanName)
+                lines.push("Plan: " + root.cursorPlanName);
+
+            if (root.cursorAvailable)
+                lines.push("Included usage: " + Math.round(root.cursorTotalPct) + "%");
+
+            if (root.cursorHasSplit)
+                lines.push("Auto: " + Math.round(root.cursorAutoPct) + "% · API: " + Math.round(root.cursorApiPct) + "%");
+
+            if (root.cursorResetTime)
+                lines.push("Resets: " + root.cursorResetTime + (root.cursorCountdown ? " (" + root.cursorCountdown + ")" : ""));
+
+            if (root.cursorError)
+                lines.push("⚠ " + root.cursorError);
         } else if (tab === "muse") {
             lines.push("Muse" + (root.museModel ? " · " + root.museModel : ""));
             if (root.museCurrentAvailable)
@@ -2299,15 +2399,40 @@ PlasmoidItem {
             }
 
             PanelSlot {
-                pct: 0
+                // The Kimi Code plan is a percentage and wins the pill; the
+                // Moonshot balance is the fallback for API-key-only setups.
+                pct: root.kimiPlanAvailable ? root.kimiPlanPct : 0
                 iconColor: root.kimiBlue
                 iconSource: Qt.resolvedUrl("../icons/kimi.svg")
                 iconText: "K"
                 stale: root.stale && root.panelShows("kimi")
                 visible: root.panelShows("kimi")
-                showCost: true
+                showCost: !root.kimiPlanAvailable
                 costText: root.kimiKeyValid ? root.formatMoney(root.kimiAvailableBalance, "USD") : "—"
-                tooltipText: "Kimi / Moonshot" + (root.kimiKeyValid ? "\nBalance: " + root.formatMoney(root.kimiAvailableBalance, "USD") + "\nVoucher: " + root.formatMoney(root.kimiVoucherBalance, "USD") + "\nCash: " + root.formatMoney(root.kimiCashBalance, "USD") : "\nNo Moonshot API key set")
+                tooltipText: {
+                    var t = root.kimiPlanAvailable ? "Kimi Code" : "Kimi / Moonshot";
+                    for (var i = 0; i < root.kimiPlanWindows.length; i++)
+                        t += "\n" + root.kimiPlanWindows[i].label + ": " + Math.round(root.kimiPlanWindows[i].pct) + "%";
+                    if (root.kimiPlanExhausted)
+                        t += "\n" + (root.kimiPlanMessage || "Plan quota used up");
+                    if (root.kimiKeyValid)
+                        t += "\nBalance: " + root.formatMoney(root.kimiAvailableBalance, "USD") + "\nVoucher: " + root.formatMoney(root.kimiVoucherBalance, "USD") + "\nCash: " + root.formatMoney(root.kimiCashBalance, "USD");
+                    else if (!root.kimiPlanAvailable)
+                        t += "\nNo Moonshot API key or Kimi Code login";
+                    return t;
+                }
+            }
+
+            PanelSlot {
+                pct: root.cursorTotalPct
+                iconColor: root.cursorWhite
+                iconSource: Qt.resolvedUrl("../icons/cursor.svg")
+                iconText: "Cu"
+                stale: root.stale && root.panelShows("cursor")
+                visible: root.panelShows("cursor")
+                showCost: !root.cursorAvailable
+                costText: root.cursorAvailable ? "" : "—"
+                tooltipText: "Cursor" + (root.cursorPlanName ? "\nPlan: " + root.cursorPlanName : "") + (root.cursorAvailable ? "\nIncluded usage: " + Math.round(root.cursorTotalPct) + "%" : "\n" + (root.cursorError || "Not signed in")) + (root.cursorResetTime ? "\nResets: " + root.cursorResetTime : "")
             }
 
             PanelSlot {
@@ -2567,7 +2692,10 @@ PlasmoidItem {
                                 return "DeepSeek Balance";
 
                             if (tab === "kimi")
-                                return "Kimi Balance";
+                                return root.kimiPlanAvailable ? "Kimi Usage" : "Kimi Balance";
+
+                            if (tab === "cursor")
+                                return "Cursor Usage";
 
                             return "AI Usage Monitor";
                         }
@@ -2855,6 +2983,10 @@ PlasmoidItem {
             }
 
             MuseTab {
+                rootItem: root
+            }
+
+            CursorTab {
                 rootItem: root
             }
 

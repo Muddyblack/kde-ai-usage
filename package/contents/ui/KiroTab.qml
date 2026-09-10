@@ -163,7 +163,7 @@ ColumnLayout {
 
     PlasmaComponents.Label {
         visible: rootItem.kiroUsageAvailable
-        text: "Read locally from Kiro app state. No API key or network request required."
+        text: rootItem.kiroSource === "cli" ? "Read live with the kiro-cli login. No API key required." : "Read locally from Kiro app state. No API key or network request required."
         font.pixelSize: 9
         opacity: 0.45
         color: Kirigami.Theme.textColor
@@ -177,7 +177,7 @@ ColumnLayout {
         spacing: 6
 
         PlasmaComponents.Label {
-            text: "No local Kiro usage data found"
+            text: "No Kiro usage data found"
             font.pixelSize: 12
             font.bold: true
             color: Kirigami.Theme.textColor
@@ -185,7 +185,7 @@ ColumnLayout {
         }
 
         PlasmaComponents.Label {
-            text: "Open Kiro and sign in at least once so the widget can read the local usage snapshot from ~/.config/Kiro/User/globalStorage/state.vscdb."
+            text: "Sign in to kiro-cli (kiro-cli login), or open the Kiro IDE and sign in once so the widget can read its usage snapshot. A kiro-cli login expires about an hour after the CLI last ran — start kiro-cli to renew it."
             font.pixelSize: 10
             opacity: 0.5
             color: Kirigami.Theme.textColor

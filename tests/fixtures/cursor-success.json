@@ -1,0 +1,59 @@
+{
+  "id": "cursor",
+  "now": 1785000000,
+  "inputs": {
+    "usage": {
+      "loggedIn": true,
+      "source": "cli",
+      "usage": {
+        "billingCycleStart": "1787817247821",
+        "billingCycleEnd": "1790495647821",
+        "planUsage": {
+          "totalSpend": 1250,
+          "includedSpend": 1250,
+          "bonusSpend": 0,
+          "remaining": 750,
+          "limit": 2000,
+          "remainingBonus": false,
+          "autoSpend": 500,
+          "apiSpend": 750,
+          "autoPercentUsed": 25,
+          "apiPercentUsed": 75,
+          "totalPercentUsed": 62.5
+        },
+        "spendLimitUsage": {
+          "totalSpend": 300,
+          "individualLimit": 1000,
+          "individualUsed": 300,
+          "individualRemaining": 700,
+          "limitType": "user"
+        },
+        "displayMessage": "You've used 63% of your included usage"
+      },
+      "plan": {
+        "planInfo": { "planName": "Pro", "includedAmountCents": 2000, "price": "$20/mo", "billingCycleEnd": "1790495647821" }
+      },
+      "stats": {
+        "aggregated": {
+          "aggregations": [
+            { "modelIntent": "claude-4.5-sonnet", "inputTokens": "30000", "outputTokens": "2000", "cacheWriteTokens": "8000", "cacheReadTokens": "60000", "totalCents": 150.5 },
+            { "modelIntent": "default", "inputTokens": "31047", "outputTokens": "879", "cacheReadTokens": "67072", "totalCents": 6.085075, "tier": 0 }
+          ],
+          "totalInputTokens": "61047",
+          "totalOutputTokens": "2879",
+          "totalCacheWriteTokens": "8000",
+          "totalCacheReadTokens": "127072",
+          "totalCostCents": 156.585075
+        },
+        "events": [
+          { "timestamp": 1787900000000, "model": "claude-4.5-sonnet", "conversation": 0, "input": 1000, "output": 100, "cacheWrite": 0, "cacheRead": 500, "cents": 2 },
+          { "timestamp": 1787900600000, "model": "claude-4.5-sonnet", "conversation": 0, "input": 800, "output": 50, "cacheWrite": 0, "cacheRead": 400, "cents": 1.5 },
+          { "timestamp": 1787990000000, "model": "default", "conversation": 1, "input": 300, "output": 20, "cacheWrite": 0, "cacheRead": 100, "cents": 0.4 }
+        ],
+        "eventCount": 3,
+        "startMs": 1787817247821
+      }
+    },
+    "status": null
+  }
+}
