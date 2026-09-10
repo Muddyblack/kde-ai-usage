@@ -55,6 +55,10 @@ ColumnLayout {
                 color: rootItem.cursorWhite
             }
         }
+        StatusChip {
+            Layout.alignment: Qt.AlignVCenter
+            status: rootItem.providerStatus.cursor
+        }
     }
 
     SubTabBar {

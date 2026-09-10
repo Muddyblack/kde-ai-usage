@@ -131,12 +131,7 @@ ColumnLayout {
 
         StatusChip {
             Layout.alignment: Qt.AlignVCenter
-            indicator: rootItem.claudeStatus.indicator
-            description: rootItem.claudeStatus.description
-            affectedComponents: rootItem.claudeStatus.components
-            incidents: rootItem.claudeStatus.incidents
-            latestUpdate: rootItem.claudeStatus.latestUpdate
-            statusUrl: "https://status.claude.com"
+            status: rootItem.providerStatus.claude
         }
     }
 

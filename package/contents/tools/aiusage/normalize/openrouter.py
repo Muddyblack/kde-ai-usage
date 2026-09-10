@@ -1,10 +1,9 @@
-from ..contract import flat_window, money, monthly_window, num, provider_base, provider_error, status_summary
+from ..contract import flat_window, money, monthly_window, num, provider_base, provider_error
 
 
 def normalize_openrouter(raw):
     now = raw["now"]
     res = raw["inputs"].get("usage") or {}
-    status = status_summary(raw["inputs"].get("status"))
 
     if not isinstance(res, dict) or not res:
         return provider_error(
@@ -13,7 +12,7 @@ def normalize_openrouter(raw):
             "#9333ea",
             now,
             "OpenRouter: no API key configured",
-            {"hasKey": False, "keyValid": False, "status": status},
+            {"hasKey": False, "keyValid": False},
         )
     if res.get("error") is not None:
         return provider_error(
@@ -22,7 +21,7 @@ def normalize_openrouter(raw):
             "#9333ea",
             now,
             res["error"],
-            {"hasKey": res.get("hasKey") is True, "keyValid": False, "status": status},
+            {"hasKey": res.get("hasKey") is True, "keyValid": False},
         )
 
     usage = num(res.get("usageUSD"))
@@ -55,6 +54,5 @@ def normalize_openrouter(raw):
         "limitRemainingUSD": limit_remaining,
         "isFreeTier": res.get("isFreeTier") is True,
         "rateLimit": res.get("rateLimit") or {},
-        "status": status,
     }
     return r

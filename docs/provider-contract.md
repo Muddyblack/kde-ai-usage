@@ -339,8 +339,17 @@ and reports `dailyUnit: "messages"`; Muse adds `subagentSessions`,
 catalog), `totalModelCalls`, `contextWindow`, `workspaceCount`,
 `topWorkspaces[]` (`name`, `sessions`), `model` and `currency`.
 
-`status` (Statuspage summary): `indicator`, `description`, `components[]`,
-`incidents[]`, `latestUpdate`. Status pages are cached on disk for
+`status` — present on every provider, attached by `normalize()` itself:
+`indicator` (`none` | `minor` | `major` | `critical`, or `""` when there is
+no live reading), `description`, `components[]`, `incidents[]`,
+`latestUpdate` and `url` (the human status page, `""` when the provider has
+none). Which page belongs to which provider, and which feed it publishes,
+is the `STATUS_PAGES` table in `contract.py`: Atlassian Statuspage
+(`/api/v2/summary.json` — Claude, OpenAI, Cursor, Kimi, and Copilot scoped
+to GitHub's `Copilot*` components) or Gatus (`/api/v1/endpoints/statuses` —
+Cline). Pages with no feed (Antigravity, Grok, DeepSeek, Mistral,
+OpenRouter) come through as `indicator: ""` plus a `url`, which the
+frontends render as a plain link. Feeds are cached on disk for
 `AI_USAGE_STATUS_TTL` seconds (default 300) so a fast poll interval does not
 hammer them.
 

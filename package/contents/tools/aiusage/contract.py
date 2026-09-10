@@ -36,6 +36,28 @@ PROVIDER_ICONS = {
     "zai": "zai.svg",
 }
 
+# Each provider's public status page. `feed` names the machine-readable format
+# collect.py fetches next to it (see STATUS_FEEDS); a page without one is still
+# handed to the frontends as a link. `components` narrows a shared page to the
+# provider's own rows — GitHub's page covers all of GitHub, and an Actions
+# outage says nothing about Copilot. Providers with no public page are absent.
+STATUS_PAGES = {
+    "antigravity": {"url": "https://aistudio.google.com/status"},
+    "claude": {"url": "https://status.claude.com", "feed": "statuspage"},
+    "cline": {"url": "https://status.cline.bot", "feed": "gatus"},
+    "copilot": {"url": "https://www.githubstatus.com", "feed": "statuspage", "components": "Copilot"},
+    "cursor": {"url": "https://status.cursor.com", "feed": "statuspage"},
+    "deepseek": {"url": "https://status.deepseek.com"},
+    "grok": {"url": "https://status.x.ai"},
+    "kimi": {"url": "https://status.moonshot.cn", "feed": "statuspage"},
+    # Mistral and OpenRouter left Statuspage; their summary.json answers 404.
+    "mistral": {"url": "https://status.mistral.ai"},
+    "openai": {"url": "https://status.openai.com", "feed": "statuspage"},
+    "openrouter": {"url": "https://status.openrouter.ai"},
+}
+
+STATUS_FEEDS = {"statuspage": "/api/v2/summary.json", "gatus": "/api/v1/endpoints/statuses"}
+
 
 def num(v):
     if isinstance(v, bool):
@@ -257,38 +279,104 @@ def money(v, currency):
     return amount + " " + currency
 
 
-def empty_status():
-    return {"indicator": "", "description": "", "components": [], "incidents": [], "latestUpdate": ""}
+def empty_status(url=""):
+    """An empty indicator with a url is a page that has no feed (or could not
+    be fetched): the frontends show it as a plain link."""
+    return {"indicator": "", "description": "", "components": [], "incidents": [], "latestUpdate": "", "url": url}
 
 
-def status_summary(d):
+# How a single Statuspage component maps onto the page-wide indicator scale.
+_COMPONENT_INDICATOR = {
+    "degraded_performance": "minor",
+    "under_maintenance": "minor",
+    "partial_outage": "major",
+    "major_outage": "critical",
+}
+_INDICATOR_RANK = {"none": 0, "minor": 1, "major": 2, "critical": 3}
+_SCOPED_DESCRIPTION = {"none": "operational", "minor": "degraded", "major": "partial outage", "critical": "major outage"}
+
+
+def status_summary(d, id_=""):
+    """Summarise the raw feed collect.py fetched for provider `id_`."""
+    page = STATUS_PAGES.get(id_) or {}
+    url = page.get("url", "")
+    if page.get("feed") == "gatus":
+        return _gatus_summary(d, url)
+    return _statuspage_summary(d, url, page.get("components", ""))
+
+
+def _statuspage_summary(d, url, only):
     if not isinstance(d, dict) or "status" not in d:
-        return empty_status()
-    incidents = d.get("incidents") or []
+        return empty_status(url)
+    incidents = [inc for inc in d.get("incidents") or [] if isinstance(inc, dict) and inc.get("status") != "resolved"]
+    rows = [c for c in d.get("components") or [] if isinstance(c, dict) and not c.get("group")]
+    status_obj = d.get("status") or {}
+    indicator = status_obj.get("indicator") or "none"
+    description = status_obj.get("description") or ""
+    if only:
+        rows = [c for c in rows if str(c.get("name") or "").startswith(only)]
+        # A fresh incident often names the product before anyone tags the
+        # affected components, so the title counts as well.
+        incidents = [
+            inc
+            for inc in incidents
+            if only in str(inc.get("name") or "")
+            or any(isinstance(c, dict) and str(c.get("name") or "").startswith(only) for c in inc.get("components") or [])
+        ]
+        indicator = max((_COMPONENT_INDICATOR.get(c.get("status"), "none") for c in rows), key=_INDICATOR_RANK.get, default="none")
+        if indicator == "none" and incidents:
+            indicator = "minor"
+        description = f"{only} {_SCOPED_DESCRIPTION[indicator]}"
     body = ""
     for inc in incidents:
-        if inc.get("status") == "resolved":
-            continue
         updates = inc.get("incident_updates") or []
-        b = (updates[0].get("body") if updates else "") or ""
-        b = b.strip()
+        b = ((updates[0].get("body") if updates else "") or "").strip()
         if b != "":
             body = b
             break
-    status_obj = d.get("status") or {}
     components = []
-    for c in d.get("components") or []:
+    for c in rows:
         status_val = c.get("status") or ""
-        if status_val != "" and status_val != "operational" and not (c.get("group") or False):
+        if status_val != "" and status_val != "operational":
             components.append((c.get("name") or "") + " (" + status_val.replace("_", " ") + ")")
-    incident_names = [inc.get("name") or "" for inc in incidents if inc.get("status") != "resolved"]
-    latest = body[0:197] + "…" if len(body) > 200 else body
     return {
-        "indicator": status_obj.get("indicator") or "none",
-        "description": status_obj.get("description") or "",
+        "indicator": indicator,
+        "description": description,
         "components": components,
-        "incidents": incident_names,
-        "latestUpdate": latest,
+        "incidents": [inc.get("name") or "" for inc in incidents],
+        "latestUpdate": body[0:197] + "…" if len(body) > 200 else body,
+        "url": url,
+    }
+
+
+def _gatus_summary(d, url):
+    """Gatus lists endpoints with their recent check results, oldest first;
+    an endpoint counts as down when its latest check failed."""
+    if not isinstance(d, list):
+        return empty_status(url)
+    checked, down = 0, []
+    for e in d:
+        results = e.get("results") if isinstance(e, dict) else None
+        if not results or not isinstance(results[-1], dict):
+            continue
+        checked += 1
+        if results[-1].get("success") is not True:
+            down.append(str(e.get("name") or e.get("key") or "endpoint"))
+    if checked == 0:
+        return empty_status(url)
+    if not down:
+        indicator, description = "none", "All Systems Operational"
+    elif len(down) == checked:
+        indicator, description = "critical", "All checks failing"
+    else:
+        indicator, description = "major", f"{len(down)} of {checked} checks failing"
+    return {
+        "indicator": indicator,
+        "description": description,
+        "components": [name + " (down)" for name in down],
+        "incidents": [],
+        "latestUpdate": "",
+        "url": url,
     }
 
 

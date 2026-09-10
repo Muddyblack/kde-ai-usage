@@ -52,8 +52,7 @@ ColumnLayout {
         }
         StatusChip {
             Layout.alignment: Qt.AlignVCenter
-            linkOnly: true
-            statusUrl: "https://aistudio.google.com/status"
+            status: rootItem.providerStatus.antigravity
         }
     }
 

@@ -128,12 +128,7 @@ ColumnLayout {
             }
             StatusChip {
                 Layout.alignment: Qt.AlignVCenter
-                indicator: rootItem.openaiStatus.indicator
-                description: rootItem.openaiStatus.description
-                affectedComponents: rootItem.openaiStatus.components
-                incidents: rootItem.openaiStatus.incidents
-                latestUpdate: rootItem.openaiStatus.latestUpdate
-                statusUrl: "https://status.openai.com"
+                status: rootItem.providerStatus.openai
             }
         }
 

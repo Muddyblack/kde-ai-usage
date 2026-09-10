@@ -6,7 +6,6 @@ from ..contract import (
     provider_error,
     quota_window,
     rolling_windows,
-    status_summary,
     unavailable_window,
     window_value,
 )
@@ -90,7 +89,6 @@ def normalize_openai(raw):
     logged_in = (creds.get("codexLoggedIn") is True) or ((creds.get("codexAccessToken") or "") != "")
     codex = codex_normalize(inp.get("codex") or {})
     codex_available = codex["session"]["available"] or codex["weekly"]["available"]
-    status = status_summary(inp.get("status"))
     stats = codex_stats(inp.get("stats"), now)
     if inp.get("orgUsage") is not None:
         entries = [item for r in (inp["orgUsage"].get("data") or []) for item in (r.get("results") or [])]
@@ -116,7 +114,6 @@ def normalize_openai(raw):
         },
         "organizationUsage": org,
         "stats": stats,
-        "status": status,
     }
 
     if not has_key and not logged_in:

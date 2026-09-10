@@ -78,12 +78,7 @@ ColumnLayout {
         }
         StatusChip {
             Layout.alignment: Qt.AlignVCenter
-            indicator: rootItem.mistralStatus.indicator
-            description: rootItem.mistralStatus.description
-            affectedComponents: rootItem.mistralStatus.components
-            incidents: rootItem.mistralStatus.incidents
-            latestUpdate: rootItem.mistralStatus.latestUpdate
-            statusUrl: "https://status.mistral.ai"
+            status: rootItem.providerStatus.mistral
         }
     }
 

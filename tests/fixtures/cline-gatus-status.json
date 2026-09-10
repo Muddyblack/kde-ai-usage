@@ -1,0 +1,12 @@
+{
+  "id": "cline",
+  "now": 1789050000,
+  "inputs": {
+    "usage": {},
+    "status": [
+      {"name": "API Health Check", "group": "Availability", "results": [{"success": false}, {"success": true}]},
+      {"name": "Web App", "group": "Availability", "results": [{"success": true}, {"success": false}]},
+      {"name": "Never checked", "results": []}
+    ]
+  }
+}

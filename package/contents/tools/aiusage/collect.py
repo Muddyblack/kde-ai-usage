@@ -10,6 +10,7 @@ import os
 import time
 
 from . import config
+from .contract import STATUS_FEEDS, STATUS_PAGES
 from .http import as_json, fetch_json, http_error_text
 from .providers.antigravity import get_antigravity_usage
 from .providers.claude_credentials import get_claude_credentials
@@ -71,6 +72,13 @@ def status_json(name, url):
     return cached
 
 
+def provider_status(id_):
+    """The raw status feed for a provider, or None when its page has none."""
+    page = STATUS_PAGES.get(id_) or {}
+    feed = STATUS_FEEDS.get(page.get("feed"))
+    return status_json(id_, page["url"] + feed) if feed else None
+
+
 def collect_claude(now):
     creds = get_claude_credentials()
     # ~/.claude/.credentials.json is written by another program and read
@@ -116,7 +124,7 @@ def collect_claude(now):
 
     settings = read_json_file(os.path.expanduser("~/.claude/settings.json"))
     stats = read_json_file(os.path.expanduser("~/.claude/stats-cache.json"))
-    status = status_json("claude", "https://status.claude.com/api/v2/summary.json")
+    status = provider_status("claude")
 
     return {
         "id": "claude",
@@ -172,7 +180,7 @@ def collect_openai(now):
             org = as_json(result.body)
 
     stats = get_codex_stats()
-    status = status_json("openai", "https://status.openai.com/api/v2/summary.json")
+    status = provider_status("openai")
 
     return {
         "id": "openai",
@@ -204,7 +212,7 @@ def collect_copilot(now):
     return {
         "id": "copilot",
         "now": now,
-        "inputs": {"usage": get_copilot_usage() or {}, "stats": get_copilot_stats() or {}},
+        "inputs": {"usage": get_copilot_usage() or {}, "stats": get_copilot_stats() or {}, "status": provider_status("copilot")},
     }
 
 
@@ -214,20 +222,20 @@ def collect_kimi(now):
     return {
         "id": "kimi",
         "now": now,
-        "inputs": {"usage": get_moonshot_balance() or {}, "codePlan": get_kimi_code_usage() or {}, "status": None},
+        "inputs": {"usage": get_moonshot_balance() or {}, "codePlan": get_kimi_code_usage() or {}, "status": provider_status("kimi")},
     }
 
 
 _SIMPLE = {
-    "antigravity": (get_antigravity_usage, None, None),
-    "kiro": (get_kiro_usage, None, None),
-    "mistral": (get_mistral_usage, "mistral", "https://status.mistral.ai/api/v2/summary.json"),
-    "openrouter": (get_openrouter_usage, "openrouter", "https://status.openrouter.ai/api/v2/summary.json"),
-    "grok": (get_grok_usage, None, None),
-    "zai": (get_zai_usage, None, None),
-    "deepseek": (get_deepseek_balance, None, None),
-    "cursor": (get_cursor_usage, None, None),
-    "cline": (get_cline_sessions, None, None),
+    "antigravity": get_antigravity_usage,
+    "kiro": get_kiro_usage,
+    "mistral": get_mistral_usage,
+    "openrouter": get_openrouter_usage,
+    "grok": get_grok_usage,
+    "zai": get_zai_usage,
+    "deepseek": get_deepseek_balance,
+    "cursor": get_cursor_usage,
+    "cline": get_cline_sessions,
 }
 
 
@@ -243,8 +251,6 @@ def collect(id_, now):
     if id_ == "kimi":
         return collect_kimi(now)
     if id_ in _SIMPLE:
-        fn, status_name, status_url = _SIMPLE[id_]
-        usage = fn() or {}
-        status = status_json(status_name, status_url) if status_url else None
-        return {"id": id_, "now": now, "inputs": {"usage": usage, "status": status}}
+        usage = _SIMPLE[id_]() or {}
+        return {"id": id_, "now": now, "inputs": {"usage": usage, "status": provider_status(id_)}}
     return {"id": id_, "now": now, "inputs": {}}

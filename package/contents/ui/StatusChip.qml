@@ -6,15 +6,19 @@ import org.kde.plasma.components as PlasmaComponents
 Rectangle {
     id: statusChip
 
-    // "none" | "minor" | "major" | "critical" | "" (hidden until fetched)
-    property string indicator: ""
-    property string description: ""
-    property var affectedComponents: []
-    property var incidents: []
-    property string latestUpdate: ""
-    property string statusUrl: ""
-    // When true: shows a neutral link chip even without a live status fetch
-    property bool linkOnly: false
+    // One provider's details.status from the backend:
+    // { indicator, description, components, incidents, latestUpdate, url }
+    property var status: ({})
+
+    // "none" | "minor" | "major" | "critical" | "" (no live feed)
+    readonly property string indicator: (status && status.indicator) || ""
+    readonly property string description: (status && status.description) || ""
+    readonly property var affectedComponents: (status && status.components) || []
+    readonly property var incidents: (status && status.incidents) || []
+    readonly property string latestUpdate: (status && status.latestUpdate) || ""
+    readonly property string statusUrl: (status && status.url) || ""
+    // A page without a machine-readable feed is still worth a link.
+    readonly property bool linkOnly: indicator === "" && statusUrl !== ""
 
     visible: indicator !== "" || linkOnly
     implicitHeight: 16

@@ -34,6 +34,10 @@ ColumnLayout {
             font.bold: true
             opacity: 0.7
         }
+        StatusChip {
+            Layout.alignment: Qt.AlignVCenter
+            status: rootItem.providerStatus.grok
+        }
     }
 
     ColumnLayout {

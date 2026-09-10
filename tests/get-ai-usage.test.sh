@@ -42,6 +42,9 @@ for fixture in "$FIXTURES"/*.json; do
         and (.quotaWindows | type) == "array"
         and (.historyValues | type) == "object"
         and (.error | type) == "string"'
+    check "$name" "carries a status block" '
+        (.details.status | (.indicator | type) == "string" and (.url | type) == "string"
+         and (.components | type) == "array" and (.incidents | type) == "array")'
     # No credential may ever reach a frontend.
     check "$name" "never leaks a credential" '
         (tojson | test("secret|sk-ant-|sk-oauth|gh-secret|zai-secret|xai-secret|ds-secret|or-secret|codex-secret") | not)'
@@ -119,7 +122,23 @@ check claude-success "summarises the status page" '
     .details.status.indicator == "minor"
     and .details.status.components == ["API (degraded performance)"]
     and .details.status.incidents == ["Elevated errors"]
-    and .details.status.latestUpdate == "We are looking into it."'
+    and .details.status.latestUpdate == "We are looking into it."
+    and .details.status.url == "https://status.claude.com"'
+check copilot-github-status "scopes GitHub status to Copilot" '
+    .details.status.indicator == "minor"
+    and .details.status.description == "Copilot degraded"
+    and .details.status.components == ["Copilot (degraded performance)"]
+    and .details.status.incidents == ["Slow Copilot completions"]
+    and .details.status.latestUpdate == "Completions are slower than usual."
+    and .details.status.url == "https://www.githubstatus.com"'
+check cline-gatus-status "reads a Gatus page by the latest check per endpoint" '
+    .details.status.indicator == "major"
+    and .details.status.components == ["Web App (down)"]
+    and .details.status.url == "https://status.cline.bot"'
+check mistral-missing "links a status page that has no feed" '
+    .details.status.indicator == "" and .details.status.url == "https://status.mistral.ai"'
+check zai-missing "has no status page" '
+    .details.status.indicator == "" and .details.status.url == ""'
 check claude-missing-credentials "reports a logged-out account" '
     (.ok | not) and .error == "Claude not logged in" and .stale
     and .historyValues == {} and (.details.hasOAuth | not)'

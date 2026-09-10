@@ -6,7 +6,6 @@ from ..contract import (
     provider_error,
     quota_window,
     rolling_windows,
-    status_summary,
     unavailable_window,
     window_value,
 )
@@ -74,7 +73,6 @@ def normalize_claude(raw):
     token = oauth.get("accessToken") or ""
     has_admin = (creds.get("claudeAdminApiKey") or "") != ""
     usage = inp.get("usage")
-    status = status_summary(inp.get("status"))
     stats = claude_stats(inp.get("stats"), now)
     if inp.get("orgUsage") is not None:
         org = price_models((inp["orgUsage"].get("data") or []), CLAUDE_PRICING)
@@ -91,7 +89,6 @@ def normalize_claude(raw):
         "autoDream": (inp.get("settings") or {}).get("autoDreamEnabled") is True,
         "organizationUsage": org,
         "stats": stats,
-        "status": status,
         "scopedWeekly": [],
     }
 

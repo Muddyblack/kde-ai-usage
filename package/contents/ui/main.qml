@@ -43,35 +43,9 @@ PlasmoidItem {
     }
     property real chartTimeOffset: 0
     // ── Service status (status pages) ────────────────────────────────────────
-    // Each object: { indicator, description, components, incidents, latestUpdate }
-    property var claudeStatus: ({
-            "indicator": "",
-            "description": "",
-            "components": [],
-            "incidents": [],
-            "latestUpdate": ""
-        })
-    property var mistralStatus: ({
-            "indicator": "",
-            "description": "",
-            "components": [],
-            "incidents": [],
-            "latestUpdate": ""
-        })
-    property var openaiStatus: ({
-            "indicator": "",
-            "description": "",
-            "components": [],
-            "incidents": [],
-            "latestUpdate": ""
-        })
-    property var openrouterStatus: ({
-            "indicator": "",
-            "description": "",
-            "components": [],
-            "incidents": [],
-            "latestUpdate": ""
-        })
+    // Provider id → details.status from the backend:
+    // { indicator, description, components, incidents, latestUpdate, url }
+    property var providerStatus: ({})
     // ── Claude data ───────────────────────────────────────────────────────────
     property bool sessionAvailable: false
     property real sessionPct: 0
@@ -1270,7 +1244,8 @@ PlasmoidItem {
             "description": "",
             "components": [],
             "incidents": [],
-            "latestUpdate": ""
+            "latestUpdate": "",
+            "url": ""
         };
     }
 
@@ -1371,6 +1346,10 @@ PlasmoidItem {
 
     function applyProvider(provider) {
         var details = provider.details || {};
+        // Reassigned, not patched: a `property var` only notifies on assignment.
+        var statuses = Object.assign({}, root.providerStatus);
+        statuses[provider.id] = details.status || root.emptyStatus();
+        root.providerStatus = statuses;
         if (provider.id === "claude")
             root.applyClaude(details);
         else if (provider.id === "openai")
@@ -1435,7 +1414,6 @@ PlasmoidItem {
         root.claudeTotalInputTokens = org.totalInputTokens || 0;
         root.claudeTotalOutputTokens = org.totalOutputTokens || 0;
         root.claudeTotalCostUSD = org.totalCostUSD || 0;
-        root.claudeStatus = d.status || root.emptyStatus();
         var stats = d.stats || {};
         root.claudeStatsAvailable = stats.available === true;
         root.claudeStatsVersion = stats.version || 0;
@@ -1506,7 +1484,6 @@ PlasmoidItem {
         root.openaiTotalInputTokens = org.totalInputTokens || 0;
         root.openaiTotalOutputTokens = org.totalOutputTokens || 0;
         root.openaiTotalCostUSD = org.totalCostUSD || 0;
-        root.openaiStatus = d.status || root.emptyStatus();
         var stats = d.stats || {};
         root.codexStatsAvailable = stats.available === true;
         root.codexStatsTotalSessions = stats.totalSessions || 0;
@@ -1586,7 +1563,6 @@ PlasmoidItem {
         root.mistralKeyValid = d.keyValid === true;
         root.mistralAvailableModels = d.availableModels || [];
         root.mistralError = error;
-        root.mistralStatus = d.status || root.emptyStatus();
         var vibe = d.vibe || {};
         root.mistralVibeSessionCount = vibe.sessionCount || 0;
         root.mistralVibeTotalCost = vibe.totalCost || 0;
@@ -1610,7 +1586,6 @@ PlasmoidItem {
         root.openrouterIsFreeTier = d.isFreeTier === true;
         root.openrouterRateLimit = d.rateLimit || ({});
         root.openrouterError = error;
-        root.openrouterStatus = d.status || root.emptyStatus();
     }
 
     function applyGrok(d, error) {

@@ -55,6 +55,11 @@ ColumnLayout {
                 color: rootItem.deepseekIsAvailable ? rootItem.deepseekBlue : Kirigami.Theme.textColor
             }
         }
+
+        StatusChip {
+            Layout.alignment: Qt.AlignVCenter
+            status: rootItem.providerStatus.deepseek
+        }
     }
 
     ColumnLayout {

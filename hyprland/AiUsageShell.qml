@@ -911,6 +911,9 @@ ShellRoot {
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 8
+                            // Above the rows below, which the status chip's
+                            // hover card overlaps.
+                            z: 2
 
                             Item {
                                 id: headerBadge
@@ -1007,6 +1010,16 @@ ShellRoot {
 
                             Item {
                                 Layout.fillWidth: true
+                            }
+
+                            // Service status of the active provider; hides itself
+                            // when the provider has no status page at all.
+                            StatusChip {
+                                Layout.alignment: Qt.AlignVCenter
+                                status: {
+                                    var p = root.activeProvider();
+                                    return !root.showSettings && p && p.details ? (p.details.status || ({})) : ({});
+                                }
                             }
 
                             // Settings gear / back toggle

@@ -65,6 +65,10 @@ ColumnLayout {
                 opacity: 0.45
                 color: Kirigami.Theme.textColor
             }
+            StatusChip {
+                Layout.alignment: Qt.AlignVCenter
+                status: rootItem.providerStatus.cline
+            }
         }
 
         GridLayout {

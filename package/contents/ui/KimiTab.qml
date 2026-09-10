@@ -11,6 +11,21 @@ ColumnLayout {
     Layout.fillWidth: true
     spacing: 14
 
+    // Kimi has no account header to sit in, so the chip gets a row of its own.
+    RowLayout {
+        Layout.fillWidth: true
+        visible: kimiStatusChip.visible
+
+        Item {
+            Layout.fillWidth: true
+        }
+        StatusChip {
+            id: kimiStatusChip
+            Layout.alignment: Qt.AlignVCenter
+            status: rootItem.providerStatus.kimi
+        }
+    }
+
     // ── Kimi Code plan (the `kimi` CLI login) ────────────────────────────────
     ColumnLayout {
         visible: rootItem.kimiPlanAvailable

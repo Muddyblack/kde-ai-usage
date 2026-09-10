@@ -63,6 +63,12 @@ ColumnLayout {
                 color: rootItem.copilotPurple
             }
         }
+
+        // Scoped to GitHub's Copilot components by the backend.
+        StatusChip {
+            Layout.alignment: Qt.AlignVCenter
+            status: rootItem.providerStatus.copilot
+        }
     }
 
     ColumnLayout {

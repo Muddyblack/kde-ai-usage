@@ -1,0 +1,21 @@
+{
+  "id": "copilot",
+  "now": 1785000000,
+  "inputs": {
+    "usage": {"hasKey": true, "keyValid": true, "username": "octocat", "used": 125, "quota": 500, "pct": 25},
+    "status": {
+      "status": {"indicator": "critical", "description": "Major System Outage"},
+      "components": [
+        {"name": "Actions", "status": "major_outage"},
+        {"name": "Copilot", "status": "degraded_performance"},
+        {"name": "Copilot AI Model Providers", "status": "operational"}
+      ],
+      "incidents": [
+        {"name": "Actions runs are delayed", "status": "investigating", "components": [{"name": "Actions"}],
+         "incident_updates": [{"body": "Runners are backing up."}]},
+        {"name": "Slow Copilot completions", "status": "identified", "components": [],
+         "incident_updates": [{"body": "Completions are slower than usual."}]}
+      ]
+    }
+  }
+}
