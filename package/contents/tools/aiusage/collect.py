@@ -13,6 +13,7 @@ from . import config
 from .http import as_json, fetch_json, http_error_text
 from .providers.antigravity import get_antigravity_usage
 from .providers.claude_credentials import get_claude_credentials
+from .providers.cline import get_cline_sessions
 from .providers.codex_rate_limits import get_codex_rate_limits
 from .providers.codex_stats import get_codex_stats
 from .providers.copilot import get_copilot_usage
@@ -226,6 +227,7 @@ _SIMPLE = {
     "zai": (get_zai_usage, None, None),
     "deepseek": (get_deepseek_balance, None, None),
     "cursor": (get_cursor_usage, None, None),
+    "cline": (get_cline_sessions, None, None),
 }
 
 

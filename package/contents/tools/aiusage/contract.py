@@ -22,6 +22,7 @@ SCHEMA_VERSION = 1
 PROVIDER_ICONS = {
     "antigravity": "antigravity-color.svg",
     "claude": "claude-color.svg",
+    "cline": "cline.svg",
     "copilot": "copilot-color.svg",
     "cursor": "cursor.svg",
     "deepseek": "deepseek-color.svg",

@@ -15,7 +15,14 @@ def normalize_cursor(raw):
     res = raw["inputs"].get("usage") or {}
 
     if not isinstance(res, dict) or not res:
-        return provider_error("cursor", "Cursor", ACCENT, now, "Cursor: not signed in — run cursor-agent login", {"loggedIn": False, "source": "", "stats": {"available": False}})
+        return provider_error(
+            "cursor",
+            "Cursor",
+            ACCENT,
+            now,
+            "Cursor: not signed in — run cursor-agent login",
+            {"loggedIn": False, "source": "", "stats": {"available": False}},
+        )
     base_details = {"loggedIn": res.get("loggedIn") is True, "source": res.get("source") or "", "stats": cursor_stats(res.get("stats"), now)}
     if res.get("error") is not None:
         return provider_error("cursor", "Cursor", ACCENT, now, f"Cursor: {res['error']}", base_details)
@@ -28,7 +35,9 @@ def normalize_cursor(raw):
     pu = usage.get("planUsage")
     if not isinstance(pu, dict):
         # Enterprise seats get no plan block; cursor-agent says the same.
-        return provider_error("cursor", "Cursor", ACCENT, now, "Cursor: usage details are not available for this plan", {**base_details, "planName": plan_name})
+        return provider_error(
+            "cursor", "Cursor", ACCENT, now, "Cursor: usage details are not available for this plan", {**base_details, "planName": plan_name}
+        )
 
     reset_at = _ms_epoch(usage.get("billingCycleEnd")) or _ms_epoch(plan_info.get("billingCycleEnd"))
     # Spend figures are integer cents.

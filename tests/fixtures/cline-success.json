@@ -1,0 +1,14 @@
+{
+  "id": "cline",
+  "now": 1789050000,
+  "inputs": {
+    "usage": {
+      "sessions": [
+        { "startedAt": 1789046340, "endedAt": 1789046465, "provider": "cline", "model": "z-ai/glm-5.3-flash", "workspace": "nixos-config", "status": "completed", "input": 18605, "output": 792, "cacheRead": 8768, "cacheWrite": 0, "cost": 0 },
+        { "startedAt": 1789047000, "endedAt": 1789047600, "provider": "cline", "model": "anthropic/claude-sonnet-4.5", "workspace": "ai-usage-widget", "status": "completed", "input": 40000, "output": 3000, "cacheRead": 20000, "cacheWrite": 1000, "cost": 0.42 },
+        { "startedAt": 1789047700, "endedAt": 1789047800, "provider": "cline", "model": "anthropic/claude-sonnet-4.5", "workspace": "ai-usage-widget", "status": "completed", "input": 5000, "output": 200, "cacheRead": 0, "cacheWrite": 0, "cost": 0.05 }
+      ]
+    },
+    "status": null
+  }
+}

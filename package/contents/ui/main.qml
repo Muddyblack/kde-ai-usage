@@ -350,6 +350,13 @@ PlasmoidItem {
     property string cursorError: ""
     // Dashboard usage for the billing cycle, in the shared stats shape (stats.py)
     property var cursorStats: ({})
+
+    // ── Cline data (local session logs, shared stats shape) ──────────────────
+    property var clineStats: ({})
+    // Today / last 7 days / last 30 days: [{key, label, sessions, tokens, cost}]
+    property var clinePeriods: []
+    property string clineError: ""
+    readonly property real clineMonthTokens: clinePeriods.length > 2 ? (clinePeriods[2].tokens || 0) : 0
     // Bumped by updateCountdowns() so Repeater rows can re-read their own countdown
     property int countdownTick: 0
     // ── Muse data ───────────────────────────────────────────────────────────
@@ -507,6 +514,7 @@ PlasmoidItem {
     readonly property color deepseekBlue: "#4f8cff"
     readonly property color kimiBlue: "#1e3a8a"
     readonly property color cursorWhite: "#e6e6e6"
+    readonly property color clineWhite: "#e6e6e6"
     readonly property color museBlue: "#0064e0"
     readonly property color sessionColor: "#e05252"
     readonly property color weeklyColor: "#f5a623"
@@ -618,6 +626,12 @@ PlasmoidItem {
             label: "Cursor",
             color: root.cursorWhite,
             icon: "cursor.svg"
+        },
+        {
+            id: "cline",
+            label: "Cline",
+            color: root.clineWhite,
+            icon: "cline.svg"
         }
     ]
 
@@ -1383,6 +1397,8 @@ PlasmoidItem {
             root.applyMuse(details, provider.error || "");
         else if (provider.id === "cursor")
             root.applyCursor(details, provider.error || "");
+        else if (provider.id === "cline")
+            root.applyCline(details, provider.error || "");
     }
 
     function applyClaude(d) {
@@ -1715,6 +1731,12 @@ PlasmoidItem {
         root.cursorStats = d.stats || ({});
     }
 
+    function applyCline(d, error) {
+        root.clineStats = d.stats || ({});
+        root.clinePeriods = d.periods || [];
+        root.clineError = error;
+    }
+
     function applyMuse(d, error) {
         root.museHasLogin = d.hasLogin === true;
         root.museEmail = d.email || "";
@@ -1943,6 +1965,16 @@ PlasmoidItem {
 
             if (root.cursorError)
                 lines.push("⚠ " + root.cursorError);
+        } else if (tab === "cline") {
+            if (root.clineStats.available === true) {
+                lines.push("Tokens: " + root.formatTokens(root.clineStats.totalTokens || 0) + " (all time)");
+                lines.push("Sessions: " + Math.round(root.clineStats.totalSessions || 0));
+                if ((root.clineStats.totalCostUSD || 0) > 0)
+                    lines.push("Spend: " + root.formatMoney(root.clineStats.totalCostUSD, "USD"));
+            }
+
+            if (root.clineError)
+                lines.push("⚠ " + root.clineError);
         } else if (tab === "muse") {
             lines.push("Muse" + (root.museModel ? " · " + root.museModel : ""));
             if (root.museCurrentAvailable)
@@ -2424,6 +2456,28 @@ PlasmoidItem {
             }
 
             PanelSlot {
+                // No quota to fill: the pill shows the last 30 days' tokens.
+                pct: 0
+                iconColor: root.clineWhite
+                iconSource: Qt.resolvedUrl("../icons/cline.svg")
+                iconText: "Cl"
+                stale: root.stale && root.panelShows("cline")
+                visible: root.panelShows("cline")
+                showCost: true
+                costText: root.clineStats.available === true ? root.formatTokens(root.clineMonthTokens) : "—"
+                tooltipText: {
+                    if (root.clineStats.available !== true)
+                        return "Cline\n" + (root.clineError || "No sessions yet");
+                    var t = "Cline";
+                    for (var i = 0; i < root.clinePeriods.length; i++) {
+                        var p = root.clinePeriods[i];
+                        t += "\n" + p.label + ": " + root.formatTokens(p.tokens || 0) + " tokens · " + p.sessions + (p.sessions === 1 ? " session" : " sessions");
+                    }
+                    return t;
+                }
+            }
+
+            PanelSlot {
                 pct: root.cursorTotalPct
                 iconColor: root.cursorWhite
                 iconSource: Qt.resolvedUrl("../icons/cursor.svg")
@@ -2696,6 +2750,9 @@ PlasmoidItem {
 
                             if (tab === "cursor")
                                 return "Cursor Usage";
+
+                            if (tab === "cline")
+                                return "Cline Stats";
 
                             return "AI Usage Monitor";
                         }
@@ -2987,6 +3044,10 @@ PlasmoidItem {
             }
 
             CursorTab {
+                rootItem: root
+            }
+
+            ClineTab {
                 rootItem: root
             }
 

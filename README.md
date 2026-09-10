@@ -50,7 +50,7 @@ A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple serv
 
 ## Features
 
-- **Multi-service support** — Switch between Claude, Antigravity, OpenAI, Grok, Kiro, Mistral, OpenRouter, Z.AI, GitHub Copilot, DeepSeek, Kimi, Muse, and Cursor tabs in the popup
+- **Multi-service support** — Switch between Claude, Antigravity, OpenAI, Grok, Kiro, Mistral, OpenRouter, Z.AI, GitHub Copilot, DeepSeek, Kimi, Muse, Cursor, and Cline tabs in the popup
 - **Balance tracking** — DeepSeek current balance with granted / topped-up breakdown
 - **Panel view** — Compact percentage readouts in the taskbar, color-coded by usage level, with an inline spark-line trend
 - **Popup view** — Segmented bars showing exact fill level with reset times and countdowns
@@ -90,6 +90,7 @@ A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple serv
 | Kimi / Moonshot AI | Kimi Code plan windows (5-hour and weekly) and extra-usage wallet; Moonshot API balance with voucher and cash breakdown | Moonshot balance supported; Kimi Code quota tested on a used-up plan only |
 | Muse | Local session stats: tokens, offline spend estimate, sessions, tool calls, workspaces, streaks. Plan windows available behind an opt-in switch | Supported (the plan quota costs tokens to read — off by default) |
 | Cursor | Included usage for the billing cycle, the Auto/API split, on-demand spend, and plan name | Free plan tested; paid plans unverified |
+| Cline | Tokens, sessions and spend for today / 7 / 30 days, plus all-time stats per model and workspace, from the CLI's own session logs | Supported (local stats; account balance not yet shown) |
 
 Provider APIs do not all expose the same information. In particular, Codex/ChatGPT
 plan limits are separate from OpenAI API organization usage, DeepSeek reports a
@@ -124,6 +125,7 @@ Enable only the services you use. Each one has its own setup requirement:
 | Kimi / Moonshot AI | A Kimi Code login (`kimi`, then `/login`) for the plan quota, and/or a Moonshot API key from widget settings, `$MOONSHOT_API_KEY`, `$KIMI_API_KEY`, or `~/.config/moonshot/api-key` for the API balance |
 | Muse | Nothing to configure for the local stats — `muse login` is enough. The optional plan quota additionally uses `$META_API_KEY` or the key `muse login` stored |
 | Cursor | cursor-agent signed in (`cursor-agent login`), or the Cursor IDE signed in. No API key |
+| Cline | The Cline CLI, run at least once. Nothing to configure |
 
 All configuration is done in the widget's settings panel (right-click the widget → *Configure*). See [How it works](#how-it-works) below for what each tab reads and where credentials are resolved from.
 
@@ -368,6 +370,9 @@ The Kimi tab combines two independent sources; either one is enough.
 
 ### Cursor *(free plan tested; paid plans untested)*
 The Cursor tab needs no API key and no Cursor IDE: it uses the login `cursor-agent login` stores in `~/.config/cursor/auth.json`, falling back to the Cursor IDE's own login in its `state.vscdb`. With it, the widget calls the two dashboard RPCs the CLI's `/usage` screen uses (`aiserver.v1.DashboardService/GetCurrentPeriodUsage` and `GetPlanInfo` on `api2.cursor.sh`) and shows the included usage for the billing cycle, how much of it went to Auto/Composer versus hand-picked API models, on-demand spend against its limit, the plan name and the cycle's end. Enterprise seats get no plan block from Cursor — the CLI says the same — and the tab reports that instead of a number. A **Stats** sub-tab mirrors the Usage page of cursor.com/dashboard for the current billing cycle: tokens, the usage value Cursor prices it at, requests, conversations, active days, peak hour, a per-day sparkline and a per-model breakdown, from the same `GetAggregatedUsageEvents` / `GetFilteredUsageEvents` calls the dashboard makes (the request list is capped at 500 per refresh; beyond that the per-day figures cover the newest requests). Cursor is opt-in, so enable it under **Settings → Providers**.
+
+### Cline
+The Cline tab is **offline**: it reads the session records the Cline CLI writes to `~/.cline/data/sessions/<id>/<id>.json` and keeps only the provider, model, workspace folder name, start and end time, and the token and cost totals (sub-agents included). Prompts, titles, git remotes and transcripts are never read into the result. **Usage** shows today, the last 7 days and the last 30 days — tokens, sessions, and spend when Cline recorded one; a lifetime token count says little on its own, since a token costs very different amounts from model to model. **Stats** keeps the all-time picture: tokens, spend, sessions, active days, streaks, longest session, peak hour, a per-day sparkline, top workspaces and a per-model breakdown. Cline is opt-in, so enable it under **Settings → Providers**.
 
 ### Muse
 The Muse tab is **fully offline** — it opens no socket, and a test enforces that against the provider's import graph. It reads what Muse Code writes to disk anyway:

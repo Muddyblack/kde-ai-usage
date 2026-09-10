@@ -14,7 +14,7 @@ Switch between tabs in the popup for each service:
 [*] [b]Antigravity / Google AI Studio[/b]
 [*] [b]OpenAI API[/b]
 [*] [b]Grok / xAI[/b]
-[*] [b]Mistral AI[/b]
+[*] [b]Mistral AI[/b]   
 [*] [b]Kiro[/b] — monthly credits, from the kiro-cli login or the Kiro IDE
 [*] [b]OpenRouter[/b]
 [*] [b]Z.AI[/b] [i](untested)[/i] — 5-hour token quota + monthly tools quota

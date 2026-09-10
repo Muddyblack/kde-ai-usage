@@ -7,13 +7,28 @@ values through WIDGET_* environment variables. Environment always wins.
 import json
 import os
 
-ALL_PROVIDERS = ["claude", "antigravity", "openai", "kiro", "mistral", "openrouter", "grok", "zai", "copilot", "deepseek", "kimi", "muse", "cursor"]
+ALL_PROVIDERS = [
+    "claude",
+    "antigravity",
+    "openai",
+    "kiro",
+    "mistral",
+    "openrouter",
+    "grok",
+    "zai",
+    "copilot",
+    "deepseek",
+    "kimi",
+    "muse",
+    "cursor",
+    "cline",
+]
 
 # Providers that stay off until explicitly enabled: most need a token the user
-# has to paste, so defaulting them on would only produce error rows. Muse and
-# Cursor need no token at all — they are opt-in because a machine without the
-# tool installed should not grow a tab for it.
-OPT_IN_PROVIDERS = {"zai", "copilot", "deepseek", "kimi", "muse", "cursor"}
+# has to paste, so defaulting them on would only produce error rows. Muse,
+# Cursor and Cline need no token at all — they are opt-in because a machine
+# without the tool installed should not grow a tab for it.
+OPT_IN_PROVIDERS = {"zai", "copilot", "deepseek", "kimi", "muse", "cursor", "cline"}
 
 _KEY_EXPORTS = [
     ("WIDGET_CLAUDE_ADMIN_KEY", "claudeAdmin"),

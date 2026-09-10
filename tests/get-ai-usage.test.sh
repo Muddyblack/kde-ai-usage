@@ -390,6 +390,21 @@ check cursor-success "turns the dashboard usage into the shared stats shape" '
     and .details.stats.models.default.requests == 1 and .details.stats.dailyUnit == "tokens"
     and (.details.stats.partial | not)'
 check cursor-free "has no stats without a stats blob" '.details.stats.available == false'
+# ── Cline ───────────────────────────────────────────────────────────────────
+
+check cline-success "sums the local session logs" '
+    .ok and .details.stats.available and .details.stats.totalSessions == 3
+    and .details.stats.totalTokens == 97365 and ((.details.stats.totalCostUSD - 0.47) | fabs) < 0.000001
+    and .details.stats.favoriteModel == "anthropic/claude-sonnet-4.5"
+    and .details.stats.models["anthropic/claude-sonnet-4.5"].sessions == 2
+    and .details.stats.topWorkspaces[0] == {name: "ai-usage-widget", sessions: 2}
+    and .details.stats.longestSessionMs == 600000
+    and ([.quotaWindows[].key] == ["cline_today", "cline_7d", "cline_30d"])
+    and .quotaWindows[2].detail == "97.4k tokens · 3 sessions · $0.47"
+    and .summary.text == "97.4k" and .summary.detail == "last 30 days"
+    and (.details.periods[1] | .sessions == 3 and .tokens == 97365)'
+check cline-missing "reports a machine that never ran Cline" '
+    (.ok | not) and .error == "Cline: no sessions yet — run cline once" and .details.stats.available == false'
 check cursor-missing "reports a missing login" '
     (.ok | not) and .error == "Cursor: not signed in — run cursor-agent login"'
 check cursor-expired "passes the login error through" '

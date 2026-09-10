@@ -124,6 +124,11 @@ ShellRoot {
             id: "cursor",
             label: "Cursor",
             accent: "#e6e6e6"
+        },
+        {
+            id: "cline",
+            label: "Cline",
+            accent: "#e6e6e6"
         }
     ]
 
@@ -220,7 +225,7 @@ ShellRoot {
 
     function providerEnabled(id) {
         // Mirrors OPT_IN_PROVIDERS in aiusage/config.py.
-        if (id === "zai" || id === "copilot" || id === "deepseek" || id === "kimi" || id === "muse" || id === "cursor")
+        if (id === "zai" || id === "copilot" || id === "deepseek" || id === "kimi" || id === "muse" || id === "cursor" || id === "cline")
             return root.settings.providers[id] === true;
         return root.settings.providers[id] !== false;
     }
@@ -335,7 +340,7 @@ ShellRoot {
     property string activeSubTab: "usage"
     readonly property bool activeHasStats: {
         var p = activeProvider();
-        return p && (p.id === "claude" || p.id === "openai" || p.id === "copilot" || p.id === "muse" || p.id === "cursor");
+        return p && (p.id === "claude" || p.id === "openai" || p.id === "copilot" || p.id === "muse" || p.id === "cursor" || p.id === "cline");
     }
 
     function activeProvider() {

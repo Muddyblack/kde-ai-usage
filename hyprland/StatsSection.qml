@@ -82,6 +82,8 @@ ColumnLayout {
                     return "No Muse sessions yet.\nRun Muse Code and its own logs will appear here.";
                 if (statsSectionRoot.providerId === "cursor")
                     return "No Cursor usage this billing cycle yet.\nRequests made with Cursor or cursor-agent will appear here.";
+                if (statsSectionRoot.providerId === "cline")
+                    return "No Cline sessions yet.\nRun the Cline CLI and its session logs in ~/.cline will appear here.";
                 return "No local activity stats yet.\nRun Claude Code to generate ~/.claude/stats-cache.json";
             }
             font.pixelSize: 11

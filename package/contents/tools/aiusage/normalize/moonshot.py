@@ -90,7 +90,11 @@ def normalize_moonshot(raw):
         rows.append(flat_window("kimi_code_plan", "Plan usage", 100, 0, code_plan["message"] or "Plan quota used up", True))
     if code_plan["booster"]:
         b = code_plan["booster"]
-        rows.append(flat_window("kimi_booster", "Extra usage", 0, 0, f"{money(b['balance'], b['currency'])} left", False, f"of {money(b['total'], b['currency'])}"))
+        rows.append(
+            flat_window(
+                "kimi_booster", "Extra usage", 0, 0, f"{money(b['balance'], b['currency'])} left", False, f"of {money(b['total'], b['currency'])}"
+            )
+        )
     if has_balance:
         rows.append(flat_window("kimi_balance", "Available balance", 0, 0, money(available, "USD"), False))
         rows.append(flat_window("kimi_split", "Voucher / cash", 0, 0, f"{money(voucher, 'USD')} / {money(cash, 'USD')}", False))
@@ -121,7 +125,9 @@ def normalize_moonshot(raw):
             history["kcw"] = weekly["pct"]
         if history:
             as_window = lambda w: {"available": True, "pct": w["pct"], "resetAt": w["resetAt"]} if w else None  # noqa: E731
-            r["chartWindows"] = rolling_windows("kimi_code_5h", "kimi_code_24h", "kimi_code_7d", "kc", "kcw", as_window(session), as_window(weekly), monthly_id="kimi_code_30d")
+            r["chartWindows"] = rolling_windows(
+                "kimi_code_5h", "kimi_code_24h", "kimi_code_7d", "kc", "kcw", as_window(session), as_window(weekly), monthly_id="kimi_code_30d"
+            )
             r["historyValues"] = history
         elif has_balance:
             r["chartWindows"] = monthly_window("kimi", "km", True)

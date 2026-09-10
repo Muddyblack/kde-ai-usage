@@ -277,6 +277,14 @@ dashboard's `GetAggregatedUsageEvents` and `GetFilteredUsageEvents`; the
 backend reduces each request to model, tokens, cost, time and a conversation
 ordinal, so no account or conversation identifier reaches the envelope.
 
+**cline** — `stats` (the shared stats shape, all time, from the CLI's local
+session records: `totalTokens`, `totalCostUSD`, `totalSessions`, `models`
+keyed by model with `input`/`output`/`cached`/`cacheWrite`/`total`/`cost`/
+`sessions`, `topWorkspaces`, `dailySeries`) and `periods[]` (`key` —
+`cline_today` / `cline_7d` / `cline_30d` — `label`, `sessions`, `tokens`,
+`cost`). "Today" starts at local midnight; the other two are rolling. No
+network request is made.
+
 **muse** — `hasLogin`, `email`, `fullName` (display identity from the CLI
 login store), `current` / `weekly` (`available`, `pct`, `resetAt`),
 `quotaError`, `stats`. Deliberately thin: every total, the model and the

@@ -319,6 +319,78 @@ def cursor_stats(s, now):
     return r
 
 
+def cline_stats(s, now):
+    """Normalize the providers/cline.py session list — all local, all time.
+
+    Cline records no per-message counts in the session header, so the
+    messages tile stays at zero rather than opening every transcript.
+    """
+    sessions = [x for x in (s.get("sessions") if isinstance(s, dict) else None) or [] if isinstance(x, dict)]
+    if not sessions:
+        return {"available": False}
+
+    models, workspaces, daily, hours = {}, {}, {}, {}
+    favorite, favorite_out = "", 0
+    totals = {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "cost": 0}
+    longest = None
+    for x in sessions:
+        tokens = num(x.get("input")) + num(x.get("output")) + num(x.get("cacheRead")) + num(x.get("cacheWrite"))
+        for k in totals:
+            totals[k] += num(x.get(k))
+        name = x.get("model") or "unknown"
+        m = models.setdefault(name, {"input": 0, "output": 0, "cached": 0, "cacheWrite": 0, "total": 0, "cost": 0, "sessions": 0})
+        m["input"] += num(x.get("input"))
+        m["output"] += num(x.get("output"))
+        m["cached"] += num(x.get("cacheRead"))
+        m["cacheWrite"] += num(x.get("cacheWrite"))
+        m["total"] += tokens
+        m["cost"] += num(x.get("cost"))
+        m["sessions"] += 1
+        if x.get("workspace"):
+            workspaces[x["workspace"]] = workspaces.get(x["workspace"], 0) + 1
+        local = datetime.datetime.fromtimestamp(num(x.get("startedAt")))
+        day = local.strftime("%Y-%m-%d")
+        daily[day] = daily.get(day, 0) + tokens
+        hours[str(local.hour)] = hours.get(str(local.hour), 0) + 1
+        duration = num(x.get("endedAt")) - num(x.get("startedAt"))
+        if duration > 0 and (longest is None or duration > longest):
+            longest = duration
+
+    for name, m in models.items():
+        # Output, not the total: input is context resent on every call.
+        if m["output"] > favorite_out:
+            favorite, favorite_out = name, m["output"]
+
+    series = [{"date": d, "total": t} for d, t in sorted(daily.items())]
+    blob = {
+        "dailyActivity": [{"date": d} for d in daily],
+        "totalSessions": len(sessions),
+        "firstSessionDate": min(daily),
+        "lastComputedDate": datetime.datetime.fromtimestamp(now).strftime("%Y-%m-%dT%H:%M:%S"),
+        "longestSession": {"duration": longest * 1000} if longest else {},
+        "hourCounts": hours,
+    }
+    r = activity_base(blob, now, series, "tokens")
+    top = sorted(workspaces.items(), key=lambda kv: (-kv[1], kv[0]))[:5]
+    r.update(
+        {
+            "totalTokens": totals["input"] + totals["output"] + totals["cacheRead"] + totals["cacheWrite"],
+            "totalInputTokens": totals["input"],
+            "totalOutputTokens": totals["output"],
+            "totalCachedTokens": totals["cacheRead"],
+            "totalCacheWriteTokens": totals["cacheWrite"],
+            "totalCostUSD": totals["cost"],
+            "favoriteModel": favorite,
+            "models": models,
+            "dailyTokens": series,
+            "workspaceCount": len(workspaces),
+            "topWorkspaces": [{"name": n, "sessions": c} for n, c in top],
+            "currency": "USD",
+        }
+    )
+    return r
+
+
 def codex_stats(s, now):
     if not isinstance(s, dict) or num(s.get("totalSessions")) == 0:
         return {"available": False}
