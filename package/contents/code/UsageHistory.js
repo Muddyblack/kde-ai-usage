@@ -18,6 +18,12 @@ var MERGE_WINDOW_MS = 120000;
 // so this is a 480 KB ceiling, and the merge cost is process startup either way —
 // 10k points measure the same as 500.
 var DEFAULT_LIMIT = 10000;
+// A flat run is stored as its first sighting, its last one before the value moves,
+// and one sighting an hour in between. The hourly one bounds how far back the
+// chart has to reach when a run ends while no frontend is running to see it end.
+var HEARTBEAT_MS = 3600000;
+// The grid slopePerHour() resamples on — the default poll interval.
+var SLOPE_STEP_MS = 300000;
 
 // A sample only counts when it carries a number. A provider that failed reports
 // its keys as null; writing those into the series would erase the last good
@@ -223,6 +229,54 @@ function withResets(series, resetAtMs, periodMs, minT, maxT) {
     return out;
 }
 
+// Least-squares slope in %/hour over the trailing `windowMs` of one series, fitted
+// to the series resampled on a five-minute grid rather than to the stored points.
+// record() stores a flat run as a pair of points, so fitting those directly would
+// weigh the run by how it is stored instead of how long it lasted, and the ETA and
+// the chart's pulse would move with the storage. `fallbackKey` stands in for a
+// point that lacks `key`, the way the Antigravity chart reads "ag" for "agg".
+function slopePerHour(points, key, windowMs, fallbackKey) {
+    var xs = [];
+    var ys = [];
+    var i;
+    for (i = 0; i < (points || []).length; i++) {
+        var v = points[i][key];
+        if (!isValue(v) && fallbackKey)
+            v = points[i][fallbackKey];
+        if (!isValue(v))
+            continue;
+
+        xs.push(points[i].t);
+        ys.push(v);
+    }
+    if (xs.length < 2)
+        return null;
+
+    var end = xs[xs.length - 1];
+    var steps = Math.floor((end - Math.max(end - windowMs, xs[0])) / SLOPE_STEP_MS);
+    if (steps < 1)
+        return null;
+
+    // Hours before `end` rather than epoch milliseconds, whose squares lose the
+    // precision the fit needs.
+    var n = 0, sx = 0, sy = 0, sxx = 0, sxy = 0;
+    var j = 0;
+    for (var s = steps; s >= 0; s--) {
+        var t = end - s * SLOPE_STEP_MS;
+        while (j < xs.length - 2 && xs[j + 1] < t)
+            j++;
+        var y = ys[j] + (ys[j + 1] - ys[j]) * (t - xs[j]) / (xs[j + 1] - xs[j]);
+        var x = -s * SLOPE_STEP_MS / 3.6e+06;
+        n++;
+        sx += x;
+        sy += y;
+        sxx += x * x;
+        sxy += x * y;
+    }
+    var denom = n * sxx - sx * sx;
+    return denom === 0 ? null : (n * sxy - sx * sy) / denom;
+}
+
 // ── The save protocol ────────────────────────────────────────────────────
 //
 // Both frontends run this over tools/sh/history-io, so it lives here rather than
@@ -237,12 +291,18 @@ function withResets(series, resetAtMs, periodMs, minT, maxT) {
 function newStore(limit) {
     return {
         limit: limit || DEFAULT_LIMIT,
-        // Replaced, never patched in place: an unchanged reference is all a
-        // frontend needs to know there is nothing to repaint.
+        // What the file holds, or will once the queue drains.
+        points: [],
+        // The latest reading. It stands in for the end of a flat run that has not
+        // ended yet, so it is shown but not saved until the run does end.
+        tail: null,
+        // `points` and `tail` together, for the chart. Replaced, never patched in
+        // place: an unchanged reference is all a frontend needs to know there is
+        // nothing to repaint.
         history: [],
         json: "[]",
         // The point this frontend last wrote. record() patches that one and no
-        // other, which holds a timestamp to one writer — bar the case in record().
+        // other, which holds a timestamp to one writer — bar the case in _store().
         ownT: null,
         // Queued to go out: measured, and restored.
         fresh: [],
@@ -254,14 +314,49 @@ function newStore(limit) {
     };
 }
 
-function _setHistory(store, points) {
-    var json = JSON.stringify(points);
+// Rebuild what the chart sees. Returns false when it came out the same.
+function _refresh(store) {
+    var shown = store.tail ? union(store.points, [store.tail], store.limit) : store.points;
+    var json = JSON.stringify(shown);
     if (json === store.json)
         return false;
 
-    store.history = points;
+    store.history = shown;
     store.json = json;
     return true;
+}
+
+// The newest stored point holding `key`, or null.
+function _lastSaved(store, key) {
+    for (var i = store.points.length - 1; i >= 0; i--)
+        if (isValue(store.points[i][key]))
+            return store.points[i];
+    return null;
+}
+
+// Whether the tail holds a sighting of `key` newer than the last one stored.
+function _unstored(tail, key, saved) {
+    return !!tail && isValue(tail[key]) && (!saved || tail.t > saved.t);
+}
+
+// Store this poll's hold and point, and queue them. `saveT` is when the point
+// goes: now, or the time of the point being patched.
+function _store(store, save, hold, holdT, saveT) {
+    var queued = [];
+    if (hold)
+        queued.push(assignValues({
+            t: holdT
+        }, hold));
+    if (save) {
+        queued.push(assignValues({
+            t: saveT
+        }, save));
+        store.ownT = saveT;
+    }
+    // union() builds every point afresh, so nothing the frontend still holds is
+    // rewritten under it — a mutation QML would never signal.
+    store.points = union(store.points, queued, store.limit);
+    store.fresh = union(store.fresh, queued, store.limit);
 }
 
 // A series this frontend restored rather than measured. It goes under whatever
@@ -274,26 +369,38 @@ function restore(store, points) {
     store.seed = union(store.seed, series, store.limit);
     // An import is as good a trigger as a poll for a save that is waiting.
     store.waiting = false;
-    return _setHistory(store, union(series, store.history, store.limit));
+    store.points = union(series, store.points, store.limit);
+    return _refresh(store);
 }
 
 // One poll's provider values, whether or not it carried any. Calling this every
 // poll is also what releases a save that failed, so a retry waits for the next
 // one instead of going straight back out at a tool that just refused it.
+//
+// Only what the chart does not already show is stored — most readings repeat the
+// one before. The chart joins samples with curves, so a flat run keeps both of its
+// ends: its first sighting, and its last one, written when the run ends (the
+// hold). Without the last one the curve would ramp from where the run began to
+// the next value, drawing a slow climb that never happened.
 function record(store, values, nowMs) {
     store.waiting = false;
 
+    var obs = {
+        t: nowMs
+    };
     var keys = [];
-    for (var key in (values || {}))
-        if (isValue(values[key]))
-            keys.push(key);
+    var k;
+    for (k in (values || {}))
+        if (isValue(values[k])) {
+            obs[k] = values[k];
+            keys.push(k);
+        }
     if (keys.length === 0)
         return false;
 
-    var out = store.history.slice();
-    var i;
-    var last = out.length > 0 ? out[out.length - 1] : null;
-    // Samples inside the merge window patch this frontend's own previous point
+    var tail = store.tail;
+    var last = store.points.length > 0 ? store.points[store.points.length - 1] : null;
+    // Changes inside the merge window patch this frontend's own previous point
     // rather than adding one, so a fast poll interval cannot flood the series.
     // Someone else's point is left alone however recent: two writers patching one
     // point leaves no way to tell which value is the newer reading. `nowMs` is the
@@ -302,43 +409,55 @@ function record(store, values, nowMs) {
     // window passes. Closing it needs a writer id in every point — ~30% more file
     // for a one-point wobble at ~0.1% a day on the default poll.
     var patching = !!last && last.t === store.ownT && nowMs - last.t < MERGE_WINDOW_MS;
-    var point = {
-        t: patching ? last.t : nowMs
-    };
-    for (i = 0; i < keys.length; i++)
-        point[keys[i]] = values[keys[i]];
+    var save = null;
+    var hold = null;
+    var saved;
 
-    if (patching) {
-        // A *copy*: slice() is shallow, and writing through `last` would rewrite
-        // the point inside the array the frontend still holds — a mutation QML
-        // never signals, and one the file has not seen.
-        var patched = {
-            t: point.t
-        };
-        assignValues(patched, last);
-        out[out.length - 1] = assignValues(patched, point);
-    } else {
-        // A copy again, so the series cannot alias the queued point.
-        out.push(assignValues({
-            t: point.t
-        }, point));
+    for (var i = 0; i < keys.length; i++) {
+        k = keys[i];
+        saved = _lastSaved(store, k);
+        var shown = _unstored(tail, k, saved) ? tail[k] : (saved ? saved[k] : undefined);
+        if (shown !== obs[k]) {
+            if (!save)
+                save = {};
+            save[k] = obs[k];
+            // What a patch overwrites is under two minutes old, too short a run
+            // to need closing.
+            if (!patching && _unstored(tail, k, saved)) {
+                if (!hold)
+                    hold = {};
+                hold[k] = tail[k];
+            }
+        } else if (!saved || nowMs - saved.t >= HEARTBEAT_MS) {
+            if (!save)
+                save = {};
+            save[k] = obs[k];
+        }
+    }
+    // A series that stopped reporting — its provider erroring, or switched off —
+    // has ended its run too, at its last sighting. The next poll replaces the tail,
+    // so this is the last chance to keep it.
+    for (k in (tail || {})) {
+        if (k === "t" || isValue(obs[k]))
+            continue;
+        if (_unstored(tail, k, _lastSaved(store, k))) {
+            if (!hold)
+                hold = {};
+            hold[k] = tail[k];
+        }
     }
 
-    var cap = store.limit;
-    if (out.length > cap)
-        out = out.slice(out.length - cap);
-
-    store.ownT = point.t;
-    // Only the keys this sample carried. The rest of the series is this
-    // frontend's copies of the other one's points.
-    store.fresh = union(store.fresh, [point], cap);
-    return _setHistory(store, out);
+    store.tail = obs;
+    if (save || hold)
+        _store(store, save, hold, tail ? tail.t : null, patching ? last.t : nowMs);
+    return _refresh(store);
 }
 
 // The file is the truth for everything it knows; what only exists here — not
 // mirrored yet — is kept, and the fresh lane wins over both.
 function adopt(store, series) {
-    return _setHistory(store, union(union(store.history, normalize(series, store.limit), store.limit), store.fresh, store.limit));
+    store.points = union(union(store.points, normalize(series, store.limit), store.limit), store.fresh, store.limit);
+    return _refresh(store);
 }
 
 // The startup read has answered (or given up): the file is ours to write.
@@ -403,6 +522,8 @@ if (typeof module !== "undefined" && module.exports) {
         union: union,
         normalize: normalize,
         withResets: withResets,
+        slopePerHour: slopePerHour,
+        HEARTBEAT_MS: HEARTBEAT_MS,
         newStore: newStore,
         restore: restore,
         record: record,

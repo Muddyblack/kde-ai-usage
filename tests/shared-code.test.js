@@ -43,7 +43,9 @@ test("patches its own recent point instead of appending", () => {
     const store = UsageHistory.newStore(500);
     UsageHistory.record(store, { s: 10 }, now - 30000);
     UsageHistory.record(store, { s: 20, w: 5 }, now);
-    assert.deepEqual(store.history, [{ t: now - 30000, s: 20, w: 5 }]);
+    assert.deepEqual(store.points, [{ t: now - 30000, s: 20, w: 5 }]);
+    // ...while the chart also gets the reading at `now`, where it was taken.
+    assert.deepEqual(store.history, [{ t: now - 30000, s: 20, w: 5 }, { t: now, s: 20, w: 5 }]);
 });
 
 test("leaves another writer's point alone however recent it is", () => {
@@ -132,7 +134,7 @@ test("keeps a failed provider's null out of the series", () => {
     UsageHistory.record(store, { s: 10, w: 40 }, now - 30000);
     assert.equal(UsageHistory.record(store, { s: null, w: undefined }, now), false);
     UsageHistory.record(store, { s: null, w: 41 }, now);
-    assert.deepEqual(store.history, [{ t: now - 30000, s: 10, w: 41 }]);
+    assert.deepEqual(store.points, [{ t: now - 30000, s: 10, w: 41 }]);
     assert.deepEqual(store.fresh, [{ t: now - 30000, s: 10, w: 41 }]);
 });
 
@@ -146,7 +148,7 @@ test("never patches a point in place", () => {
     const before = store.history;
     UsageHistory.record(store, { s: 20 }, now);
     assert.deepEqual(before, [{ t: now - 30000, s: 10 }]);
-    assert.deepEqual(store.history, [{ t: now - 30000, s: 20 }]);
+    assert.deepEqual(store.points, [{ t: now - 30000, s: 20 }]);
 });
 
 test("combines repeated timestamps inside one side of the union", () => {
@@ -262,6 +264,24 @@ test("a reading is asserted, a restored series is offered", () => {
     assert.deepEqual(second.points, [{ t: 5000, w: 20 }]);
 });
 
+test("a reading that changed nothing is not worth a save", () => {
+    // At a poll faster than the merge window the same value lands again and
+    // again; each repeat would otherwise spawn history-io to write a point the
+    // file already has.
+    const store = UsageHistory.newStore(500);
+    UsageHistory.opened(store);
+    UsageHistory.record(store, { w: 40 }, 1000);
+    assert.deepEqual(UsageHistory.take(store).points, [{ t: 1000, w: 40 }]);
+    UsageHistory.done(store, [{ t: 1000, w: 40 }]);
+
+    UsageHistory.record(store, { w: 40 }, 31000);
+    assert.equal(UsageHistory.take(store), null, "a repeat must not queue a save");
+
+    // A change to the same point still does.
+    UsageHistory.record(store, { w: 41 }, 61000);
+    assert.deepEqual(UsageHistory.take(store).points, [{ t: 1000, w: 41 }]);
+});
+
 test("a failed save is not retried until the next poll", () => {
     // The Quickshell panel asks for the next batch on every process exit. Handing
     // this one straight back would be a loop of failing saves as fast as the
@@ -315,6 +335,125 @@ test("adopting keeps what only exists here and lets fresh readings win", () => {
     assert.deepEqual(store.history, [{ t: 1, w: 1 }, { t: 2, cp: 7 }, { t: 3000, w: 50 }]);
 });
 
+// ── Only changes are stored ────────────────────────────────────────────────
+// Most readings repeat the one before — 83% of a real history did — so a flat run
+// is stored as its first and last sighting plus one an hour. The chart joins
+// samples with curves, so dropping repeats is only safe if it draws the same line.
+
+const MIN = 60000;
+
+// A day of five-minute readings for one series: flat, a climb, flat, a reset to
+// zero, flat, another climb, flat.
+function aDayOfReadings() {
+    const out = [];
+    let t = 1785000000000;
+    const run = (v, n) => { for (let i = 0; i < n; i++, t += 5 * MIN) out.push({ t, v }); };
+    run(40, 30);
+    for (let v = 41; v <= 48; v++) run(v, 1);
+    run(48, 40);
+    run(0, 20);
+    for (let v = 3; v <= 30; v += 3) run(v, 1);
+    run(30, 60);
+    return out;
+}
+
+function recordAll(readings) {
+    const store = UsageHistory.newStore(10000);
+    for (const r of readings)
+        UsageHistory.record(store, { w: r.v }, r.t);
+    return store;
+}
+
+test("the chart draws the same line from the changes as from every reading", () => {
+    const readings = aDayOfReadings();
+    const store = recordAll(readings);
+    const shown = store.history.map(p => ({ t: p.t, v: p.w }));
+    assert.ok(store.points.length < readings.length / 3, `${store.points.length} of ${readings.length} stored`);
+
+    // Every point the chart gets is a reading that was really taken...
+    const taken = new Map(readings.map(r => [r.t, r.v]));
+    for (const p of shown)
+        assert.equal(taken.get(p.t), p.v, `t=${p.t}`);
+    // ...and every reading it does not get sits between two it does that hold the
+    // same value, so the curve through them is flat there and passes through it.
+    const kept = new Set(shown.map(p => p.t));
+    for (const r of readings) {
+        if (kept.has(r.t))
+            continue;
+        const before = shown.filter(p => p.t < r.t).pop();
+        const after = shown.find(p => p.t > r.t);
+        assert.equal(before.v, r.v, `before t=${r.t}`);
+        assert.equal(after.v, r.v, `after t=${r.t}`);
+    }
+    // And the line reaches the latest reading, not the start of the run it is in.
+    assert.equal(shown[shown.length - 1].t, readings[readings.length - 1].t);
+});
+
+test("a run that ends is closed by its last sighting", () => {
+    // Without that point the curve would ramp from where the run began to the new
+    // value, drawing a slow climb that never happened.
+    const t0 = 1785000000000;
+    const store = UsageHistory.newStore(500);
+    for (let i = 0; i <= 6; i++)
+        UsageHistory.record(store, { w: 40 }, t0 + i * 5 * MIN);
+    UsageHistory.record(store, { w: 45 }, t0 + 35 * MIN);
+    assert.deepEqual(store.points, [{ t: t0, w: 40 }, { t: t0 + 30 * MIN, w: 40 }, { t: t0 + 35 * MIN, w: 45 }]);
+});
+
+test("an unchanged reading is still stored once an hour", () => {
+    // So a run that ends while no frontend is running to see it end is drawn from
+    // at most an hour before, not from wherever it began.
+    const t0 = 1785000000000;
+    const store = UsageHistory.newStore(500);
+    for (let i = 0; i <= 36; i++)
+        UsageHistory.record(store, { w: 40 }, t0 + i * 5 * MIN);
+    assert.deepEqual(store.points.map(p => (p.t - t0) / MIN), [0, 60, 120, 180]);
+    assert.equal(store.fresh.length, 4, "and nothing in between is queued");
+});
+
+test("a series that stops reporting closes its run at its last sighting", () => {
+    // A provider erroring for a while must not leave its flat run open, or the
+    // chart would ramp across the outage from wherever the run began.
+    const t0 = 1785000000000;
+    const store = UsageHistory.newStore(500);
+    for (let i = 0; i <= 6; i++)
+        UsageHistory.record(store, { w: 40, s: 1 }, t0 + i * 5 * MIN);
+    for (let i = 7; i <= 12; i++)
+        UsageHistory.record(store, { s: 1 }, t0 + i * 5 * MIN);
+    UsageHistory.record(store, { w: 50, s: 1 }, t0 + 65 * MIN);
+    const w = store.points.filter(p => p.w !== undefined).map(p => [(p.t - t0) / MIN, p.w]);
+    assert.deepEqual(w, [[0, 40], [30, 40], [65, 50]]);
+});
+
+test("the chart gets the latest reading even when nothing was stored for it", () => {
+    const t0 = 1785000000000;
+    const store = UsageHistory.newStore(500);
+    UsageHistory.record(store, { w: 40 }, t0);
+    UsageHistory.record(store, { w: 40 }, t0 + 5 * MIN);
+    assert.deepEqual(store.points, [{ t: t0, w: 40 }]);
+    assert.deepEqual(store.history, [{ t: t0, w: 40 }, { t: t0 + 5 * MIN, w: 40 }]);
+});
+
+test("the burn rate reads the same from the changes as from every reading", () => {
+    // Fitting the stored points directly would weigh a flat run by how it is
+    // stored rather than how long it lasted, and move the ETA and the pulse.
+    const readings = aDayOfReadings();
+    const store = recordAll(readings);
+    const dense = readings.map(r => ({ t: r.t, w: r.v }));
+    for (const hours of [2, 6, 12]) {
+        const fromDense = UsageHistory.slopePerHour(dense, "w", hours * 3600000);
+        const fromStored = UsageHistory.slopePerHour(store.history, "w", hours * 3600000);
+        assert.ok(Math.abs(fromDense - fromStored) < 1e-9, `${hours}h: ${fromDense} vs ${fromStored}`);
+    }
+});
+
+test("the burn rate can read one series through another", () => {
+    // The Antigravity chart reads "ag" wherever a point has no "agg".
+    const slope = UsageHistory.slopePerHour([{ t: 0, ag: 10 }, { t: 3600000, agg: 20 }], "agg", 3600000, "ag");
+    assert.ok(Math.abs(slope - 10) < 1e-9, String(slope));
+    assert.equal(UsageHistory.slopePerHour([{ t: 0, w: 1 }], "w", 3600000), null, "one sample has no slope");
+});
+
 // ── The two frontends against the real history-io ───────────────────────────
 // The Plasma widget and the Quickshell panel share one file and never
 // coordinate, so what each one *sends* decides what the other can lose. Both
@@ -351,8 +490,10 @@ class Frontend {
         this.env = {};
     }
 
+    // What it has stored. The chart's view adds the latest reading on top, which
+    // the file only gets once that reading's run ends.
     get history() {
-        return this.store.history;
+        return this.store.points;
     }
 
     run(op, json) {

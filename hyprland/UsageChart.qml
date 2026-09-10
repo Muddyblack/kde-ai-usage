@@ -186,29 +186,10 @@ Rectangle {
         return Qt.formatDateTime(minDate, "MMM d") + " - " + Qt.formatDateTime(maxDate, "MMM d");
     }
 
-    // Usage slope in %/hour over the trailing lookback, for the pulse effect.
+    // Usage slope in %/hour over the trailing lookback, for the pulse effect —
+    // the same fit the Plasma widget uses. See UsageHistory.slopePerHour.
     function usageSlopePerHour(lookbackMs) {
-        var now_ms = new Date().getTime();
-        var first = null, last = null;
-        for (var i = 0; i < usageHistory.length; i++) {
-            var p = usageHistory[i];
-            var v = p[chart.historyKey];
-            if (chart.isAntigravity && (v === undefined || v === null)) {
-                v = p.ag;
-            }
-            if (v === undefined || v === null)
-                continue;
-            if (p.t < now_ms - lookbackMs)
-                continue;
-            if (first === null)
-                first = p;
-            last = p;
-        }
-        if (first === null || last === null || last.t <= first.t)
-            return null;
-        var lv = last[chart.historyKey] !== undefined ? last[chart.historyKey] : last.ag;
-        var fv = first[chart.historyKey] !== undefined ? first[chart.historyKey] : first.ag;
-        return (lv - fv) / ((last.t - first.t) / 3600000);
+        return UsageHistory.slopePerHour(usageHistory, chart.historyKey, lookbackMs, chart.isAntigravity ? "ag" : null);
     }
 
     visible: extraVisible && hasAnySeriesData && windows.length > 0

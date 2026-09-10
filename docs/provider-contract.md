@@ -363,6 +363,16 @@ the same millisecond both claim the point and its value flips between their
 readings until the merge window passes — left as it is, since closing it means a
 writer id in every point for a one-point wobble at roughly 0.1% a day.
 
+**Only changes are stored.** Most readings repeat the one before, so `record`
+keeps a flat run as its first sighting, its last sighting before the value moves,
+and one sighting an hour. The chart joins samples with curves, and a run's two
+ends are what keep the line flat until the change instead of ramping across the
+whole run; the hourly one bounds that for a run that ends while nothing is
+watching. The latest reading is shown but not saved until its run ends (the
+store's `tail`), so the line still reaches the present. The burn rate and the
+chart's pulse fit the series resampled every five minutes (`slopePerHour`), not
+the stored points, so they do not move with how a run happens to be stored.
+
 The state machine over all this — the two lanes, one batch in flight, what an
 answer means — is `UsageHistory.js` too, shared rather than written out twice in
 QML, where only a running Plasma session or Quickshell could exercise it. Each

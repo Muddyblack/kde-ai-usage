@@ -1064,44 +1064,10 @@ PlasmoidItem {
     }
 
     // ── Burn-rate / ETA ─────────────────────────────────────────────────────────
-    // Linear slope (%/hour) over up to the last `windowMs` of the given series key
-    // ("s" session or "w" weekly). Returns null when not enough recent data.
+    // Slope (%/hour) over up to the last `windowMs` of the given series key, or
+    // null when there is not enough recent data. See UsageHistory.slopePerHour.
     function usageSlopePerHour(seriesKey, windowMs) {
-        var pts = root.usageHistory;
-        if (!pts || pts.length < 2)
-            return null;
-
-        var now = pts[pts.length - 1].t;
-        var cutoff = now - windowMs;
-        var xs = [], ys = [];
-        for (var i = 0; i < pts.length; i++) {
-            var v = pts[i][seriesKey];
-            if (v === undefined || v === null)
-                continue;
-
-            if (pts[i].t < cutoff)
-                continue;
-
-            xs.push(pts[i].t);
-            ys.push(v);
-        }
-        if (xs.length < 2)
-            return null;
-
-        // least-squares slope in % per ms, then scale to per hour
-        var n = xs.length, sx = 0, sy = 0, sxx = 0, sxy = 0;
-        for (var j = 0; j < n; j++) {
-            sx += xs[j];
-            sy += ys[j];
-            sxx += xs[j] * xs[j];
-            sxy += xs[j] * ys[j];
-        }
-        var denom = n * sxx - sx * sx;
-        if (denom === 0)
-            return null;
-
-        var slopePerMs = (n * sxy - sx * sy) / denom;
-        return slopePerMs * 3.6e+06;
+        return UsageHistory.slopePerHour(root.usageHistory, seriesKey, windowMs);
     }
 
     // ETA text to reach 100% for a series given its current value. Returns "" when
