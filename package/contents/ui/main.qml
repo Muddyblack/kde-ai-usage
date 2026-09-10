@@ -379,7 +379,7 @@ PlasmoidItem {
     // `weeklyUsageHistory` exposes {t,v} for whichever window chartWindow selects.
     property var usageHistory: []
     property string chartWindow: Plasmoid.configuration.chartWindow || "weekly"
-    readonly property int historyLimit: 500
+    readonly property int historyLimit: 10000
     // Granularity ("5h" | "24h" | "7d" | "30d") is remembered across tabs so switching
     // services keeps the same time range.
     property string chartGranularity: Plasmoid.configuration.chartGranularity || "7d"
@@ -815,17 +815,23 @@ PlasmoidItem {
         root.historyConfigDirty = true;
     }
 
-    // Plasma rewrites plasma-org.kde.plasma.desktop-appletsrc — the config of
-    // every widget on the desktop — whole on each change, so pushing the series
-    // through it on every poll churns a shared file for nothing. The mirror file
-    // is written every poll and is what both frontends read, so the config only
-    // has to be recent enough to seed a fresh install.
+    // What the config is allowed to hold. Plasma rewrites
+    // plasma-org.kde.plasma.desktop-appletsrc — the config of every widget on the
+    // desktop — whole on each change, so the series has no business going through
+    // it: the mirror file is the store, and the config only has to seed a fresh
+    // install. It also bounds the startup seed, which is built from it and travels
+    // a command line.
+    readonly property int historyConfigLimit: 500
+
     function flushHistoryConfig() {
         if (!root.historyConfigDirty)
             return;
 
         root.historyConfigDirty = false;
-        Plasmoid.configuration.usageHistory = root.historyJson;
+        var points = root.usageHistory;
+        // historyJson is already the whole series serialized, so only a tail costs
+        // anything to produce.
+        Plasmoid.configuration.usageHistory = points.length > root.historyConfigLimit ? JSON.stringify(points.slice(points.length - root.historyConfigLimit)) : root.historyJson;
     }
 
     Timer {
@@ -971,11 +977,10 @@ PlasmoidItem {
         });
     }
 
+    // history-io snapshots the shared file itself — see the note there for why the
+    // series does not travel on a command line.
     function exportHistory() {
-        var json = root.historyJson;
-        // Pass the payload base64-encoded and decode it inside the shell, so the JSON
-        // (quotes, brackets) never has to survive command-line quoting.
-        var cmd = root.pythonEnv() + "WIDGET_HISTORY_JSON=\"$(printf %s '" + root.base64(json) + "' | base64 -d)\" " + root.scriptPath("history-io") + " export";
+        var cmd = root.pythonEnv() + root.scriptPath("history-io") + " export";
         historyIOSource.disconnectSource(cmd);
         historyIOSource.connectSource(cmd);
     }

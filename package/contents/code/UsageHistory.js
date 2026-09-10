@@ -12,7 +12,12 @@
 // Samples closer together than this patch the previous point instead of adding
 // one, which keeps a fast poll interval from flooding the series.
 var MERGE_WINDOW_MS = 120000;
-var DEFAULT_LIMIT = 500;
+// About 34 days of unbroken 5-minute polling, and most of a year at the density a
+// machine that sleeps actually produces. 500 was ~13 days, which left the 30-day
+// deltas ("last month") permanently without data. The file is ~40 bytes a sample,
+// so this is a 480 KB ceiling, and the merge cost is process startup either way —
+// 10k points measure the same as 500.
+var DEFAULT_LIMIT = 10000;
 
 // A sample only counts when it carries a number. A provider that failed reports
 // its keys as null; writing those into the series would erase the last good

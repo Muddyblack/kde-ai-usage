@@ -7,8 +7,7 @@
 #   history-io seed       — the same, for a series the caller restored rather than measured;
 #                           the file keeps its own values and gains only the keys it lacks
 #   history-io autoload   — read the latest file for startup restore; delete it if unreadable
-#   history-io export     — snapshot $WIDGET_HISTORY_JSON to a timestamped file, print its
-#                           path; the latest file gains what it lacks and keeps the rest
+#   history-io export     — copy the latest file to a timestamped snapshot, print its path
 #   history-io import     — read the most recent file, print its JSON (delete if corrupt)
 #
 # Output is a single JSON object: {"ok":true,"path":…} | {"ok":true,"data":[…]} |
@@ -104,7 +103,7 @@ sync_latest() {
   local json="$1" mode="${2:-}" out pkg_tools
   if [ -n "$PY" ]; then
     pkg_tools="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-    if out="$(printf '%s' "$json" | PYTHONPATH="$pkg_tools${PYTHONPATH:+:$PYTHONPATH}" "$PY" -B -m aiusage.history save "$LATEST" 500 ${mode:+"$mode"})"; then
+    if out="$(printf '%s' "$json" | PYTHONPATH="$pkg_tools${PYTHONPATH:+:$PYTHONPATH}" "$PY" -B -m aiusage.history save "$LATEST" "" ${mode:+"$mode"})"; then
       printf '%s\n' "$out"
       return 0
     fi
@@ -165,8 +164,12 @@ case "${1:-}" in
     printf '{"ok":true,"data":%s}\n' "$(cat "$src")"
     ;;
   export)
-    json="${WIDGET_HISTORY_JSON:-}"
-    if [ -z "$json" ] || [ "$json" = "[]" ]; then
+    # A snapshot of the shared file, not of the caller's memory. A frontend could
+    # only hand its series over on a command line, and Linux caps a single
+    # argument at MAX_ARG_STRLEN — 128 KB, however large ARG_MAX is — which a
+    # full series passes long before the point cap does. The two converge on every
+    # save, so the file is the same history bar at most one poll.
+    if [ ! -f "$LATEST" ]; then
       emit_err "no history to export"
       exit 0
     fi
@@ -178,16 +181,12 @@ case "${1:-}" in
     # would carry off the finished snapshot when the write lands in between.
     tmp="$(mktemp "$DIR/.usage-history-export.tmp.XXXXXX")" || { emit_err "could not write to $DIR"; exit 0; }
     out="$DIR/usage-history-$ts-${tmp##*.}.json"
-    if ! printf '%s' "$json" > "$tmp" || ! mv -f "$tmp" "$out"; then
+    # Reading needs no lock: a save publishes by rename, so this sees one whole
+    # version of the file or another, never a half-written one.
+    if ! cat "$LATEST" > "$tmp" || ! mv -f "$tmp" "$out"; then
       rm -f "$tmp"
       emit_err "could not write $out"
       exit 0
-    fi
-    # The shared file is not the caller's to replace, so it only gains what it
-    # lacks — and a merge that cannot run, or cannot lock, leaves it alone. The
-    # export the user asked for has succeeded either way.
-    if lock_history; then
-      sync_latest "$json" --keep-existing >/dev/null || true
     fi
     printf '{"ok":true,"path":%s}\n' "$(jstr "$out")"
     ;;

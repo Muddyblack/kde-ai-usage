@@ -24,7 +24,8 @@ import os
 import re
 import sys
 
-DEFAULT_LIMIT = 500
+# Mirrors DEFAULT_LIMIT in UsageHistory.js — see the note there.
+DEFAULT_LIMIT = 10000
 
 # A timestamp written as a string is only read back when it is a plain decimal.
 # float() would also take "1_0" and "nan"; JS's Number() would take "0x10" and

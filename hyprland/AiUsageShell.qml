@@ -267,10 +267,11 @@ ShellRoot {
 
     property string historyMsg: ""
 
-    // Export a timestamped copy of the shared history via history-io.
+    // Export a timestamped copy of the shared history via history-io, which
+    // snapshots the file itself rather than taking the series on a command line.
     function exportHistory() {
         exportProcess.exec({
-            command: ["sh", "-c", "PYTHON3=\"$1\" WIDGET_HISTORY_JSON=\"$2\" exec \"$3\" export", "ai-usage", root.settings.pythonPath || "", JSON.stringify(root.usageHistory), root.historyTool()]
+            command: ["sh", "-c", "PYTHON3=\"$1\" exec \"$2\" export", "ai-usage", root.settings.pythonPath || "", root.historyTool()]
         });
     }
 
@@ -305,7 +306,7 @@ ShellRoot {
     // Unified usage history: [{t, s, w, cp, cw, kr, ag, or, mv, gr, za, gh, ds}] — same format
     // as the Plasma widget so the chart survives across both.
     property var usageHistory: []
-    readonly property int historyLimit: 500
+    readonly property int historyLimit: 10000
 
     // Clock driving the countdown chips (30 s tick).
     property double nowTick: new Date().getTime()

@@ -124,14 +124,13 @@ case "$out" in
 esac
 [ "$(cat "$latest")" = "$held" ] || fail "a save wrote while another process held the lock"
 
-# An export still writes the snapshot the user asked for — its name is unique, so
-# it races nothing — and leaves the shared file alone.
-out="$(WIDGET_HISTORY_LOCK_WAIT=1 WIDGET_HISTORY_JSON='[{"t":97,"w":97}]' "$tool" export)"
+# An export only reads, so a held lock is none of its business.
+out="$(WIDGET_HISTORY_LOCK_WAIT=1 "$tool" export)"
 case "$out" in
   '{"ok":true,"path"'*) ;;
-  *) fail "an export that could not lock reported $out" ;;
+  *) fail "an export was blocked by a lock it does not need: $out" ;;
 esac
-[ "$(cat "$latest")" = "$held" ] || fail "an export wrote to the shared file without the lock"
+[ "$(cat "$latest")" = "$held" ] || fail "an export changed the shared file"
 exec 8>&-
 # Nothing else has made a timestamped copy yet; drop this one so the export test
 # further down still finds its own.
@@ -173,31 +172,34 @@ out="$(save '[{"t":null,"w":1},{"t":"10","w":100},{"t":11,"w":null}]')"
 [ "$out" = '{"ok":true,"data":[{"t":9,"w":90},{"t":10,"w":100},{"t":11}]}' ] \
   || fail "save did not sanitize its payload: $out"
 
-# ── export snapshots verbatim and offers itself to the shared file ──────────
-rm -f "$latest"
-save '[{"t":1,"w":40}]' >/dev/null
-# The snapshot carries a stale copy of t=1: the exporting frontend adopted w:40
-# from the other one, which has patched it since. The timestamped file is the
-# snapshot the user asked for, verbatim; the shared file gains the point it was
-# missing and keeps its own value for the one it already had.
-WIDGET_HISTORY_JSON='[{"t":1,"w":10},{"t":3,"w":60}]' "$tool" export >/dev/null
-[ "$(cat "$latest")" = '[{"t":1,"w":40},{"t":3,"w":60}]' ] \
-  || fail "export overrode the shared file with its snapshot: $(cat "$latest")"
+# ── export copies the shared file, verbatim and untouched ──────────────────
+rm -f "$latest" "$dir"/usage-history-2*.json
+save '[{"t":1,"w":40},{"t":3,"w":60}]' >/dev/null
+before="$(cat "$latest")"
+"$tool" export >/dev/null
 stamped="$(find "$dir" -name 'usage-history-2*.json' | head -n1)"
 [ -n "$stamped" ] || fail "export wrote no timestamped copy"
-[ "$(cat "$stamped")" = '[{"t":1,"w":10},{"t":3,"w":60}]' ] || fail "the timestamped copy is not verbatim"
+[ "$(cat "$stamped")" = "$before" ] || fail "the snapshot is not the shared file: $(cat "$stamped")"
+[ "$(cat "$latest")" = "$before" ] || fail "export modified the shared file"
+
+# With nothing saved there is nothing to snapshot.
+mv "$latest" "$latest.held"
+out="$("$tool" export)"
+[ "$out" = '{"error":"no history to export"}' ] || fail "an empty export returned $out"
+mv "$latest.held" "$latest"
 
 # ── import falls back to the newest timestamped copy ────────────────────────
 rm -f "$latest"
 out="$("$tool" import)"
-[ "$out" = '{"ok":true,"data":[{"t":1,"w":10},{"t":3,"w":60}]}' ] || fail "import fallback returned $out"
+[ "$out" = '{"ok":true,"data":[{"t":1,"w":40},{"t":3,"w":60}]}' ] || fail "import fallback returned $out"
 
 # ── two exports inside one second are two files ─────────────────────────────
 # `date` is second-precision, so a name built from it alone would collide and the
 # second export would replace the first snapshot.
-rm -f "$dir"/usage-history-2*.json
-p1="$(WIDGET_HISTORY_JSON='[{"t":1,"w":11}]' "$tool" export)"
-p2="$(WIDGET_HISTORY_JSON='[{"t":2,"w":22}]' "$tool" export)"
+rm -f "$latest" "$dir"/usage-history-2*.json
+save '[{"t":1,"w":11}]' >/dev/null
+p1="$("$tool" export)"
+p2="$("$tool" export)"
 [ "$p1" != "$p2" ] || fail "two exports returned the same path: $p1"
 [ "$(find "$dir" -name 'usage-history-2*.json' | wc -l)" -eq 2 ] \
   || fail "the second export replaced the first snapshot"
@@ -205,7 +207,7 @@ p2="$(WIDGET_HISTORY_JSON='[{"t":2,"w":22}]' "$tool" export)"
 # The reservation must not leave an empty file behind when the write fails: an
 # unreadable snapshot is what import would find and report.
 chmod 500 "$dir"
-WIDGET_HISTORY_JSON='[{"t":3,"w":33}]' "$tool" export >/dev/null 2>&1 || true
+"$tool" export >/dev/null 2>&1 || true
 chmod 700 "$dir"
 [ "$(find "$dir" -name 'usage-history-2*.json' | wc -l)" -eq 2 ] \
   || fail "a failed export left a stray snapshot behind"
@@ -216,19 +218,20 @@ chmod 700 "$dir"
 # that `rm -f` carries off the finished snapshot when the write lands in between.
 # The real window is microseconds, so hold the rename open to see it.
 rm -f "$latest" "$dir"/usage-history-2*.json
-WIDGET_HISTORY_JSON='[{"t":7,"w":70}]' "$tool" export >/dev/null
+save '[{"t":7,"w":70}]' >/dev/null
+"$tool" export >/dev/null
 real_mv="$(command -v mv)"
 mkdir -p "$tmp/slow"
 printf '#!/bin/sh\nsleep 2\nexec %s "$@"\n' "$real_mv" > "$tmp/slow/mv"
 chmod +x "$tmp/slow/mv"
-( PATH="$tmp/slow:$PATH" WIDGET_HISTORY_JSON='[{"t":8,"w":80}]' "$tool" export >/dev/null ) &
+( PATH="$tmp/slow:$PATH" "$tool" export >/dev/null ) &
 export_pid=$!
 sleep 1
 
 [ "$(find "$dir" -name 'usage-history-2*.json' -empty | wc -l)" -eq 0 ] \
   || fail "an export in flight is visible under the snapshot glob"
 out="$("$tool" autoload)"
-[ "$out" = '{"ok":true,"data":[{"t":7,"w":70}]}' ] \
+[ "$out" = "{\"ok\":true,\"data\":$(cat "$latest")}" ] \
   || fail "an export in flight derailed a reader: $out"
 
 wait "$export_pid"
@@ -236,5 +239,19 @@ wait "$export_pid"
   || fail "a reader cost the export its snapshot"
 [ "$(find "$dir" -name '.usage-history-export*' | wc -l)" -eq 0 ] \
   || fail "an export left its reservation behind"
+
+# ── one cap, stated once ────────────────────────────────────────────────────
+# The tool names no limit, so aiusage.history's DEFAULT_LIMIT governs both it and
+# the frontends, which read the same constant from UsageHistory.js.
+rm -f "$latest"
+python3 -c "
+import json, sys
+json.dump([{'t': i, 'w': i} for i in range(10005)], open(sys.argv[1], 'w'), separators=(',', ':'))
+" "$latest"
+save '[{"t":99999999,"w":1}]' >/dev/null
+n="$(python3 -c 'import json,sys; print(len(json.load(open(sys.argv[1]))))' "$latest")"
+[ "$n" -eq 10000 ] || fail "the shared file was capped at $n, expected 10000"
+first="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))[0]["t"])' "$latest")"
+[ "$first" = "6" ] || fail "the cap dropped the wrong end: oldest t=$first"
 
 echo "history-io: ok"

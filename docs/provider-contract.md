@@ -322,7 +322,14 @@ history and formats its own countdowns from `resetText`):
   replaying quota resets.
 
 `~/.local/share/ai-usage-widget/usage-history-latest.json` is the store, shared
-by both frontends, and `tools/sh/history-io` owns every access to it. A save
+by both frontends, and `tools/sh/history-io` owns every access to it. It holds the
+newest `DEFAULT_LIMIT` samples — 10,000, about 40 bytes each, which is a month of
+unbroken 5-minute polling and most of a year on a machine that sleeps. A save
+carries only new samples, so the size costs nothing per poll; `export` copies the
+file rather than taking the series from a frontend, because a single command-line
+argument is capped at 128 KB and a full series passes that well before the point
+cap does. The Plasma widget's config keeps a 500-sample tail of the same series,
+which is also what bounds the startup seed. A save
 (`history-io autosave`) takes an `flock`, unions the payload into whatever is
 already on disk, replaces the file by rename, and prints the merged series back
 to the caller. A lock it cannot take is an error, not something to go ahead
