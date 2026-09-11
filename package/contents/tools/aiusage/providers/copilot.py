@@ -74,7 +74,7 @@ def _oauth_from_apps_json(path):
     accept github.company.com, whose first ten characters are "github.com".
     """
     try:
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
     except (OSError, ValueError):
         return "", ""
@@ -107,6 +107,8 @@ def _gh_cli_token():
             [gh, "auth", "token", "--hostname", "github.com"],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=10,
             **paths.no_window(),
         )
@@ -122,7 +124,7 @@ def _copilot_cli_login():
     never the token (that is in the keyring). The login still saves a request:
     it is the username the billing endpoint needs."""
     try:
-        with open(os.path.expanduser("~/.copilot/config.json")) as f:
+        with open(os.path.expanduser("~/.copilot/config.json"), encoding="utf-8") as f:
             # The file is JSON with a leading // comment banner.
             text = "\n".join(line for line in f if not line.lstrip().startswith("//"))
     except OSError:

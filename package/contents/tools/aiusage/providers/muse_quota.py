@@ -91,7 +91,7 @@ def _cache_path():
 
 def _read_cache(ttl):
     try:
-        with open(_cache_path(), errors="replace") as f:
+        with open(_cache_path(), encoding="utf-8", errors="replace") as f:
             cached = json.load(f)
     except (OSError, ValueError):
         return None
@@ -107,7 +107,7 @@ def _read_cache(ttl):
 def _write_cache(quota):
     try:
         os.makedirs(_config.cache_dir(), exist_ok=True)
-        with open(_cache_path(), "w") as f:
+        with open(_cache_path(), "w", encoding="utf-8") as f:
             json.dump({"fetchedAt": datetime.datetime.now(datetime.timezone.utc).timestamp(), "quota": quota}, f)
     except OSError:
         pass
@@ -174,7 +174,7 @@ def _fetch(api_key, model, fixture_path=None):
             # newline="" disables universal-newline translation: a replayed
             # capture has to carry the CRLF the wire actually sent, or it
             # silently tests a stream nobody ever receives.
-            with open(fixture_path, errors="replace", newline="") as f:
+            with open(fixture_path, encoding="utf-8", errors="replace", newline="") as f:
                 raw = f.read()
         except OSError:
             return {}, "unreachable"

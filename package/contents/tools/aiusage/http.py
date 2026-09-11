@@ -60,7 +60,7 @@ def resolve_key(widget_var, env_var, *files):
             if not path or not os.path.isfile(path):
                 continue
             try:
-                with open(path) as f:
+                with open(path, encoding="utf-8") as f:
                     value = clean_credential(f.read())
             except OSError:
                 value = ""
@@ -104,7 +104,7 @@ def fetch_json(url, headers=None, timeout=10, fixture_path=None, data=None):
     (bytes) turns the request into a POST, for RPC-style endpoints."""
     if fixture_path and os.path.isfile(fixture_path):
         try:
-            with open(fixture_path) as f:
+            with open(fixture_path, encoding="utf-8") as f:
                 return HttpResult(200, f.read())
         except OSError:
             return HttpResult(0, "")

@@ -82,7 +82,7 @@ def _read_json(path):
     """None on anything unreadable or malformed. These are other programs'
     files: a corrupt one must cost the provider a field, never the run."""
     try:
-        with open(path, errors="replace") as f:
+        with open(path, encoding="utf-8", errors="replace") as f:
             return json.load(f)
     except (OSError, ValueError):
         return None
@@ -200,7 +200,7 @@ def _scan_file(path):
     except OSError:
         return None
     try:
-        f = open(path, errors="replace")
+        f = open(path, encoding="utf-8", errors="replace")
     except OSError:
         return None
     with f:
@@ -506,7 +506,7 @@ def get_muse_stats():
     stats = _aggregate(records, catalog)
     try:
         os.makedirs(_config.cache_dir(), exist_ok=True)
-        with open(cache_path, "w") as fh:
+        with open(cache_path, "w", encoding="utf-8") as fh:
             json.dump(stats, fh)
     except OSError:
         pass

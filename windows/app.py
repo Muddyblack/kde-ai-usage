@@ -930,19 +930,36 @@ def _kwin_keep_pill_above():
 
 
 def _install_log():
-    """Frozen, the app has no console, so Qt's warnings go to a file instead."""
+    """Frozen, the app has no console: sys.stdout and sys.stderr are None and
+    Qt's warnings go nowhere. All three go to a file instead, so a traceback
+    from a slot — or --selftest's warnings, in CI — can still be read."""
     log_dir = paths.history_dir()
     try:
         os.makedirs(log_dir, exist_ok=True)
-        log = open(os.path.join(log_dir, "tray.log"), "a", encoding="utf-8")
+        log = open(os.path.join(log_dir, "tray.log"), "a", encoding="utf-8", buffering=1)
     except OSError:
         return
+
+    if sys.stdout is None:
+        sys.stdout = log
+    if sys.stderr is None:
+        sys.stderr = log
 
     def handler(_mode, _context, message):
         log.write(time.strftime("%Y-%m-%d %H:%M:%S ") + message + "\n")
         log.flush()
 
     qInstallMessageHandler(handler)
+
+
+def _flush_stdio():
+    """Flush what print() wrote, before os._exit() skips the interpreter's own
+    flush. A windowed build (the .exe) has no console, so either stream can be
+    None there — calling .flush() on it raised, and the bootloader turned that
+    into an "unhandled exception" dialog on every quit."""
+    for stream in (sys.stdout, sys.stderr):
+        if stream is not None:
+            stream.flush()
 
 
 def _run_headless(app, engine, backend, warnings, screenshot, settings):
@@ -972,8 +989,7 @@ def _run_headless(app, engine, backend, warnings, screenshot, settings):
         app.exec()
         for warning in warnings:
             print(warning, file=sys.stderr)
-        sys.stdout.flush()
-        sys.stderr.flush()
+        _flush_stdio()
         os._exit(0)
 
     steps = []
@@ -992,8 +1008,7 @@ def _run_headless(app, engine, backend, warnings, screenshot, settings):
 
     for warning in warnings:
         print(warning, file=sys.stderr)
-    sys.stdout.flush()
-    sys.stderr.flush()
+    _flush_stdio()
     os._exit(1 if warnings and not screenshot else 0)
 
 
@@ -1027,11 +1042,12 @@ def main(argv):
     app.setQuitOnLastWindowClosed(False)
 
     headless = selftest or screenshot
-    if not headless:
-        if _hand_off_to_running_instance():
-            return 0
-        if FROZEN:
-            _install_log()
+    if not headless and _hand_off_to_running_instance():
+        return 0
+    if FROZEN:
+        # Headless as well: CI runs the built .exe with --selftest and prints
+        # this log when it fails, the .exe having no console to write to.
+        _install_log()
 
     backend = Backend()
     engine = QQmlApplicationEngine()
@@ -1067,8 +1083,7 @@ def main(argv):
     # Leave without waiting for the worker threads: a provider may be waiting on
     # the network, and a normal exit would sit out its timeout. Nothing there
     # needs finishing — a history save lands by atomic rename or not at all.
-    sys.stdout.flush()
-    sys.stderr.flush()
+    _flush_stdio()
     os._exit(code)
 
 

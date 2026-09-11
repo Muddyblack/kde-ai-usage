@@ -22,7 +22,7 @@ class CodexStatsTest(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.tmp, True)
         day = os.path.join(self.tmp, "sessions", "2026", "09", "10")
         os.makedirs(day)
-        with open(os.path.join(day, "rollout-a.jsonl"), "w") as fh:
+        with open(os.path.join(day, "rollout-a.jsonl"), "w", encoding="utf-8") as fh:
             fh.write(_line(timestamp="2026-09-10T10:00:00.000Z", type="session_meta"))
             fh.write(_line(timestamp="2026-09-10T10:05:00.000Z", type="event_msg", payload={"type": "user_message"}))
 

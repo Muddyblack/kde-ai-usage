@@ -103,7 +103,7 @@ def _glm_acp_key():
     if not os.path.isfile(path):
         return ""
     try:
-        with open(path, errors="replace") as f:
+        with open(path, encoding="utf-8", errors="replace") as f:
             data = as_json(f.read())
     except OSError:
         return ""

@@ -5,6 +5,10 @@ on:
     tags:
       - "v*"
 
+# Read-only unless a job asks for more; only `release` publishes.
+permissions:
+  contents: read
+
 jobs:
   windows:
     runs-on: windows-latest

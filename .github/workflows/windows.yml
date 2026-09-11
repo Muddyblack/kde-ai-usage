@@ -64,11 +64,18 @@ jobs:
 
       - name: bundled app loads
         shell: pwsh
+        # The selftest takes seconds; a hang (a modal error dialog nobody can
+        # click) should fail fast rather than sit out the six-hour job limit.
+        timeout-minutes: 5
         env:
           QT_QPA_PLATFORM: offscreen
         run: |
           $p = Start-Process -FilePath "dist/AI Usage/AI Usage.exe" -ArgumentList "--selftest" -Wait -PassThru
-          if ($p.ExitCode -ne 0) { exit $p.ExitCode }
+          if ($p.ExitCode -ne 0) {
+            # The .exe has no console; its warnings and errors go to tray.log.
+            Get-Content "$env:LOCALAPPDATA\ai-usage-widget\tray.log" -ErrorAction SilentlyContinue
+            exit $p.ExitCode
+          }
 
       - name: zip
         shell: pwsh

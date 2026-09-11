@@ -58,7 +58,7 @@ def _read_grok_auth(auth_file):
     if not os.path.isfile(auth_file):
         return {}
     try:
-        with open(auth_file) as f:
+        with open(auth_file, encoding="utf-8") as f:
             data = as_json(f.read())
     except OSError:
         data = None
@@ -99,7 +99,7 @@ def _grok_local_stats():
     docs = []
     for p in paths:
         try:
-            with open(p) as f:
+            with open(p, encoding="utf-8") as f:
                 d = as_json(f.read())
         except OSError:
             d = None
@@ -164,7 +164,7 @@ def _grok_account_meta(access_token, team_id_hint, user_id_hint, client_ver):
 
 def _tail_lines(path, n):
     try:
-        with open(path, errors="replace") as f:
+        with open(path, encoding="utf-8", errors="replace") as f:
             return list(deque(f, maxlen=n))
     except OSError:
         return []
@@ -351,7 +351,7 @@ def get_grok_usage():
     settings_path = os.path.expanduser("~/.grok/user-settings.json")
     if os.path.isfile(settings_path):
         try:
-            with open(settings_path) as f:
+            with open(settings_path, encoding="utf-8") as f:
                 s = as_json(f.read())
         except OSError:
             s = None

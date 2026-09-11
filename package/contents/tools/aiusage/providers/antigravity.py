@@ -141,7 +141,7 @@ def _proc_listening_ports(pid):
     ports = set()
     for proc_net in ("/proc/net/tcp", "/proc/net/tcp6"):
         try:
-            with open(proc_net) as f:
+            with open(proc_net, encoding="utf-8") as f:
                 lines = f.readlines()[1:]
         except OSError:
             continue
@@ -265,6 +265,9 @@ def _run_agy_usage(agy_path):
             [agy_path, "--output-format", "json", "--print=/usage"],
             capture_output=True,
             text=True,
+            # Named, or Windows decodes the CLI's UTF-8 as its ANSI code page.
+            encoding="utf-8",
+            errors="replace",
             timeout=20,
             **paths.no_window(),
         )
@@ -317,7 +320,9 @@ def get_antigravity_usage():
     cli = shutil.which("aiu") or shutil.which("antigravity-usage")
     if cli:
         try:
-            proc = subprocess.run([cli, "--json"], capture_output=True, text=True, timeout=15, **paths.no_window())
+            proc = subprocess.run(
+                [cli, "--json"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15, **paths.no_window()
+            )
         except (OSError, subprocess.TimeoutExpired):
             proc = None
         if proc is not None and proc.returncode == 0:

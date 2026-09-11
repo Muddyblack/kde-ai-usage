@@ -44,7 +44,10 @@ pyz = PYZ(a.pure)  # noqa: F821
 exe = EXE(  # noqa: F821
     pyz,
     a.scripts,
-    [],
+    # UTF-8 mode: without it Windows' default text encoding is the ANSI code
+    # page (cp1252), for open() and subprocess output alike. The backend names
+    # its encodings itself; this covers anything that does not.
+    [("X utf8", None, "OPTION")],
     exclude_binaries=True,
     name="AI Usage",
     console=False,

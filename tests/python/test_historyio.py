@@ -76,7 +76,7 @@ class HistoryIoTest(unittest.TestCase):
         self.assertEqual(len(json.loads(self.on_disk())), 12)
 
     def test_corrupt_file_is_dropped_and_healed(self):
-        with open(self.latest, "w") as fh:
+        with open(self.latest, "w", encoding="utf-8") as fh:
             fh.write('[{"t":1,"w":')
         self.assertEqual(self.run_cmd("autoload"), '{"ok":true,"empty":true,"deleted":true}')
         self.assertFalse(os.path.exists(self.latest))

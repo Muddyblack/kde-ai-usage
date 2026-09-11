@@ -135,7 +135,7 @@ def main(argv):
 
     for provider, (url, table) in SOURCES.items():
         if provider in overrides:
-            with open(overrides[provider], errors="replace") as f:
+            with open(overrides[provider], encoding="utf-8", errors="replace") as f:
                 text = f.read()
         else:
             try:

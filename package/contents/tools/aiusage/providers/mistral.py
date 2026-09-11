@@ -17,7 +17,7 @@ def _vibe_key():
     if not os.path.isfile(path):
         return ""
     try:
-        with open(path, errors="replace") as f:
+        with open(path, encoding="utf-8", errors="replace") as f:
             for line in f:
                 if line.startswith("MISTRAL_API_KEY="):
                     return line.split("=", 1)[1].strip().strip("'\"")
@@ -38,7 +38,7 @@ def _vibe_stats():
     docs = []
     for p in sorted(paths):
         try:
-            with open(p) as f:
+            with open(p, encoding="utf-8") as f:
                 d = as_json(f.read())
         except OSError:
             continue
@@ -83,7 +83,7 @@ def _vibe_model():
     if not os.path.isfile(path):
         return ""
     try:
-        with open(path, errors="replace") as f:
+        with open(path, encoding="utf-8", errors="replace") as f:
             for line in f:
                 if line.startswith("active_model"):
                     m = re.search(r'=\s*"?([^"]*?)"?\s*$', line.rstrip("\n"))

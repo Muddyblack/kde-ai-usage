@@ -44,14 +44,14 @@ class CodexRateLimitsTest(unittest.TestCase):
         self.bin = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.bin, True)
         server = os.path.join(self.bin, "fake_codex.py")
-        with open(server, "w") as fh:
+        with open(server, "w", encoding="utf-8") as fh:
             fh.write(FAKE_SERVER)
         if os.name == "nt":
-            with open(os.path.join(self.bin, "codex.cmd"), "w") as fh:
+            with open(os.path.join(self.bin, "codex.cmd"), "w", encoding="utf-8") as fh:
                 fh.write(f'@echo off\r\n"{sys.executable}" "{server}" %*\r\n')
         else:
             shim = os.path.join(self.bin, "codex")
-            with open(shim, "w") as fh:
+            with open(shim, "w", encoding="utf-8") as fh:
                 fh.write(f'#!/bin/sh\nexec "{sys.executable}" "{server}" "$@"\n')
             os.chmod(shim, os.stat(shim).st_mode | stat.S_IEXEC)
         self.pid_file = os.path.join(self.bin, "pid")
@@ -84,7 +84,7 @@ class CodexRateLimitsTest(unittest.TestCase):
         except ImportError:
             self.skipTest("psutil not installed")
         self.call("ok")
-        with open(self.pid_file) as fh:
+        with open(self.pid_file, encoding="utf-8") as fh:
             pid = int(fh.read())
         deadline = time.monotonic() + 5
         while _pid_alive(pid) and time.monotonic() < deadline:

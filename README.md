@@ -251,7 +251,7 @@ VS Code-family IDEs (Cursor, Kiro) are read from `%APPDATA%`. Its own files:
 |---|---|
 | Settings (same format as Hyprland's) | `%APPDATA%\ai-usage-widget\hyprland-settings.json` |
 | Usage history | `%LOCALAPPDATA%\ai-usage-widget\` |
-| Log (Qt warnings, nothing else) | `%LOCALAPPDATA%\ai-usage-widget\tray.log` |
+| Log (Qt warnings and Python errors) | `%LOCALAPPDATA%\ai-usage-widget\tray.log` |
 
 Antigravity is found through `psutil`, which the build bundles. Running from a
 checkout instead:

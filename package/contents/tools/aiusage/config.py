@@ -74,7 +74,7 @@ def load_settings():
     if not os.path.isfile(path):
         return {}
     try:
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
         return data if isinstance(data, dict) else {}
     except (OSError, ValueError):

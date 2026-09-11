@@ -32,7 +32,7 @@ def _usage(meta):
 
 def _read_session(path):
     try:
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
     except (OSError, ValueError):
         return None

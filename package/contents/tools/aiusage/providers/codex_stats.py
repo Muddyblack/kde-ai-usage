@@ -50,7 +50,7 @@ def _grep_toml(path, key):
         pattern = re.compile(r"^\s*" + re.escape(key) + r'\s*=\s*"([^"]*)"')
         _TOML_KEY_RE_CACHE[key] = pattern
     try:
-        with open(path, errors="replace") as f:
+        with open(path, encoding="utf-8", errors="replace") as f:
             for line in f:
                 m = pattern.match(line)
                 if m:
@@ -84,7 +84,7 @@ def _scan_rollout(path, date):
     msgs = 0
     first = True
     try:
-        with open(path, errors="replace") as f:
+        with open(path, encoding="utf-8", errors="replace") as f:
             for line in f:
                 pre = line[:200]
                 if first:
@@ -233,7 +233,7 @@ def get_codex_stats():
             stale = True
         if not stale:
             try:
-                with open(cache_path) as fh:
+                with open(cache_path, encoding="utf-8") as fh:
                     return json.load(fh)
             except (OSError, ValueError):
                 pass
@@ -257,7 +257,7 @@ def get_codex_stats():
 
     try:
         os.makedirs(cache_dir, exist_ok=True)
-        with open(cache_path, "w") as fh:
+        with open(cache_path, "w", encoding="utf-8") as fh:
             json.dump(result, fh)
     except OSError:
         pass
