@@ -88,6 +88,18 @@ Worth checking by hand in a VM, since no test covers it:
 
 - the popup opens against the taskbar next to the icon, with the taskbar on each
   edge;
+- each tray style (Logo and percent, Numbers, Ring) reads at 100 %, 125 % and
+  150 % display scaling, on a light and a dark taskbar, and the icons keep their
+  places (and "show in taskbar" choice) across a restart;
+- each logo sits to the left of its number: the icons are created newest-last
+  on the assumption that Windows, like Plasma, lays them out newest-first
+  (`TrayApp._show_entries`) — flip that if Windows turns out not to;
+- a number below 70 % is white on a dark taskbar and near-black on a light one
+  (read from the "system" light/dark setting);
+- the floating pill: its slot logos show (they are tinted by a GPU effect, so
+  check a machine without GPU acceleration too — a VM, a remote desktop), a
+  drag moves it and a click opens the popup beside it, and it comes back where
+  it was left after a restart, or above the taskbar when that screen is gone;
 - a click on the icon while the popup is open closes it rather than reopening it;
 - **Start with Windows** survives a sign-out;
 - no console window flashes up on a refresh (Codex and `gh` are console programs);
@@ -110,6 +122,12 @@ Still to confirm on a real install:
 | kiro-cli | `%LOCALAPPDATA%\kiro-cli\data.sqlite3` |
 | Muse | `%LOCALAPPDATA%\muse\…`, `%APPDATA%\muse\…` |
 | Copilot editor plugins | `%LOCALAPPDATA%\github-copilot\apps.json` |
+| Z.AI via glm-acp-agent | `%USERPROFILE%\.config\glm-acp-agent\credentials.json` (the Linux path under the profile; the tool may use `%APPDATA%` instead) |
+
+Everything else is either one of those dotfile folders or a key file of the
+widget's own (`~/.config/deepseek/api-key` and the like), which no vendor tool
+writes: on Windows it is simply looked for under `%USERPROFILE%\.config\`, and
+the Settings page or an environment variable is the usual way in anyway.
 
 Every one of them can be pointed elsewhere with the provider's environment
 variable (`CURSOR_IDE_DB`, `KIRO_IDE_DB`, `KIRO_CLI_DB`, `MUSE_SESSIONS_DIR`, …)

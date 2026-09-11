@@ -20,6 +20,7 @@ Window {
     visible: false
     color: "transparent"
     flags: Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
+    // Matched by the KWin script in app.py (POPUP_TITLE) on Plasma Wayland.
     title: "AI Usage"
 
     // ── Environment ──────────────────────────────────────────────────────────
@@ -36,6 +37,8 @@ Window {
     readonly property var screenNames: []
     readonly property string monitorMode: "focused"
     readonly property string baseDir: ""
+    // What it has instead: tray styles and the floating pill (settings page, Display).
+    readonly property bool trayOptions: true
 
     readonly property bool autostartAvailable: backend.autostartAvailable
     readonly property bool autostart: backend.autostart
@@ -58,9 +61,12 @@ Window {
             pollSec: 300,
             showChart: true,
             museQuota: false,
-            antigravityChartFilter: "both"
+            antigravityChartFilter: "both",
+            trayStyle: "icons",
+            floatingPill: false
         })
     property bool showSettings: false
+    onSettingsChanged: root.publishTray()
     readonly property string antigravityChartFilter: root.settings.antigravityChartFilter || "both"
 
     function loadSettings() {
@@ -75,6 +81,10 @@ Window {
         s.showChart = d.showChart !== false;
         s.museQuota = d.museQuota === true;
         s.antigravityChartFilter = d.antigravityChartFilter || "both";
+        // trayNumbers was the on/off switch before there were three styles.
+        s.trayStyle = d.trayStyle || (d.trayNumbers === false ? "ring" : "icons");
+        delete s.trayNumbers;
+        s.floatingPill = d.floatingPill === true;
         root.settings = s;
     }
 
@@ -179,18 +189,38 @@ Window {
         return Format.countdownFromEpoch(resetAt, root.nowTick);
     }
 
-    // The tray icon draws the active tab's first slot as a ring, and its
-    // tooltip lists every provider — the glance the Hyprland pill gives.
+    // The glance the Hyprland pill gives: the active tab's slots, which app.py
+    // (tray_entries) turns into tray icons in the chosen trayStyle.
     function publishTray() {
         var p = root.activeProvider();
-        var slot = p && p.slots && p.slots.length > 0 ? p.slots[0] : null;
         var lines = ["AI Usage"];
         for (var i = 0; i < root.providers.length; i++) {
             var q = root.providers[i];
             if (q.label && q.summary && q.summary.text)
                 lines.push(q.label + ": " + q.summary.text);
         }
-        backend.publishTrayState(slot ? (slot.pct || 0) : -1, slot ? String(slot.color || "") : "", lines.join("\n"));
+        var slots = [];
+        var raw = p && p.slots ? p.slots : [];
+        for (var j = 0; j < raw.length; j++) {
+            var s = raw[j] || {};
+            var text = s.text === null || s.text === undefined ? "" : String(s.text);
+            slots.push({
+                pct: s.pct || 0,
+                color: String(s.color || ""),
+                text: text,
+                // Windows cuts a tray tooltip at 127 characters, so each icon
+                // names only its own value.
+                tooltip: s.tooltip ? String(s.tooltip) : p.label + ": " + (text || Math.round(s.pct || 0) + "%")
+            });
+        }
+        backend.publishTrayState(JSON.stringify({
+            style: root.settings.trayStyle || "icons",
+            floatingPill: root.settings.floatingPill === true,
+            // The active provider's logo leads the numbers, or sits inside the ring.
+            icon: p ? root.providerIcon(p) : "",
+            tooltip: lines.join("\n"),
+            slots: slots
+        }));
     }
 
     // ── Backend fetch ────────────────────────────────────────────────────────
@@ -313,6 +343,11 @@ Window {
             root.errorText = message;
         }
 
+        // The tray menu's switches (tray style, floating pill), JSON-encoded.
+        function onSettingRequested(key, value) {
+            root.setSetting2(key, JSON.parse(value));
+        }
+
         function onHistoryFinished(op, result) {
             if (op === "autoload") {
                 try {
@@ -341,6 +376,131 @@ Window {
     Component.onCompleted: {
         root.loadSettings();
         backend.history("autoload", "");
+    }
+
+    // ── Floating pill ────────────────────────────────────────────────────────
+    // The panel pill (hyprland/PanelPill.qml) in a small always-on-top window of
+    // its own, for anyone who wants the panel's look rather than tray icons.
+    // Drag it anywhere; app.py puts it back where it was left (pillPosition) or,
+    // the first time, just above the taskbar. A click opens the popup by it.
+    // It never takes focus, so clicking it does not close an open popup first.
+    Window {
+        id: pillWindow
+
+        objectName: "floatingPill"
+        // Declared inside the popup, a Window would be its transient child, and
+        // Qt shows a transient child only while its parent is shown — the popup
+        // is hidden most of the time. Without a parent it stands on its own.
+        transientParent: null
+        visible: root.settings.floatingPill === true
+        width: pill.implicitWidth + 8
+        height: pill.implicitHeight + 8
+        color: "transparent"
+        flags: Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.WindowDoesNotAcceptFocus
+        // Matched by the KWin script in app.py (PILL_TITLE) on Plasma Wayland.
+        title: "AI Usage pill"
+
+        onXChanged: pillSave.restart()
+        onYChanged: pillSave.restart()
+
+        Timer {
+            id: pillSave
+            interval: 800
+            onTriggered: {
+                if (pillWindow.visible)
+                    root.setSetting2("pillPosition", {
+                        x: pillWindow.x,
+                        y: pillWindow.y
+                    });
+            }
+        }
+
+        PanelPill {
+            id: pill
+
+            readonly property string brandLogo: root.providerIcon(root.activeProvider())
+
+            anchors.centerIn: parent
+            iconSource: brandLogo !== "" ? brandLogo : root.iconSource
+            // The pill's own hover sits under the drag area below, so the tint
+            // is driven from there.
+            active: pillMouse.containsMouse || root.visible
+            slots: {
+                var p = root.activeProvider();
+                if (root.loading && root.providers.length === 0)
+                    return [
+                        {
+                            pct: 0,
+                            color: "#cc785c",
+                            text: "…",
+                            tooltip: "Loading"
+                        }
+                    ];
+                var raw = p && p.slots ? p.slots : [];
+                if (raw.length === 0)
+                    return [
+                        {
+                            pct: 0,
+                            color: "#cc785c",
+                            text: "—",
+                            tooltip: "No data"
+                        }
+                    ];
+                // The backend sends text: null for "show the percentage", which a
+                // string property cannot take.
+                var out = [];
+                for (var i = 0; i < raw.length; i++)
+                    out.push({
+                        pct: raw[i].pct || 0,
+                        color: raw[i].color || "#cc785c",
+                        text: raw[i].text || "",
+                        tooltip: raw[i].tooltip || ""
+                    });
+                return out;
+            }
+            stale: {
+                var p = root.activeProvider();
+                return root.errorText !== "" || (p ? !!p.stale : false);
+            }
+            hasError: {
+                var p = root.activeProvider();
+                return root.errorText !== "" || (p ? (p.error || "") !== "" : false);
+            }
+        }
+
+        // A press that moves drags the window; one that does not is a click.
+        MouseArea {
+            id: pillMouse
+
+            property point pressedAt
+            property bool dragged: false
+
+            anchors.fill: pill
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onPressed: mouse => {
+                pressedAt = Qt.point(mouse.x, mouse.y);
+                dragged = false;
+            }
+            onPositionChanged: mouse => {
+                if (pressed && !dragged && Math.abs(mouse.x - pressedAt.x) + Math.abs(mouse.y - pressedAt.y) > 4) {
+                    dragged = true;
+                    pillWindow.startSystemMove();
+                }
+            }
+            onClicked: {
+                if (!dragged)
+                    backend.togglePopupFromPill();
+            }
+        }
+
+        QC.ToolTip {
+            // A window of its own: the pill's window is only as big as the pill.
+            popupType: QC.Popup.Window
+            visible: pillMouse.containsMouse && !pillMouse.pressed && !root.visible && pill.tooltipText !== ""
+            delay: 500
+            text: pill.tooltipText
+        }
     }
 
     // ── Window ───────────────────────────────────────────────────────────────

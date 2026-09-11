@@ -265,6 +265,73 @@ ColumnLayout {
                 Layout.fillWidth: true
             }
         }
+
+        // The Windows tray app's own display choices (windows/app.py,
+        // tray_entries); a shell with a real panel has none of them.
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 6
+            visible: page.shell.trayOptions === true
+            Rectangle {
+                Layout.preferredWidth: 7
+                Layout.preferredHeight: 7
+                radius: 3.5
+                color: "#34d399"
+                Layout.alignment: Qt.AlignVCenter
+            }
+            Text {
+                text: "Tray"
+                font.pixelSize: 11
+                color: "#f8fafc"
+                Layout.preferredWidth: 90
+            }
+            SettingCombo {
+                Layout.preferredWidth: 130
+                readonly property var values: ["icons", "numbers", "ring"]
+                model: ["Logo and percent", "Numbers", "Ring"]
+                currentIndex: Math.max(0, values.indexOf(page.shell.settings.trayStyle || "icons"))
+                onActivated: page.shell.setSetting2("trayStyle", values[currentIndex])
+            }
+            Item {
+                Layout.fillWidth: true
+            }
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 6
+            visible: page.shell.trayOptions === true
+            Rectangle {
+                Layout.preferredWidth: 7
+                Layout.preferredHeight: 7
+                radius: 3.5
+                color: "#f472b6"
+                Layout.alignment: Qt.AlignVCenter
+            }
+            Text {
+                text: "Floating pill"
+                font.pixelSize: 11
+                color: "#f8fafc"
+                Layout.preferredWidth: 90
+            }
+            StyledToggle {
+                checked: page.shell.settings.floatingPill === true
+                onToggled: page.shell.setSetting2("floatingPill", checked)
+            }
+            Item {
+                Layout.fillWidth: true
+            }
+        }
+
+        Text {
+            visible: page.shell.trayOptions === true
+            Layout.fillWidth: true
+            text: "Logo and percent reads like the panel pill; the tray gives every icon the same square, so each value is two icons. The floating pill is the panel's own pill in a small window: drag it anywhere, click it for this popup."
+            font.pixelSize: 9
+            opacity: 0.4
+            color: "#f8fafc"
+            wrapMode: Text.WordWrap
+        }
     }
 
     // ── Data ─────────────────────────────────────────────────────────────────

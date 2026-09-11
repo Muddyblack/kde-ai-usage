@@ -40,7 +40,11 @@ class TrayAppTest(unittest.TestCase):
     def test_popup_and_every_settings_section_load_cleanly(self):
         # Every provider off, so nothing here depends on the network. The
         # selftest itself opens each settings section in turn.
-        off = {"providers": dict.fromkeys(("claude", "antigravity", "openai", "kiro", "mistral", "openrouter", "grok"), False)}
+        # The floating pill is on too, so its window loads and draws as well.
+        off = {
+            "providers": dict.fromkeys(("claude", "antigravity", "openai", "kiro", "mistral", "openrouter", "grok"), False),
+            "floatingPill": True,
+        }
         result = self.selftest(off)
         self.assertEqual(result.returncode, 0, result.stderr)
 

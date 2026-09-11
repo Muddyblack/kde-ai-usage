@@ -51,6 +51,8 @@ ShellRoot {
     readonly property bool pillControls: true
     readonly property bool interpreterControls: true
     readonly property bool autostartAvailable: false
+    // Tray styles and a floating pill are the Windows app's; this has a real panel.
+    readonly property bool trayOptions: false
     readonly property bool autostart: false
     function setAutostart(enabled) {
     }
@@ -167,18 +169,22 @@ ShellRoot {
             onStreamFinished: {
                 try {
                     var d = JSON.parse(this.text.trim());
-                    root.settings = {
-                        providers: d.providers || {},
-                        keys: d.keys || {},
-                        pollSec: d.pollSec || 300,
-                        showChart: d.showChart !== false,
-                        museQuota: d.museQuota === true,
-                        antigravityChartFilter: d.antigravityChartFilter || "both",
-                        pillMode: d.pillMode || (d.floatingPill === false ? "tray" : "always"),
-                        position: d.position || "top-right",
-                        monitor: d.monitor || "focused",
-                        pythonPath: d.pythonPath || ""
-                    };
+                    // Every field is carried through, known here or not:
+                    // saveSettings() writes the whole object back, and on Linux
+                    // the Windows tray app shares this file and keeps its own
+                    // switches in it (trayNumbers).
+                    var s = Object.assign({}, d);
+                    s.providers = d.providers || {};
+                    s.keys = d.keys || {};
+                    s.pollSec = d.pollSec || 300;
+                    s.showChart = d.showChart !== false;
+                    s.museQuota = d.museQuota === true;
+                    s.antigravityChartFilter = d.antigravityChartFilter || "both";
+                    s.pillMode = d.pillMode || (d.floatingPill === false ? "tray" : "always");
+                    s.position = d.position || "top-right";
+                    s.monitor = d.monitor || "focused";
+                    s.pythonPath = d.pythonPath || "";
+                    root.settings = s;
                 } catch (e) {}
             }
         }

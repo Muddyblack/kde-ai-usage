@@ -221,9 +221,23 @@ A tray app with the same popup as the Hyprland panel — the QML is shared, not
 copied — backed by the same provider package. Download
 `ai-usage-windows-<version>.zip` from a release, unzip it anywhere, and run
 `AI Usage.exe`. It sits in the notification area: click the icon for the popup,
-right-click for **Refresh**, **Settings**, **Start with Windows** and **Quit**.
-The icon draws the active tab's usage as a ring, and its tooltip lists every
-provider. Nothing to install — Python and Qt ship inside the folder.
+right-click for **Refresh**, **Settings**, **Tray style**, **Floating pill**,
+**Start with Windows** and **Quit**. Three tray styles (also under *Settings →
+Display*):
+
+- **Logo and percent** (default) — like the panel pill: for each value of the
+  active tab, the provider's logo tinted by level, then `NN%`. Windows gives
+  every tray icon the same square, so that is two icons per value.
+- **Numbers** — the logo once, then each value as plain coloured digits.
+- **Ring** — a single icon, the logo inside a usage ring.
+
+**Floating pill** adds the panel's own pill as a small always-on-top window —
+drag it anywhere, it stays where it was left; a click opens the popup beside it.
+
+Windows 11 puts new tray icons in the `^` overflow at first: drag them onto the
+taskbar once, or turn them on under *Settings → Personalization → Taskbar →
+Other system tray icons*. Nothing to install — Python and Qt ship inside the
+folder.
 
 It reads the same logins as on Linux, which the CLIs keep under your profile on
 Windows too (`%USERPROFILE%\.claude`, `.codex`, `.gemini`, `.copilot`, …). The
