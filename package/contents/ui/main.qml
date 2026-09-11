@@ -567,7 +567,7 @@ PlasmoidItem {
             id: "copilot",
             label: "Copilot",
             color: root.copilotPurple,
-            icon: "copilot-color.svg",
+            icon: "githubcopilot.svg",
             keyConfig: "githubToken",
             keyPlaceholder: "optional — gh/Copilot login is used"
         },
@@ -2386,7 +2386,7 @@ PlasmoidItem {
             PanelSlot {
                 pct: root.copilotPct
                 iconColor: root.copilotPurple
-                iconSource: Qt.resolvedUrl("../icons/copilot-color.svg")
+                iconSource: Qt.resolvedUrl("../icons/githubcopilot.svg")
                 iconText: "CP"
                 stale: root.stale && root.panelShows("copilot")
                 visible: root.panelShows("copilot")
