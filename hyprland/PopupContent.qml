@@ -242,7 +242,12 @@ ColumnLayout {
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
                         shell.activeId = modelData.id;
-                        shell.refresh();
+                        // A shell may throttle what a tab switch fetches
+                        // (the Windows app does); the ⟳ button always refreshes.
+                        if (typeof shell.refreshTab === "function")
+                            shell.refreshTab();
+                        else
+                            shell.refresh();
                     }
                     Rectangle {
                         anchors.fill: parent

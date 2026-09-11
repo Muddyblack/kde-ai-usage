@@ -490,7 +490,7 @@ def neutral_text_colour():
     return "#f8fafc"
 
 
-def render_entry(entry):
+def _render_entry(entry):
     kind, icon, color = entry["kind"], entry.get("icon") or "", entry.get("color") or ""
     if kind == "logo":
         return logo_icon(icon)
@@ -502,6 +502,22 @@ def render_entry(entry):
     if kind == "percent":
         return percent_icon(entry["value"], text_colour)
     return number_icon(entry["value"], text_colour)
+
+
+_RENDERED = {}
+
+
+def render_entry(entry):
+    """The icon for an entry, drawn once per look. The tinted logo is coloured
+    pixel by pixel, and the tray is refreshed on every tab switch and setting
+    change; the same few icons come back again and again."""
+    key = tuple(sorted((k, v) for k, v in entry.items() if k != "tooltip"))
+    icon = _RENDERED.get(key)
+    if icon is None:
+        if len(_RENDERED) > 256:
+            _RENDERED.clear()
+        icon = _RENDERED[key] = _render_entry(entry)
+    return icon
 
 
 class TrayApp:
@@ -527,6 +543,7 @@ class TrayApp:
         # otherwise; every one of them opens the popup and has the menu.
         self.icons = []
         self.menus = []
+        self._shown = None
         self._anchor = None
         backend.trayStateChanged.connect(self._on_tray_state)
 
@@ -611,27 +628,34 @@ class TrayApp:
         self.menus.append(menu)
 
     def _show_entries(self, entries):
-        """Match the icons to `entries`, reusing the ones already shown so their
-        place in the tray — and the user's choice to keep them visible — stays.
+        """Show `entries` in the tray.
 
         The tray lays icons out newest first (Plasma does, and Windows adds new
         ones on the left too), so they are made in reverse: that is what puts
-        each logo to the left of its number."""
+        each logo to the left of its number. That only holds for icons made
+        together, though — one added next to older ones lands wherever the
+        tray puts it, which scrambled the pairs after a tab switch. So the same
+        number of icons is updated in place, and a different number means all
+        of them are made anew, in one go."""
+        if entries == self._shown:
+            return
+        self._shown = entries
         entries = list(reversed(entries))
-        while len(self.icons) > len(entries):
-            icon, menu = self.icons.pop(), self.menus.pop()
-            if self._anchor is icon:
-                self._anchor = None
-            icon.hide()
-            icon.deleteLater()
-            menu.deleteLater()
-        for i, entry in enumerate(entries):
-            picture = render_entry(entry)
-            if i < len(self.icons):
-                self.icons[i].setIcon(picture)
-            else:
-                self._add_icon(picture)
-            self.icons[i].setToolTip(entry["tooltip"])
+        if len(entries) != len(self.icons):
+            while self.icons:
+                icon, menu = self.icons.pop(), self.menus.pop()
+                if self._anchor is icon:
+                    self._anchor = None
+                icon.hide()
+                icon.deleteLater()
+                menu.deleteLater()
+            for entry in entries:
+                self._add_icon(render_entry(entry))
+        else:
+            for icon, entry in zip(self.icons, entries):
+                icon.setIcon(render_entry(entry))
+        for icon, entry in zip(self.icons, entries):
+            icon.setToolTip(entry["tooltip"])
 
     def _on_tray_state(self, text):
         try:
@@ -859,6 +883,8 @@ function apply(w) {
     if (w.caption !== PILL && w.caption !== POPUP)
         return;
     w.keepAbove = true;
+    // Along to whichever virtual desktop is switched to, as a panel would be.
+    w.onAllDesktops = true;
     w.skipTaskbar = true;
     w.skipPager = true;
     w.skipSwitcher = true;

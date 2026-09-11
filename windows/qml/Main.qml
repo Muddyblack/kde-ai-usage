@@ -237,6 +237,7 @@ Window {
                 root.activeId = data.active || (root.providers[0] || {}).id || "";
             root.errorText = "";
             root.nowTick = new Date().getTime();
+            root.lastFetched = root.nowTick;
             root.recordHistory();
             root.publishTray();
         } catch (e) {
@@ -246,6 +247,15 @@ Window {
 
     function refresh() {
         backend.refresh();
+    }
+
+    // A tab click only fetches when the data is over a minute old: every
+    // refresh asks every provider, and clicking back and forth between tabs
+    // would otherwise keep one running all the time.
+    property double lastFetched: 0
+    function refreshTab() {
+        if (new Date().getTime() - root.lastFetched > 60000)
+            backend.refresh();
     }
 
     Timer {
