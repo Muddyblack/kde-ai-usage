@@ -44,6 +44,8 @@ MANIFEST
 # PyInstaller / Py2app
 *.manifest
 *.spec
+# ...except the Windows app's own, hand-written build spec.
+!windows/ai-usage.spec
 
 # Installer logs
 pip-log.txt
