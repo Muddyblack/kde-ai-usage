@@ -1,4 +1,4 @@
-.PHONY: help view view-h install pack tag test lint-py check-pricing
+.PHONY: help view view-h install pack tag test test-py lint-py check-pricing run-windows
 .DEFAULT_GOAL := help
 
 help: ## list targets
@@ -31,11 +31,22 @@ test: ## run the provider backend contract tests
 	@./tests/get-codex-rate-limits.test.sh
 	@if command -v node >/dev/null 2>&1; then node --test tests/*.test.js; \
 	  else echo "skipping tests/shared-code.test.js (node not found)"; fi
+	@$(MAKE) --no-print-directory test-py
 
-lint-py: ## lint + format-check the Python backend (dev only, needs ruff)
+test-py: ## run the portable unittest suites (also what CI runs on Windows)
+	@python3 -m unittest discover -s tests/python
+
+run-windows: ## run the Windows tray app on this machine (PySide6 via 'nix develop .#windows')
+	@if command -v nix >/dev/null 2>&1 && [ -f flake.nix ]; then \
+	  nix develop .#windows --command python3 windows/app.py; \
+	else \
+	  python3 windows/app.py; \
+	fi
+
+lint-py: ## lint + format-check the Python backend and tray app (dev only, needs ruff)
 	@if command -v ruff >/dev/null 2>&1; then \
-	  ruff check package/contents/tools/aiusage && \
-	  ruff format --check package/contents/tools/aiusage; \
+	  ruff check package/contents/tools/aiusage windows tests/python && \
+	  ruff format --check package/contents/tools/aiusage windows tests/python; \
 	else \
 	  echo "ruff not found — install it or run 'nix develop'"; exit 1; \
 	fi

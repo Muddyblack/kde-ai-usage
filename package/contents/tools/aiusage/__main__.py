@@ -33,6 +33,18 @@ def _emit(obj):
     sys.stdout.write(json.dumps(finalize(obj), separators=(",", ":"), ensure_ascii=False) + "\n")
 
 
+def snapshot():
+    """The envelope `--all` prints, for an in-process caller (the Windows tray
+    app, which has no shell to run this module through).
+
+    Like main(), this exports the settings file's keys into os.environ first. A
+    long-lived caller has to put its environment back afterwards, or a key the
+    user later clears would linger there."""
+    cfg = config.load_settings()
+    config.apply_widget_env(cfg)
+    return finalize(envelope.build(envelope.enabled(cfg)))
+
+
 def main(argv):
     mode = ""
     requested = ""

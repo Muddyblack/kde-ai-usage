@@ -57,7 +57,8 @@ def _vibe_stats():
         recent.append(
             {
                 "title": d.get("title") or "untitled",
-                "project": wd.split("/")[-1] if wd else "",
+                # vibe records the directory in its own OS's spelling.
+                "project": wd.replace("\\", "/").rstrip("/").split("/")[-1] if wd else "",
                 "branch": d.get("git_branch") or "",
                 "cost": s(d, "session_cost"),
                 "tokens": s(d, "session_total_llm_tokens"),

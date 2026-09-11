@@ -17,6 +17,7 @@ import os
 import sqlite3
 import time
 
+from .. import paths
 from ..contract import num
 from ..http import as_json, clean_credential, fetch_json, http_error_text
 
@@ -24,7 +25,7 @@ _API = "https://api2.cursor.sh/aiserver.v1.DashboardService"
 
 
 def _config_home():
-    return os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
+    return paths.config_home()
 
 
 def _agent_token():
@@ -40,7 +41,7 @@ def _agent_token():
 
 
 def _ide_token():
-    path = os.environ.get("CURSOR_IDE_DB") or os.path.join(_config_home(), "Cursor", "User", "globalStorage", "state.vscdb")
+    path = os.environ.get("CURSOR_IDE_DB") or os.path.join(paths.electron_app_data(), "Cursor", "User", "globalStorage", "state.vscdb")
     if not os.path.isfile(path):
         return ""
     try:

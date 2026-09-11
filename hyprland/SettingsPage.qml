@@ -1,13 +1,16 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls.Basic as QC
-import Quickshell
 
 // In-popup settings page, ported from the Plasma SettingsPanel. Four sections,
 // one on screen at a time — the whole page at once was a wall of unrelated rows
 // in which a provider's own options (its key, its quota) sat far from the
 // switch that turns it on. Everything is persisted through
 // shell.setSetting()/saveSettings() into the JSON config the backend reads.
+//
+// Shared by the Quickshell panel and the Windows tray app, so nothing here
+// imports Quickshell: the shell hands over its screen names, and says through
+// pillControls / interpreterControls / autostartAvailable which rows apply.
 ColumnLayout {
     id: page
 
@@ -84,7 +87,8 @@ ColumnLayout {
             },
             {
                 id: "panel",
-                label: "Panel"
+                // Without a pill there is no panel to set up, only the chart.
+                label: page.shell.pillControls ? "Panel" : "Display"
             },
             {
                 id: "data",
@@ -105,9 +109,8 @@ ColumnLayout {
         visible: page.section === "providers"
 
         Repeater {
-            // Labels, accents and key names all come from the provider registry
-            // in AiUsageShell.qml, so adding a provider there is enough to make
-            // it configurable here.
+            // Labels, accents and key names all come from ProviderRegistry.js,
+            // so adding a provider there is enough to make it configurable here.
             model: page.shell.allProviders
 
             ProviderSettingRow {
@@ -137,6 +140,7 @@ ColumnLayout {
         RowLayout {
             Layout.fillWidth: true
             spacing: 6
+            visible: page.shell.pillControls
             Rectangle {
                 Layout.preferredWidth: 7
                 Layout.preferredHeight: 7
@@ -165,6 +169,7 @@ ColumnLayout {
         RowLayout {
             Layout.fillWidth: true
             spacing: 6
+            visible: page.shell.pillControls
             Rectangle {
                 Layout.preferredWidth: 7
                 Layout.preferredHeight: 7
@@ -193,6 +198,7 @@ ColumnLayout {
         RowLayout {
             Layout.fillWidth: true
             spacing: 6
+            visible: page.shell.pillControls
             Rectangle {
                 Layout.preferredWidth: 7
                 Layout.preferredHeight: 7
@@ -214,9 +220,9 @@ ColumnLayout {
                 // shows as the current value and keeps working when it comes back.
                 readonly property var values: {
                     var v = ["focused", "all"];
-                    var screens = Quickshell.screens;
+                    var screens = page.shell.screenNames || [];
                     for (var i = 0; i < screens.length; i++)
-                        v.push(screens[i].name);
+                        v.push(screens[i]);
                     if (v.indexOf(page.shell.monitorMode) === -1)
                         v.push(page.shell.monitorMode);
                     return v;
@@ -399,12 +405,45 @@ ColumnLayout {
         spacing: 8
         visible: page.section === "advanced"
 
+        // Registers the app to start at login — the Windows tray app only; a
+        // Quickshell config is started by the compositor's own config.
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 6
+            visible: page.shell.autostartAvailable === true
+
+            Text {
+                text: "Start at login"
+                font.pixelSize: 11
+                color: "#f8fafc"
+                Layout.preferredWidth: 90
+            }
+            StyledToggle {
+                checked: page.shell.autostart === true
+                onToggled: page.shell.setAutostart(checked)
+            }
+            Item {
+                Layout.fillWidth: true
+            }
+        }
+
+        Text {
+            visible: page.shell.autostartAvailable === true
+            Layout.fillWidth: true
+            text: "Starts AI Usage in the tray when you sign in. The same switch is in the tray icon's menu."
+            font.pixelSize: 9
+            opacity: 0.4
+            color: "#f8fafc"
+            wrapMode: Text.WordWrap
+        }
+
         // Interpreter override, exported as $PYTHON3 to the shell tools. Unlike the
         // API keys this is a top-level setting, not a keys[] entry, because the
         // shell scripts need it before any Python runs.
         RowLayout {
             Layout.fillWidth: true
             spacing: 6
+            visible: page.shell.interpreterControls
 
             Text {
                 text: "Python"
@@ -443,6 +482,7 @@ ColumnLayout {
         }
 
         Text {
+            visible: page.shell.interpreterControls
             Layout.fillWidth: true
             text: "Interpreter for the backend — e.g. a venv's bin/python. Empty auto-detects from PATH (python3 → python3.x → python). The tray helper picks this up on its next refresh."
             font.pixelSize: 9
@@ -463,6 +503,7 @@ ColumnLayout {
         RowLayout {
             Layout.fillWidth: true
             spacing: 6
+            visible: page.shell.interpreterControls
 
             Text {
                 text: "Terminal"
@@ -507,6 +548,7 @@ ColumnLayout {
         }
 
         Text {
+            visible: page.shell.interpreterControls
             Layout.fillWidth: true
             text: "Same data as this popup, as a table in a shell. Link it into ~/.local/bin to run it as ai-usage-cli, or pass --compact for one status-bar line."
             font.pixelSize: 9

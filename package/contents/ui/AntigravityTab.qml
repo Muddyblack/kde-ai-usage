@@ -67,8 +67,13 @@ ColumnLayout {
         tooltipText: "Prompt Credits\nUsed: " + Math.round(value) + "%  ·  " + rootItem.antigravityPromptCreditsAvailable + " / " + rootItem.formatTokens(rootItem.antigravityPromptCreditsMonthly) + " left" + (rootItem.antigravityResetTime ? "\nResets: " + rootItem.antigravityResetTime : "")
     }
 
+    // Only when it says something the family rows below do not: with one model
+    // per family (the agy CLI's view) it is just their average, a third copy of
+    // the same numbers. The IDE's per-model view, or no families at all, keeps it.
     PopupRow {
-        visible: rootItem.antigravityPromptCreditsMonthly === 0 && Object.keys(rootItem.antigravityModels).length > 0
+        visible: rootItem.antigravityPromptCreditsMonthly === 0 && Object.keys(rootItem.antigravityModels).length > 0 && (rootItem.antigravityGroups.length === 0 || rootItem.antigravityGroups.some(function (g) {
+                return (g.models || []).length > 1;
+            }))
         label: "Overall Quota"
         resetText: rootItem.antigravityResetTime ? "resets " + rootItem.antigravityResetTime : ""
         countdownText: rootItem.antigravityCountdown === "resetting..." ? "resetting..." : (rootItem.antigravityCountdown ? "in " + rootItem.antigravityCountdown : "")
@@ -83,17 +88,29 @@ ColumnLayout {
     // Mirrors the Antigravity IDE's "Gemini Models" / "Claude & GPT Models"
     // grouping (each group shares a 5-hour reset window), while keeping the
     // richer per-model bars underneath each group header.
+    //
+    // A family that holds a single model — all the agy CLI reports — is one
+    // full row instead, as in the Hyprland and Windows popups: a header with its
+    // percentage over a sub-row carrying the same name and the same percentage
+    // only printed every number twice.
     ColumnLayout {
+        id: groupsSection
         Layout.fillWidth: true
         spacing: 10
         visible: rootItem.antigravityGroups.length > 0
 
+        readonly property bool perModel: rootItem.antigravityGroups.some(function (g) {
+            return (g.models || []).length > 1;
+        })
+
         Rectangle {
+            visible: groupsSection.perModel
             Layout.fillWidth: true
             height: 1
             color: Qt.rgba(1, 1, 1, 0.08)
         }
         PlasmaComponents.Label {
+            visible: groupsSection.perModel
             text: "Model Quotas"
             font.bold: true
             font.pixelSize: 11
@@ -109,9 +126,26 @@ ColumnLayout {
                 spacing: 5
                 required property var modelData
                 readonly property var group: modelData
+                readonly property bool perModel: (group.models || []).length > 1
+                readonly property color familyColor: group.key === "gemini" ? rootItem.googleBlue : rootItem.googleGreen
+
+                // One model in the family: the family is the row.
+                PopupRow {
+                    visible: !groupCol.perModel
+                    label: groupCol.group.label
+                    resetText: groupCol.group.resetTime ? "resets " + groupCol.group.resetTime : ""
+                    countdownText: {
+                        var cd = groupCol.group.resetDate ? rootItem.formatCountdown(groupCol.group.resetDate) : "";
+                        return cd === "resetting..." ? cd : (cd ? "in " + cd : "");
+                    }
+                    value: groupCol.group.isExhausted ? 100 : groupCol.group.usedPct
+                    barColor: groupCol.familyColor
+                    tooltipText: groupCol.group.label + "\n" + Math.round(value) + "% used" + (groupCol.group.isExhausted ? "\n⚠ Quota exhausted" : "") + (groupCol.group.resetTime ? "\nResets: " + groupCol.group.resetTime : "")
+                }
 
                 // Group header: name, shared reset countdown, pooled usage %.
                 RowLayout {
+                    visible: groupCol.perModel
                     Layout.fillWidth: true
                     spacing: 6
                     Rectangle {
@@ -160,7 +194,7 @@ ColumnLayout {
 
                 // Per-model bars within the group.
                 Repeater {
-                    model: groupCol.group.models
+                    model: groupCol.perModel ? groupCol.group.models : []
                     // Wrap in a plain Item so the MouseArea can use anchors.fill
                     // without conflicting with the layout delegate.
                     Item {

@@ -161,6 +161,17 @@
               echo "  make help        — list targets (view, install, pack, tag)"
             '';
           };
+
+          # The Windows tray app (windows/) runs on Linux too, which is how it is
+          # developed: `nix develop .#windows`, then `python windows/app.py`.
+          # Separate because only people working on that app want PySide6.
+          windows = pkgs.mkShell {
+            name = "ai-usage-widget-windows";
+            packages = [
+              (pkgs.python3.withPackages (ps: [ ps.pyside6 ps.psutil ]))
+              pkgs.ruff
+            ];
+          };
         });
     };
 }

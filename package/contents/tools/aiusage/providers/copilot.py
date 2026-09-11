@@ -23,6 +23,7 @@ import os
 import shutil
 import subprocess
 
+from .. import paths
 from ..http import as_json, clean_credential, error_json, fetch_json, http_error_json, resolve_key
 
 # Sent by the Copilot editor plugins; /copilot_internal rejects a request that
@@ -35,7 +36,13 @@ _EDITOR_HEADERS = {
 
 
 def _config_home():
-    return os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
+    return paths.config_home()
+
+
+def _windows_plugin_dir():
+    """The Copilot plugins keep their login under %LOCALAPPDATA% on Windows,
+    not under %APPDATA% where config_home() points."""
+    return [os.path.join(paths.data_home(), "github-copilot")] if paths.IS_WINDOWS else []
 
 
 def _plugin_dirs():
@@ -47,6 +54,7 @@ def _plugin_dirs():
     for path in (
         os.path.join(_config_home(), "github-copilot"),
         os.path.expanduser("~/.config/github-copilot"),
+        *_windows_plugin_dir(),
         os.path.expanduser("~/.copilot"),
     ):
         if path not in dirs:
@@ -100,6 +108,7 @@ def _gh_cli_token():
             capture_output=True,
             text=True,
             timeout=10,
+            **paths.no_window(),
         )
     except (OSError, subprocess.TimeoutExpired):
         return ""

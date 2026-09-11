@@ -1,0 +1,4 @@
+# Runtime for the Windows tray app (windows/app.py). The backend itself stays
+# standard-library-only; psutil is only how Antigravity is found without /proc.
+PySide6-Essentials>=6.7
+psutil>=5.9

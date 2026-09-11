@@ -45,6 +45,7 @@ import os
 import re
 
 from .. import config as _config
+from .. import paths
 from ..billing import price_models
 from ..contract import num
 
@@ -54,11 +55,11 @@ _VIEW_DIR = ".msp-view-v1"
 
 
 def _data_home():
-    return os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
+    return paths.data_home()
 
 
 def _config_home():
-    return os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
+    return paths.config_home()
 
 
 def sessions_root():
@@ -234,7 +235,7 @@ def _scan_file(path):
                 if isinstance(root, str) and root:
                     # Folder name only: enough to tell projects apart in the
                     # tab, without putting a filesystem layout in the envelope.
-                    workspace = os.path.basename(root.rstrip("/")) or root
+                    workspace = os.path.basename(root.rstrip("/\\")) or root
                 continue
             event = payload.get("event")
             if not isinstance(event, dict):

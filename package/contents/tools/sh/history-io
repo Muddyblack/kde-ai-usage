@@ -28,6 +28,20 @@ LATEST="$DIR/usage-history-latest.json"
 LOCK="$DIR/.usage-history.lock"
 mkdir -p "$DIR"
 
+# The logic lives in aiusage.historyio, shared with the Windows frontend, which
+# has no shell to run this script. What follows it here is the fallback for a
+# machine where Python does not run at all. Its answer is relayed only when it
+# exits cleanly: it prints every error as an envelope and exits 0, so a non-zero
+# exit means the interpreter itself failed — before writing anything — and the
+# code below still answers that case readably.
+if [ -n "$PY" ]; then
+  _pkg_tools="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  if _out="$(PYTHONPATH="$_pkg_tools${PYTHONPATH:+:$PYTHONPATH}" "$PY" -B -m aiusage.historyio "${1:-}" 2>/dev/null)"; then
+    printf '%s\n' "$_out"
+    exit 0
+  fi
+fi
+
 # Serialize read-modify-write against the other frontend (and against a second
 # Plasma widget instance, which is a writer too). Held until the script exits,
 # because the fd closing is what releases it.
