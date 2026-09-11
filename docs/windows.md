@@ -62,8 +62,23 @@ pyinstaller --noconfirm windows/ai-usage.spec
 
 The result is a folder, `dist\AI Usage\`, rather than a single file: a one-file
 build unpacks itself to a temp directory on every start. Zip the folder to ship
-it. CI does exactly this (`.github/workflows/windows.yml`), and tagged releases
-attach the zip (`release.yml`).
+it.
+
+The installer wraps that folder (Inno Setup, `windows/installer.iss`):
+
+```powershell
+windows\build-installer.ps1 -Version 2.4.0     # → AI-Usage-Setup-2.4.0.exe
+```
+
+It installs per user (no admin rights) to `%LOCALAPPDATA%\Programs\AI Usage`,
+adds a Start menu entry, optionally a desktop shortcut and *Start when I sign
+in* (the same registry value as the tray menu's switch), stops a running copy
+before replacing it, and registers an uninstaller. Keep its `AppId` as it is:
+that is how a newer installer finds and updates the installed app.
+
+CI does all of this on every push (`.github/workflows/windows.yml`, as a
+workflow artifact), and tagged releases attach both the installer and the zip
+(`release.yml`).
 
 ## Testing on real Windows
 

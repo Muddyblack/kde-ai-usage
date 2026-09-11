@@ -24,10 +24,16 @@ jobs:
         shell: pwsh
         run: Compress-Archive -Path "dist/AI Usage" -DestinationPath "ai-usage-windows-$env:GITHUB_REF_NAME.zip"
 
+      - name: Build the installer
+        shell: pwsh
+        run: windows/build-installer.ps1 -Version ($env:GITHUB_REF_NAME.TrimStart("v"))
+
       - uses: actions/upload-artifact@v4
         with:
           name: windows
-          path: ai-usage-windows-*.zip
+          path: |
+            ai-usage-windows-*.zip
+            AI-Usage-Setup-*.exe
 
   release:
     needs: windows
@@ -82,7 +88,8 @@ jobs:
             plasmapkg2 -i ${{ steps.info.outputs.artifact }}
             ```
 
-            **Windows:** unzip `ai-usage-windows-${{ github.ref_name }}.zip` anywhere and run `AI Usage.exe`; it lives in the tray.
+            **Windows:** run `AI-Usage-Setup-${{ steps.info.outputs.version }}.exe` (no admin rights needed; it updates an existing install in place). Or unzip `ai-usage-windows-${{ github.ref_name }}.zip` anywhere and run `AI Usage.exe`. Either way it lives in the tray.
           files: |
             ${{ steps.info.outputs.artifact }}
             ai-usage-windows-*.zip
+            AI-Usage-Setup-*.exe

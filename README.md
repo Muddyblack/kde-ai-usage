@@ -219,8 +219,12 @@ settings are stored locally in
 
 A tray app with the same popup as the Hyprland panel — the QML is shared, not
 copied — backed by the same provider package. Download
-`ai-usage-windows-<version>.zip` from a release, unzip it anywhere, and run
-`AI Usage.exe`. It sits in the notification area: click the icon for the popup,
+`AI-Usage-Setup-<version>.exe` from a release and run it: no admin rights, a
+Start menu entry, an optional *Start when I sign in*, and an uninstaller under
+*Installed apps*; running a newer one updates in place. (Or take
+`ai-usage-windows-<version>.zip`, unzip it anywhere and run `AI Usage.exe`.)
+The app isn't code-signed yet, so SmartScreen asks once: *More info → Run
+anyway*. It sits in the notification area: click the icon for the popup,
 right-click for **Refresh**, **Settings**, **Tray style**, **Floating pill**,
 **Start with Windows** and **Quit**. Three tray styles (also under *Settings →
 Display*):

@@ -509,6 +509,18 @@ Window {
         onActivated: root.hide()
     }
 
+    // The panel drags from anywhere a control does not claim the press — its
+    // background, headings, text. Buttons, tabs, the chart's scrub and the
+    // settings fields keep their presses. The floating pill comes along
+    // (app.py, TrayApp._on_panel_moved; the KWin script on Plasma Wayland).
+    DragHandler {
+        target: null
+        onActiveChanged: {
+            if (active)
+                root.startSystemMove();
+        }
+    }
+
     Rectangle {
         anchors.fill: parent
         radius: 12

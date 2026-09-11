@@ -516,6 +516,12 @@ class TrayApp:
         self.backend = backend
         self.window = engine.rootObjects()[0]
         self._hidden_at = 0.0
+        # The popup and the floating pill move as one: dragging either brings
+        # the other along. _pill_offset is where the pill sits relative to the
+        # popup; _syncing marks the moves made here, so they are not taken for
+        # the user's.
+        self._pill_offset = None
+        self._syncing = False
 
         # The logo and one icon per value in numbers mode, one ring icon
         # otherwise; every one of them opens the popup and has the menu.
@@ -575,12 +581,18 @@ class TrayApp:
             # An open popup travels with the pill while it is dragged.
             self.pill.xChanged.connect(self._follow_pill)
             self.pill.yChanged.connect(self._follow_pill)
+            # Grabbing the pill makes it the active window; that must not count
+            # as leaving the popup.
+            self.pill.activeChanged.connect(self._on_active_changed)
             backend.popupToggleRequested.connect(self.toggle_from_pill)
             self._on_pill_visible()
 
         self.window.activeChanged.connect(self._on_active_changed)
         # The popup grows and shrinks with its content; keep it on the taskbar.
         self.window.heightChanged.connect(self._reposition)
+        # The user dragging the popup brings the pill along.
+        self.window.xChanged.connect(self._on_panel_moved)
+        self.window.yChanged.connect(self._on_panel_moved)
         self._show_entries(tray_entries({}))
 
     # ── Icons ──
@@ -674,7 +686,7 @@ class TrayApp:
         self.toggle()
 
     def _follow_pill(self):
-        if self.window.isVisible() and self._anchor is self.pill:
+        if not self._syncing and self.window.isVisible() and self._anchor is self.pill:
             self._place()
 
     # ── Popup ──
@@ -700,7 +712,14 @@ class TrayApp:
             self.show()
 
     def _on_active_changed(self):
-        if not self.window.isActive() and self.window.isVisible():
+        # Decided a moment later, once focus has settled: on the way from the
+        # popup to the pill neither is active for an instant.
+        QTimer.singleShot(150, self._hide_if_left)
+
+    def _hide_if_left(self):
+        """Close the popup once focus is on neither it nor the pill."""
+        pill_active = self.pill is not None and self.pill.isActive()
+        if self.window.isVisible() and not self.window.isActive() and not pill_active:
             self.hide()
 
     def _on_activated(self, icon, reason):
@@ -713,7 +732,28 @@ class TrayApp:
         if self.window.isVisible():
             self._place()
 
+    def _on_panel_moved(self):
+        """The user dragged the popup: the pill keeps its place beside it."""
+        if self._syncing or self._pill_offset is None or not self.window.isVisible():
+            return
+        if self._anchor is not self.pill or not self.pill.isVisible():
+            return
+        self._syncing = True
+        try:
+            self.pill.setPosition(self.window.x() + self._pill_offset[0], self.window.y() + self._pill_offset[1])
+        finally:
+            self._syncing = False
+
     def _place(self):
+        self._syncing = True
+        try:
+            self._place_window()
+        finally:
+            self._syncing = False
+        if self._anchor is self.pill and self.pill is not None and self.pill.isVisible():
+            self._pill_offset = (self.pill.x() - self.window.x(), self.pill.y() - self.window.y())
+
+    def _place_window(self):
         """Put the popup against the taskbar, next to the tray icon.
 
         The taskbar edge is wherever the screen's available area stops short of
@@ -763,8 +803,11 @@ _KWIN_SCRIPT = """\
 // Loaded by windows/app.py for as long as it runs; see _kwin_keep_pill_above().
 // The pill and the popup keep above other windows and out of the taskbar, and
 // the popup sits under the pill — over it where there is no room below — and
-// follows it while it is dragged, as TrayApp._place does on Windows.
+// the two move as one: dragging the pill brings the popup, dragging the popup
+// brings the pill — as TrayApp does on Windows. `syncing` marks the moves made
+// here, so that one does not set off the other again.
 var PILL = "__PILL__", POPUP = "__POPUP__", GAP = 8;
+var syncing = false;
 
 function find(caption) {
     var all = workspace.windowList();
@@ -776,7 +819,7 @@ function find(caption) {
 
 function placePopup() {
     var pill = find(PILL), popup = find(POPUP);
-    if (!pill || !popup)
+    if (syncing || !pill || !popup)
         return;
     var p = pill.frameGeometry, g = popup.frameGeometry;
     var area = workspace.clientArea(KWin.MaximizeArea, pill);
@@ -786,9 +829,30 @@ function placePopup() {
         y = p.y - g.height - GAP;
     x = Math.round(Math.max(area.x + GAP, Math.min(x, area.x + area.width - g.width - GAP)));
     y = Math.round(Math.max(area.y + GAP, Math.min(y, area.y + area.height - g.height - GAP)));
-    // Only on a real move: setting it fires frameGeometryChanged again.
-    if (x !== Math.round(g.x) || y !== Math.round(g.y))
-        popup.frameGeometry = {x: x, y: y, width: g.width, height: g.height};
+    if (x === Math.round(g.x) && y === Math.round(g.y))
+        return;
+    syncing = true;
+    popup.frameGeometry = {x: x, y: y, width: g.width, height: g.height};
+    syncing = false;
+}
+
+// The popup changed: a new size (its content) puts it back under the pill; a
+// move of the user's takes the pill along by as much.
+function popupChanged(popup, old) {
+    if (syncing)
+        return;
+    var g = popup.frameGeometry;
+    if (g.width !== old.width || g.height !== old.height) {
+        placePopup();
+        return;
+    }
+    var pill = find(PILL);
+    if (!pill)
+        return;
+    var p = pill.frameGeometry;
+    syncing = true;
+    pill.frameGeometry = {x: p.x + g.x - old.x, y: p.y + g.y - old.y, width: p.width, height: p.height};
+    syncing = false;
 }
 
 function apply(w) {
@@ -798,9 +862,12 @@ function apply(w) {
     w.skipTaskbar = true;
     w.skipPager = true;
     w.skipSwitcher = true;
-    // The pill moving (a drag) and the popup resizing (its content) both
-    // move the popup.
-    w.frameGeometryChanged.connect(placePopup);
+    if (w.caption === PILL)
+        w.frameGeometryChanged.connect(placePopup);
+    else
+        w.frameGeometryChanged.connect(function (old) {
+            popupChanged(w, old);
+        });
     placePopup();
 }
 workspace.windowList().forEach(apply);
