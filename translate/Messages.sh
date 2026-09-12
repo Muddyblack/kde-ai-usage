@@ -59,14 +59,15 @@ xgettext \
     --output="$pot" \
     "${sources[@]}"
 
-# The Python backend feeds labels and errors straight to the frontend, so it
-# shares the same catalog. xgettext knows Python's gettext/_ built-ins; only the
-# extra sources and --join-existing are needed to append to the .pot above.
+# The Python backend emits a language-neutral JSON contract (English), so it is
+# never localized at runtime. The strings it hands to the frontend are marked
+# with gettext_noop (N_) purely so they land in this catalog; the QML translates
+# them when it displays them. xgettext knows N_ as a built-in Python keyword.
 mapfile -t py_sources < <(find package/contents/tools/aiusage -type f -name '*.py' | LC_ALL=C sort)
 xgettext \
     --from-code=UTF-8 \
     --language=Python \
-    --keyword=_ \
+    --keyword=N_ \
     --add-comments=TRANSLATORS \
     --package-name="AI Usage Monitor" \
     --package-version="$version" \

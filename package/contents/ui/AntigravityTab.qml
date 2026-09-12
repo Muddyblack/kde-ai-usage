@@ -140,7 +140,7 @@ ColumnLayout {
                     }
                     value: groupCol.group.isExhausted ? 100 : groupCol.group.usedPct
                     barColor: groupCol.familyColor
-                    tooltipText: groupCol.group.label + "\n" + Math.round(value) + "% used" + (groupCol.group.isExhausted ? "\n⚠ Quota exhausted" : "") + (groupCol.group.resetTime ? "\nResets: " + groupCol.group.resetTime : "")
+                    tooltipText: rootItem.tr(groupCol.group.label) + "\n" + Math.round(value) + "% used" + (groupCol.group.isExhausted ? "\n⚠ Quota exhausted" : "") + (groupCol.group.resetTime ? "\nResets: " + groupCol.group.resetTime : "")
                 }
 
                 // Group header: name, shared reset countdown, pooled usage %.
@@ -156,7 +156,7 @@ ColumnLayout {
                         color: groupCol.group.key === "gemini" ? rootItem.googleBlue : rootItem.googleGreen
                     }
                     PlasmaComponents.Label {
-                        text: groupCol.group.label
+                        text: rootItem.tr(groupCol.group.label)
                         font.pixelSize: 10
                         font.bold: true
                         opacity: 0.85

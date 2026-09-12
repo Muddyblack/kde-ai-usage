@@ -17,10 +17,9 @@ import os
 import sqlite3
 import time
 
-from .. import paths
+from .. import N_, paths
 from ..contract import num
 from ..http import as_json, clean_credential, fetch_json, http_error_text
-from ..i18n import _
 
 _API = "https://api2.cursor.sh/aiserver.v1.DashboardService"
 
@@ -153,16 +152,16 @@ def get_cursor_usage():
         return {}
     expires = _jwt_expiry(token)
     if expires and expires <= time.time():
-        return {"loggedIn": True, "source": source, "error": _("login expired — run cursor-agent login")}
+        return {"loggedIn": True, "source": source, "error": N_("login expired — run cursor-agent login")}
 
     usage = _call("GetCurrentPeriodUsage", token, "CURSOR_USAGE_RESPONSE_FILE")
     if usage.status in (401, 403):
-        return {"loggedIn": True, "source": source, "error": _("login rejected — run cursor-agent login")}
+        return {"loggedIn": True, "source": source, "error": N_("login rejected — run cursor-agent login")}
     if usage.status != 200:
         return {"loggedIn": True, "source": source, "error": http_error_text(usage.status)}
     body = as_json(usage.body)
     if not isinstance(body, dict):
-        return {"loggedIn": True, "source": source, "error": _("usage response could not be parsed")}
+        return {"loggedIn": True, "source": source, "error": N_("usage response could not be parsed")}
 
     # The plan name and the stats are niceties: their failure must not cost
     # the usage numbers.

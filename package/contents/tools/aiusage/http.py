@@ -8,7 +8,7 @@ pay. See plan.md constraint #3.
 
 import os
 
-from .i18n import _
+from . import N_
 
 
 class HttpResult:
@@ -75,14 +75,14 @@ def http_error_text(status):
     """The frontend-facing error vocabulary — deliberately shorter than the
     per-provider wording (see docs/provider-contract.md)."""
     if status in (0, None, ""):
-        return _("offline")
+        return N_("offline")
     if status == 401:
-        return _("token expired")
+        return N_("token expired")
     if status == 403:
-        return _("access denied")
+        return N_("access denied")
     if status == 429:
-        return _("rate limited")
-    return _("err %s") % status
+        return N_("rate limited")
+    return N_("err %s") % status
 
 
 def error_json(message):
@@ -94,10 +94,10 @@ def http_error_json(label, status, auth_message=None):
     specific authentication message than "Invalid <label> credential" pass it
     as auth_message."""
     if status in (401, 403):
-        return error_json(auth_message or _("Invalid %s credential") % label)
+        return error_json(auth_message or N_("Invalid %s credential") % label)
     if status in (0, None, ""):
-        return error_json(_("%s network error") % label)
-    return error_json(_("%s HTTP %s") % (label, status))
+        return error_json(N_("%s network error") % label)
+    return error_json(N_("%s HTTP %s") % (label, status))
 
 
 def fetch_json(url, headers=None, timeout=10, fixture_path=None, data=None):

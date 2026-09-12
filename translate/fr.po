@@ -70,8 +70,8 @@ msgstr ""
 #: package/contents/ui/AntigravityTab.qml:219
 #: package/contents/ui/ClaudeTab.qml:144 package/contents/ui/ClaudeTab.qml:157
 #: package/contents/ui/CursorTab.qml:85 package/contents/ui/KiroTab.qml:64
-#: package/contents/ui/main.qml:2384 package/contents/ui/main.qml:2420
-#: package/contents/ui/main.qml:2440 package/contents/ui/main.qml:2511
+#: package/contents/ui/main.qml:2390 package/contents/ui/main.qml:2426
+#: package/contents/ui/main.qml:2446 package/contents/ui/main.qml:2517
 msgid ""
 "\n"
 "Resets: "
@@ -94,8 +94,8 @@ msgid "Average quota usage across Gemini models\n"
 msgstr "Utilisation moyenne du quota pour les modèles Gemini\n"
 
 #: package/contents/ui/AntigravityTab.qml:84
-#: package/contents/ui/AntigravityTab.qml:215 package/contents/ui/main.qml:1919
-#: package/contents/ui/main.qml:2420
+#: package/contents/ui/AntigravityTab.qml:215 package/contents/ui/main.qml:1925
+#: package/contents/ui/main.qml:2426
 msgid "% used"
 msgstr "% utilisé"
 
@@ -164,8 +164,8 @@ msgstr "hier"
 #: package/contents/ui/ClaudeTab.qml:143 package/contents/ui/ClaudeTab.qml:144
 #: package/contents/ui/ClaudeTab.qml:156 package/contents/ui/ClaudeTab.qml:157
 #: package/contents/ui/ClaudeTab.qml:210 package/contents/ui/MistralTab.qml:167
-#: package/contents/ui/MistralTab.qml:415 package/contents/ui/main.qml:1842
-#: package/contents/ui/main.qml:1932 package/contents/ui/main.qml:2430
+#: package/contents/ui/MistralTab.qml:415 package/contents/ui/main.qml:1848
+#: package/contents/ui/main.qml:1938 package/contents/ui/main.qml:2436
 msgid " tokens"
 msgstr " jetons"
 
@@ -360,7 +360,7 @@ msgstr "Depuis "
 #: package/contents/ui/CopilotTab.qml:226
 #: package/contents/ui/CopilotTab.qml:228 package/contents/ui/MuseTab.qml:241
 #: package/contents/ui/MuseTab.qml:243 package/contents/ui/OpenAiTab.qml:539
-#: package/contents/ui/OpenAiTab.qml:541 package/contents/ui/main.qml:1223
+#: package/contents/ui/OpenAiTab.qml:541 package/contents/ui/main.qml:1229
 msgid "d"
 msgstr "j"
 
@@ -786,7 +786,7 @@ msgstr "Tableau de bord Cursor ↗"
 msgid "Cursor error"
 msgstr "Erreur Cursor"
 
-#: package/contents/ui/CursorTab.qml:331 package/contents/ui/main.qml:2511
+#: package/contents/ui/CursorTab.qml:331 package/contents/ui/main.qml:2517
 msgid "Not signed in"
 msgstr "Non connecté"
 
@@ -869,8 +869,8 @@ msgid_plural "%1 local sessions · "
 msgstr[0] "1 session locale · "
 msgstr[1] "%1 sessions locales · "
 
-#: package/contents/ui/GrokTab.qml:80 package/contents/ui/main.qml:2007
-#: package/contents/ui/main.qml:2496 package/contents/ui/main.qml:2525
+#: package/contents/ui/GrokTab.qml:80 package/contents/ui/main.qml:2013
+#: package/contents/ui/main.qml:2502 package/contents/ui/main.qml:2531
 msgid " tokens · "
 msgstr " jetons · "
 
@@ -894,7 +894,7 @@ msgstr ""
 msgid "Kimi Code plan"
 msgstr "Forfait Kimi Code"
 
-#: package/contents/ui/KimiTab.qml:57 package/contents/ui/main.qml:2471
+#: package/contents/ui/KimiTab.qml:57 package/contents/ui/main.qml:2477
 #: package/contents/tools/aiusage/normalize/moonshot.py:91
 #: package/contents/tools/aiusage/normalize/moonshot.py:119
 #: package/contents/tools/aiusage/providers/kimi_code.py:137
@@ -924,7 +924,7 @@ msgstr ""
 "Lu avec la connexion kimi CLI (~/.kimi-code). Exécutez kimi une fois lorsque "
 "la connexion expire."
 
-#: package/contents/ui/KimiTab.qml:92 package/contents/ui/main.qml:1968
+#: package/contents/ui/KimiTab.qml:92 package/contents/ui/main.qml:1974
 msgid "Kimi Code: "
 msgstr "Kimi Code : "
 
@@ -962,7 +962,7 @@ msgid "Kiro"
 msgstr "Kiro"
 
 #: package/contents/ui/KiroTab.qml:57 package/contents/ui/main.qml:157
-#: package/contents/ui/main.qml:1592
+#: package/contents/ui/main.qml:1598
 #: package/contents/tools/aiusage/normalize/kiro.py:41
 msgid "Credits"
 msgstr "Crédits"
@@ -1263,7 +1263,7 @@ msgstr ""
 
 #: package/contents/ui/OpenAiTab.qml:150 package/contents/ui/OpenAiTab.qml:161
 #: package/contents/ui/OpenAiTab.qml:222 package/contents/ui/OpenAiTab.qml:236
-#: package/contents/ui/main.qml:2352 package/contents/ui/main.qml:2372
+#: package/contents/ui/main.qml:2358 package/contents/ui/main.qml:2378
 msgid "% left"
 msgstr "% restant"
 
@@ -1738,7 +1738,7 @@ msgctxt "chart reset window"
 msgid "5h reset"
 msgstr "réinitialisation 5h"
 
-#: package/contents/ui/UsageChart.qml:785 package/contents/ui/main.qml:1856
+#: package/contents/ui/UsageChart.qml:785 package/contents/ui/main.qml:1862
 msgid "Gemini: "
 msgstr "Gemini : "
 
@@ -1790,7 +1790,7 @@ msgstr "Quota d'outils mensuels Z.AI"
 msgid "Model usage"
 msgstr "Utilisation du modèle"
 
-#: package/contents/ui/main.qml:156 package/contents/ui/main.qml:1591
+#: package/contents/ui/main.qml:156 package/contents/ui/main.qml:1597
 #: package/contents/tools/aiusage/normalize/kiro.py:40
 msgid "Credit"
 msgstr "Crédit"
@@ -1839,343 +1839,335 @@ msgstr "Échec de l'export : impossible de capturer l'image"
 msgid "Saved to "
 msgstr "Enregistré dans "
 
-#: package/contents/ui/main.qml:1058
+#: package/contents/ui/main.qml:1064
 msgctxt "rate limit tier"
 msgid "default"
 msgstr "Par défaut"
 
-#: package/contents/ui/main.qml:1060
+#: package/contents/ui/main.qml:1066
 msgctxt "rate limit tier"
 msgid "pro"
 msgstr "Pro"
 
-#: package/contents/ui/main.qml:1062
+#: package/contents/ui/main.qml:1068
 msgctxt "rate limit tier"
 msgid "max"
 msgstr "Max"
 
-#: package/contents/ui/main.qml:1064
+#: package/contents/ui/main.qml:1070
 msgctxt "rate limit tier"
 msgid "business"
 msgstr "Business"
 
-#: package/contents/ui/main.qml:1066
+#: package/contents/ui/main.qml:1072
 msgctxt "rate limit tier"
 msgid "free"
 msgstr "Free"
 
-#: package/contents/ui/main.qml:1075
+#: package/contents/ui/main.qml:1081
 msgctxt "effort level"
 msgid "high"
 msgstr "élevé"
 
-#: package/contents/ui/main.qml:1077
+#: package/contents/ui/main.qml:1083
 msgctxt "effort level"
 msgid "low"
 msgstr "faible"
 
-#: package/contents/ui/main.qml:1079
+#: package/contents/ui/main.qml:1085
 msgctxt "effort level"
 msgid "medium"
 msgstr "moyen"
 
-#: package/contents/ui/main.qml:1158
+#: package/contents/ui/main.qml:1164
 msgid "~%1m to 100%"
 msgstr "~%1m pour atteindre 100%"
 
-#: package/contents/ui/main.qml:1161
+#: package/contents/ui/main.qml:1167
 msgid "~%1h to 100%"
 msgstr "~%1h pour atteindre 100%"
 
-#: package/contents/ui/main.qml:1163
+#: package/contents/ui/main.qml:1169
 msgid "~%1d to 100%"
 msgstr "~%1j pour atteindre 100%"
 
-#: package/contents/ui/main.qml:1197
+#: package/contents/ui/main.qml:1203
 msgid "≈ same as %1"
 msgstr "≈ identique à %1"
 
-#: package/contents/ui/main.qml:1199
+#: package/contents/ui/main.qml:1205
 msgid "%1 vs %2"
 msgstr "%1 par rapport à %2"
 
-#: package/contents/ui/main.qml:1226
+#: package/contents/ui/main.qml:1232
 msgid "h"
 msgstr "h"
 
-#: package/contents/ui/main.qml:1229
+#: package/contents/ui/main.qml:1235
 msgid "m"
 msgstr "min"
 
-#: package/contents/ui/main.qml:1231
+#: package/contents/ui/main.qml:1237
 msgid "<1m"
 msgstr "< 1 min"
 
-#: package/contents/ui/main.qml:1345
+#: package/contents/ui/main.qml:1351
 msgid "usage backend unavailable"
 msgstr "backend d'utilisation indisponible"
 
-#: package/contents/ui/main.qml:1385 package/contents/tools/aiusage/http.py:78
-msgid "offline"
-msgstr "hors ligne"
-
-#: package/contents/ui/main.qml:1387 package/contents/tools/aiusage/http.py:84
-msgid "rate limited"
-msgstr "limite de débit atteinte"
-
-#: package/contents/ui/main.qml:1832
+#: package/contents/ui/main.qml:1838
 msgid "AI API Usage"
 msgstr "Utilisation de l'API IA"
 
-#: package/contents/ui/main.qml:1837 package/contents/ui/main.qml:1838
+#: package/contents/ui/main.qml:1843 package/contents/ui/main.qml:1844
 msgid " · resetting..."
 msgstr " · réinitialisation..."
 
-#: package/contents/ui/main.qml:1840
+#: package/contents/ui/main.qml:1846
 msgid "Claude 5H: "
 msgstr "Claude 5H : "
 
-#: package/contents/ui/main.qml:1846
+#: package/contents/ui/main.qml:1852
 msgid "Claude 7D: "
 msgstr "Claude 7J : "
 
-#: package/contents/ui/main.qml:1848
+#: package/contents/ui/main.qml:1854
 msgid "Extra budget: "
 msgstr "Budget supplémentaire : "
 
-#: package/contents/ui/main.qml:1848
+#: package/contents/ui/main.qml:1854
 msgid " tokens left"
 msgstr " jetons restants"
 
-#: package/contents/ui/main.qml:1851
+#: package/contents/ui/main.qml:1857
 msgid "Extra usage: "
 msgstr "Utilisation supplémentaire : "
 
-#: package/contents/ui/main.qml:1854
+#: package/contents/ui/main.qml:1860
 msgid "API Cost (30d): $"
 msgstr "Coût API (30j) : $"
 
-#: package/contents/ui/main.qml:1858 package/contents/ui/main.qml:1881
-#: package/contents/ui/main.qml:1887 package/contents/ui/main.qml:1977
+#: package/contents/ui/main.qml:1864 package/contents/ui/main.qml:1887
+#: package/contents/ui/main.qml:1893 package/contents/ui/main.qml:1983
 msgid "Plan: "
 msgstr "Forfait : "
 
-#: package/contents/ui/main.qml:1861 package/contents/ui/main.qml:1890
+#: package/contents/ui/main.qml:1867 package/contents/ui/main.qml:1896
 msgid "Credits: "
 msgstr "Crédits : "
 
-#: package/contents/ui/main.qml:1864 package/contents/ui/main.qml:1893
-#: package/contents/ui/main.qml:1924 package/contents/ui/main.qml:1986
+#: package/contents/ui/main.qml:1870 package/contents/ui/main.qml:1899
+#: package/contents/ui/main.qml:1930 package/contents/ui/main.qml:1992
 msgid "Resets: "
 msgstr "Réinitialisation : "
 
-#: package/contents/ui/main.qml:1867
+#: package/contents/ui/main.qml:1873
 msgid "API usage: configured"
 msgstr "Utilisation API : configurée"
 
-#: package/contents/ui/main.qml:1870
+#: package/contents/ui/main.qml:1876
 msgid "API cost (30d): $"
 msgstr "Coût API (30j) : $"
 
-#: package/contents/ui/main.qml:1873
+#: package/contents/ui/main.qml:1879
 msgid "Codex: signed in"
 msgstr "Codex : connecté"
 
-#: package/contents/ui/main.qml:1873
+#: package/contents/ui/main.qml:1879
 msgid " as "
 msgstr " en tant que "
 
-#: package/contents/ui/main.qml:1876
+#: package/contents/ui/main.qml:1882
 msgid "Codex 5H left: "
 msgstr "Codex 5H restant : "
 
-#: package/contents/ui/main.qml:1876 package/contents/ui/main.qml:1879
+#: package/contents/ui/main.qml:1882 package/contents/ui/main.qml:1885
 msgid " (resets in "
 msgstr " (réinitialisation dans "
 
-#: package/contents/ui/main.qml:1879
+#: package/contents/ui/main.qml:1885
 msgid "Codex weekly left: "
 msgstr "Codex hebdomadaire restant : "
 
-#: package/contents/ui/main.qml:1884
+#: package/contents/ui/main.qml:1890
 msgid "API usage needs an OpenAI API key"
 msgstr "L'utilisation API nécessite une clé API OpenAI"
 
-#: package/contents/ui/main.qml:1896
+#: package/contents/ui/main.qml:1902
 msgid "Overage: "
 msgstr "Dépassement : "
 
-#: package/contents/ui/main.qml:1899
+#: package/contents/ui/main.qml:1905
 msgid "API key: configured"
 msgstr "Clé API : configurée"
 
-#: package/contents/ui/main.qml:1902 package/contents/ui/main.qml:1942
+#: package/contents/ui/main.qml:1908 package/contents/ui/main.qml:1948
 msgid " models available"
 msgstr " modèles disponibles"
 
-#: package/contents/ui/main.qml:1911
+#: package/contents/ui/main.qml:1917
 msgid "Spent: $"
 msgstr "Dépensé : $"
 
-#: package/contents/ui/main.qml:1914
+#: package/contents/ui/main.qml:1920
 msgid "Limit: $"
 msgstr "Limite : $"
 
-#: package/contents/ui/main.qml:1917
+#: package/contents/ui/main.qml:1923
 msgid "Free tier"
 msgstr "Forfait gratuit"
 
-#: package/contents/ui/main.qml:1919 package/contents/ui/main.qml:2420
+#: package/contents/ui/main.qml:1925 package/contents/ui/main.qml:2426
 msgid "Grok credits: "
 msgstr "Crédits Grok : "
 
-#: package/contents/ui/main.qml:1919
+#: package/contents/ui/main.qml:1925
 msgid "Grok CLI connected; billing quota unavailable"
 msgstr "Grok CLI connecté ; quota de facturation indisponible"
 
-#: package/contents/ui/main.qml:1926
+#: package/contents/ui/main.qml:1932
 msgid " local CLI sessions"
 msgstr " sessions CLI locales"
 
-#: package/contents/ui/main.qml:1930 package/contents/ui/main.qml:2430
+#: package/contents/ui/main.qml:1936 package/contents/ui/main.qml:2436
 msgid "Z.AI tokens: "
 msgstr "Jetons Z.AI : "
 
-#: package/contents/ui/main.qml:1934
+#: package/contents/ui/main.qml:1940
 msgid "Tools: "
 msgstr "Outils : "
 
-#: package/contents/ui/main.qml:1936
+#: package/contents/ui/main.qml:1942
 msgid "Tools left: "
 msgstr "Outils restants : "
 
-#: package/contents/ui/main.qml:1939
+#: package/contents/ui/main.qml:1945
 msgid "Level: "
 msgstr "Niveau : "
 
-#: package/contents/ui/main.qml:1947 package/contents/ui/main.qml:2440
+#: package/contents/ui/main.qml:1953 package/contents/ui/main.qml:2446
 msgid "Copilot: "
 msgstr "Copilot : "
 
-#: package/contents/ui/main.qml:1949 package/contents/ui/main.qml:2440
+#: package/contents/ui/main.qml:1955 package/contents/ui/main.qml:2446
 msgid " requests"
 msgstr " requêtes"
 
-#: package/contents/ui/main.qml:1958
+#: package/contents/ui/main.qml:1964
 msgid "Balance: "
 msgstr "Solde : "
 
-#: package/contents/ui/main.qml:1959
+#: package/contents/ui/main.qml:1965
 #: package/contents/tools/aiusage/normalize/deepseek.py:39
 msgid "Available for API calls"
 msgstr "Disponible pour les appels API"
 
-#: package/contents/ui/main.qml:1959
+#: package/contents/ui/main.qml:1965
 msgid "Balance unavailable"
 msgstr "Solde indisponible"
 
-#: package/contents/ui/main.qml:1968
+#: package/contents/ui/main.qml:1974
 msgid "plan quota used up"
 msgstr "quota du forfait épuisé"
 
-#: package/contents/ui/main.qml:1971
+#: package/contents/ui/main.qml:1977
 msgid "Moonshot balance: "
 msgstr "Solde Moonshot : "
 
-#: package/contents/ui/main.qml:1980
+#: package/contents/ui/main.qml:1986
 msgid "Included usage: "
 msgstr "Utilisation incluse : "
 
-#: package/contents/ui/main.qml:1983
+#: package/contents/ui/main.qml:1989
 msgid "Auto: "
 msgstr "Auto : "
 
-#: package/contents/ui/main.qml:1983
+#: package/contents/ui/main.qml:1989
 msgid " · API: "
 msgstr " · API : "
 
-#: package/contents/ui/main.qml:1992
+#: package/contents/ui/main.qml:1998
 msgid "Tokens: "
 msgstr "Jetons : "
 
-#: package/contents/ui/main.qml:1992
+#: package/contents/ui/main.qml:1998
 msgid " (all time)"
 msgstr " (tout temps)"
 
-#: package/contents/ui/main.qml:1993
+#: package/contents/ui/main.qml:1999
 msgid "Sessions: "
 msgstr "Sessions : "
 
-#: package/contents/ui/main.qml:1995
+#: package/contents/ui/main.qml:2001
 msgid "Spend: "
 msgstr "Dépenses : "
 
-#: package/contents/ui/main.qml:2003
+#: package/contents/ui/main.qml:2009
 msgid "Current: "
 msgstr "En cours : "
 
-#: package/contents/ui/main.qml:2005
+#: package/contents/ui/main.qml:2011
 msgid "Weekly: "
 msgstr "Hebdomadaire : "
 
-#: package/contents/ui/main.qml:2007 package/contents/ui/main.qml:2496
-#: package/contents/ui/main.qml:2525
+#: package/contents/ui/main.qml:2013 package/contents/ui/main.qml:2502
+#: package/contents/ui/main.qml:2531
 msgid " sessions"
 msgstr " sessions"
 
-#: package/contents/ui/main.qml:2009
+#: package/contents/ui/main.qml:2015
 msgid "Spend (est.): "
 msgstr "Dépenses (est.) : "
 
-#: package/contents/ui/main.qml:2016
+#: package/contents/ui/main.qml:2022
 msgid "Updated "
 msgstr "Mis à jour "
 
-#: package/contents/ui/main.qml:2016
+#: package/contents/ui/main.qml:2022
 msgid " (stale)"
 msgstr " (obsolète)"
 
-#: package/contents/ui/main.qml:2109
+#: package/contents/ui/main.qml:2115
 msgid "Exported to "
 msgstr "Exporté vers "
 
-#: package/contents/ui/main.qml:2134
+#: package/contents/ui/main.qml:2140
 msgid "Imported %1 points"
 msgstr "%1 points importés"
 
-#: package/contents/ui/main.qml:2144
+#: package/contents/ui/main.qml:2150
 msgid "⚠ history I/O failed"
 msgstr "⚠ échec de lecture/écriture de l'historique"
 
-#: package/contents/ui/main.qml:2152
+#: package/contents/ui/main.qml:2158
 msgid "Choose Popup Background Color"
 msgstr "Choisir la couleur de fond du popup"
 
-#: package/contents/ui/main.qml:2152
+#: package/contents/ui/main.qml:2158
 msgid "Choose Card Background Color"
 msgstr "Choisir la couleur de fond de la carte"
 
-#: package/contents/ui/main.qml:2291
+#: package/contents/ui/main.qml:2297
 msgid "Claude 5-hour: "
 msgstr "Claude 5 heures : "
 
-#: package/contents/ui/main.qml:2307 package/contents/ui/main.qml:2368
+#: package/contents/ui/main.qml:2313 package/contents/ui/main.qml:2374
 #: package/contents/tools/aiusage/contract.py:219
 #: package/contents/tools/aiusage/contract.py:223
 #: package/contents/tools/aiusage/contract.py:233
 msgid "7D"
 msgstr "7 J"
 
-#: package/contents/ui/main.qml:2310
+#: package/contents/ui/main.qml:2316
 msgid "Claude 7-day: "
 msgstr "Claude 7 jours : "
 
-#: package/contents/ui/main.qml:2320
+#: package/contents/ui/main.qml:2326
 msgid "Gemini (Google) quota: "
 msgstr "Quota Gemini (Google) : "
 
-#: package/contents/ui/main.qml:2320 package/contents/ui/main.qml:2339
-#: package/contents/ui/main.qml:2384 package/contents/ui/main.qml:2511
+#: package/contents/ui/main.qml:2326 package/contents/ui/main.qml:2345
+#: package/contents/ui/main.qml:2390 package/contents/ui/main.qml:2517
 msgid ""
 "\n"
 "Plan: "
@@ -2183,11 +2175,11 @@ msgstr ""
 "\n"
 "Forfait : "
 
-#: package/contents/ui/main.qml:2339
+#: package/contents/ui/main.qml:2345
 msgid "External models quota: "
 msgstr "Quota de modèles externes : "
 
-#: package/contents/ui/main.qml:2352
+#: package/contents/ui/main.qml:2358
 msgid ""
 "\n"
 "Codex 5h: "
@@ -2195,7 +2187,7 @@ msgstr ""
 "\n"
 "Codex 5h : "
 
-#: package/contents/ui/main.qml:2352
+#: package/contents/ui/main.qml:2358
 msgid ""
 "\n"
 "Codex weekly: "
@@ -2203,7 +2195,7 @@ msgstr ""
 "\n"
 "Codex hebdomadaire : "
 
-#: package/contents/ui/main.qml:2352
+#: package/contents/ui/main.qml:2358
 msgid ""
 "\n"
 "API usage configured\n"
@@ -2213,7 +2205,7 @@ msgstr ""
 "Utilisation API configurée\n"
 "Coût (30j) : $"
 
-#: package/contents/ui/main.qml:2352
+#: package/contents/ui/main.qml:2358
 msgid ""
 "\n"
 "In: "
@@ -2221,11 +2213,11 @@ msgstr ""
 "\n"
 "Entrées : "
 
-#: package/contents/ui/main.qml:2352
+#: package/contents/ui/main.qml:2358
 msgid "  Out: "
 msgstr "  Sorties : "
 
-#: package/contents/ui/main.qml:2352
+#: package/contents/ui/main.qml:2358
 msgid ""
 "\n"
 "API usage needs an OpenAI API key"
@@ -2233,7 +2225,7 @@ msgstr ""
 "\n"
 "L'utilisation API nécessite une clé API OpenAI"
 
-#: package/contents/ui/main.qml:2352
+#: package/contents/ui/main.qml:2358
 msgid ""
 "\n"
 "Codex signed in"
@@ -2241,11 +2233,11 @@ msgstr ""
 "\n"
 "Codex connecté"
 
-#: package/contents/ui/main.qml:2372
+#: package/contents/ui/main.qml:2378
 msgid "OpenAI Codex weekly: "
 msgstr "OpenAI Codex hebdomadaire : "
 
-#: package/contents/ui/main.qml:2384
+#: package/contents/ui/main.qml:2390
 msgid ""
 "\n"
 "Credits: "
@@ -2253,13 +2245,13 @@ msgstr ""
 "\n"
 "Crédits : "
 
-#: package/contents/ui/main.qml:2395 package/contents/ui/main.qml:2407
+#: package/contents/ui/main.qml:2401 package/contents/ui/main.qml:2413
 #: package/contents/tools/aiusage/normalize/mistral.py:58
 #: package/contents/tools/aiusage/normalize/openrouter.py:44
 msgid "✓ key"
 msgstr "✓ clé"
 
-#: package/contents/ui/main.qml:2396
+#: package/contents/ui/main.qml:2402
 #: package/contents/tools/aiusage/normalize/mistral.py:68
 msgid ""
 "\n"
@@ -2268,7 +2260,7 @@ msgstr ""
 "\n"
 "Clé API configurée"
 
-#: package/contents/ui/main.qml:2396
+#: package/contents/ui/main.qml:2402
 #: package/contents/tools/aiusage/normalize/mistral.py:68
 msgid ""
 "\n"
@@ -2277,7 +2269,7 @@ msgstr ""
 "\n"
 "Aucune clé définie"
 
-#: package/contents/ui/main.qml:2396
+#: package/contents/ui/main.qml:2402
 msgid ""
 "\n"
 "Spend (vibe): $"
@@ -2285,11 +2277,11 @@ msgstr ""
 "\n"
 "Dépenses (vibe) : $"
 
-#: package/contents/ui/main.qml:2396
+#: package/contents/ui/main.qml:2402
 msgid " models"
 msgstr " modèles"
 
-#: package/contents/ui/main.qml:2408
+#: package/contents/ui/main.qml:2414
 msgid ""
 "\n"
 "Used: $"
@@ -2297,7 +2289,7 @@ msgstr ""
 "\n"
 "Utilisé : $"
 
-#: package/contents/ui/main.qml:2408
+#: package/contents/ui/main.qml:2414
 msgid ""
 "\n"
 "Limit: $"
@@ -2305,12 +2297,12 @@ msgstr ""
 "\n"
 "Limite : $"
 
-#: package/contents/ui/main.qml:2420
+#: package/contents/ui/main.qml:2426
 #: package/contents/tools/aiusage/normalize/grok.py:64
 msgid "Grok CLI connected; billing quota is not exposed"
 msgstr "Grok CLI connecté ; le quota de facturation n'est pas exposé"
 
-#: package/contents/ui/main.qml:2430
+#: package/contents/ui/main.qml:2436
 msgid ""
 "\n"
 "Token reset: "
@@ -2318,7 +2310,7 @@ msgstr ""
 "\n"
 "Réinitialisation des tokens : "
 
-#: package/contents/ui/main.qml:2430
+#: package/contents/ui/main.qml:2436
 msgid ""
 "\n"
 "Tools: "
@@ -2326,7 +2318,7 @@ msgstr ""
 "\n"
 "Outils : "
 
-#: package/contents/ui/main.qml:2430
+#: package/contents/ui/main.qml:2436
 msgid ""
 "\n"
 "Tools left: "
@@ -2334,7 +2326,7 @@ msgstr ""
 "\n"
 "Outils restants : "
 
-#: package/contents/ui/main.qml:2452 package/contents/ui/main.qml:2473
+#: package/contents/ui/main.qml:2458 package/contents/ui/main.qml:2479
 msgid ""
 "\n"
 "Balance: "
@@ -2342,7 +2334,7 @@ msgstr ""
 "\n"
 "Solde : "
 
-#: package/contents/ui/main.qml:2452
+#: package/contents/ui/main.qml:2458
 msgid ""
 "\n"
 "Granted: "
@@ -2350,7 +2342,7 @@ msgstr ""
 "\n"
 "Accordé : "
 
-#: package/contents/ui/main.qml:2452
+#: package/contents/ui/main.qml:2458
 msgid ""
 "\n"
 "Topped up: "
@@ -2358,7 +2350,7 @@ msgstr ""
 "\n"
 "Rechargé : "
 
-#: package/contents/ui/main.qml:2452
+#: package/contents/ui/main.qml:2458
 msgid ""
 "\n"
 "No API key set"
@@ -2366,7 +2358,7 @@ msgstr ""
 "\n"
 "Aucune clé API définie"
 
-#: package/contents/ui/main.qml:2473
+#: package/contents/ui/main.qml:2479
 msgid ""
 "\n"
 "Voucher: "
@@ -2374,7 +2366,7 @@ msgstr ""
 "\n"
 "Bon : "
 
-#: package/contents/ui/main.qml:2473
+#: package/contents/ui/main.qml:2479
 msgid ""
 "\n"
 "Cash: "
@@ -2382,7 +2374,7 @@ msgstr ""
 "\n"
 "Espèces : "
 
-#: package/contents/ui/main.qml:2475
+#: package/contents/ui/main.qml:2481
 msgid ""
 "\n"
 "No Moonshot API key or Kimi Code login"
@@ -2390,15 +2382,15 @@ msgstr ""
 "\n"
 "Aucune clé API Moonshot ni connexion Kimi Code"
 
-#: package/contents/ui/main.qml:2492
+#: package/contents/ui/main.qml:2498
 msgid "No sessions yet"
 msgstr "Aucune session pour le moment"
 
-#: package/contents/ui/main.qml:2496
+#: package/contents/ui/main.qml:2502
 msgid " session"
 msgstr " session"
 
-#: package/contents/ui/main.qml:2511
+#: package/contents/ui/main.qml:2517
 msgid ""
 "\n"
 "Included usage: "
@@ -2406,7 +2398,7 @@ msgstr ""
 "\n"
 "Utilisation incluse : "
 
-#: package/contents/ui/main.qml:2525
+#: package/contents/ui/main.qml:2531
 msgid ""
 "\n"
 "Current: "
@@ -2414,7 +2406,7 @@ msgstr ""
 "\n"
 "Actuel : "
 
-#: package/contents/ui/main.qml:2525
+#: package/contents/ui/main.qml:2531
 msgid ""
 "\n"
 "Weekly: "
@@ -2422,7 +2414,7 @@ msgstr ""
 "\n"
 "Hebdomadaire : "
 
-#: package/contents/ui/main.qml:2525
+#: package/contents/ui/main.qml:2531
 msgid ""
 "\n"
 "No local sessions yet"
@@ -2430,7 +2422,7 @@ msgstr ""
 "\n"
 "Aucune session locale pour le moment"
 
-#: package/contents/ui/main.qml:2525
+#: package/contents/ui/main.qml:2531
 msgid ""
 "\n"
 "Spend (est.): "
@@ -2438,127 +2430,127 @@ msgstr ""
 "\n"
 "Dépense (est.) : "
 
-#: package/contents/ui/main.qml:2737
+#: package/contents/ui/main.qml:2743
 msgid "Settings"
 msgstr "Paramètres"
 
-#: package/contents/ui/main.qml:2741
+#: package/contents/ui/main.qml:2747
 msgid "Claude Usage"
 msgstr "Utilisation Claude"
 
-#: package/contents/ui/main.qml:2744
+#: package/contents/ui/main.qml:2750
 msgid "Antigravity Usage"
 msgstr "Utilisation Antigravity"
 
-#: package/contents/ui/main.qml:2747
+#: package/contents/ui/main.qml:2753
 msgid "OpenAI Usage"
 msgstr "Utilisation OpenAI"
 
-#: package/contents/ui/main.qml:2750
+#: package/contents/ui/main.qml:2756
 msgid "Kiro Usage"
 msgstr "Utilisation Kiro"
 
-#: package/contents/ui/main.qml:2753
+#: package/contents/ui/main.qml:2759
 msgid "Mistral Usage"
 msgstr "Utilisation Mistral"
 
-#: package/contents/ui/main.qml:2756
+#: package/contents/ui/main.qml:2762
 msgid "OpenRouter Usage"
 msgstr "Utilisation OpenRouter"
 
-#: package/contents/ui/main.qml:2759
+#: package/contents/ui/main.qml:2765
 msgid "Grok Usage"
 msgstr "Utilisation Grok"
 
-#: package/contents/ui/main.qml:2762
+#: package/contents/ui/main.qml:2768
 msgid "Z.AI Usage"
 msgstr "Utilisation Z.AI"
 
-#: package/contents/ui/main.qml:2765
+#: package/contents/ui/main.qml:2771
 msgid "Copilot Usage"
 msgstr "Utilisation Copilot"
 
-#: package/contents/ui/main.qml:2768
+#: package/contents/ui/main.qml:2774
 msgid "DeepSeek Balance"
 msgstr "Solde DeepSeek"
 
-#: package/contents/ui/main.qml:2771
+#: package/contents/ui/main.qml:2777
 msgid "Kimi Usage"
 msgstr "Utilisation Kimi"
 
-#: package/contents/ui/main.qml:2771
+#: package/contents/ui/main.qml:2777
 msgid "Kimi Balance"
 msgstr "Solde Kimi"
 
-#: package/contents/ui/main.qml:2774
+#: package/contents/ui/main.qml:2780
 msgid "Cursor Usage"
 msgstr "Utilisation Cursor"
 
-#: package/contents/ui/main.qml:2777
+#: package/contents/ui/main.qml:2783
 msgid "Cline Stats"
 msgstr "Statistiques Cline"
 
-#: package/contents/ui/main.qml:2779 translate/metadata-i18n.js:9
+#: package/contents/ui/main.qml:2785 translate/metadata-i18n.js:9
 msgid "AI Usage Monitor"
 msgstr "Moniteur d'utilisation IA"
 
-#: package/contents/ui/main.qml:2792
+#: package/contents/ui/main.qml:2798
 msgid "Colors, chart and popup style"
 msgstr "Couleurs, graphique et style de la fenêtre contextuelle"
 
-#: package/contents/ui/main.qml:2795
+#: package/contents/ui/main.qml:2801
 msgid "Refresh interval and usage history"
 msgstr "Intervalle de rafraîchissement et historique d'utilisation"
 
-#: package/contents/ui/main.qml:2798
+#: package/contents/ui/main.qml:2804
 msgid "Python interpreter and terminal tool"
 msgstr "Interpréteur Python et outil terminal"
 
-#: package/contents/ui/main.qml:2800
+#: package/contents/ui/main.qml:2806
 msgid "Turn providers on and set their keys"
 msgstr "Activer les fournisseurs et configurer leurs clés"
 
-#: package/contents/ui/main.qml:2822
+#: package/contents/ui/main.qml:2828
 msgid "Export current tab as PNG or SVG"
 msgstr "Exporter l'onglet actuel en PNG ou SVG"
 
-#: package/contents/ui/main.qml:2829
+#: package/contents/ui/main.qml:2835
 msgid "Export as PNG"
 msgstr "Exporter en PNG"
 
-#: package/contents/ui/main.qml:2835
+#: package/contents/ui/main.qml:2841
 msgid "Export as SVG"
 msgstr "Exporter en SVG"
 
-#: package/contents/ui/main.qml:2997
+#: package/contents/ui/main.qml:3003
 msgid "Unpin from panel"
 msgstr "Détacher du panneau"
 
-#: package/contents/ui/main.qml:2997
+#: package/contents/ui/main.qml:3003
 msgid "Pin on panel"
 msgstr "Épingler au panneau"
 
-#: package/contents/ui/main.qml:3135
+#: package/contents/ui/main.qml:3141
 msgid "Combined API spend"
 msgstr "Dépense API combinée"
 
-#: package/contents/ui/main.qml:3137
+#: package/contents/ui/main.qml:3143
 msgid "Claude (30d): $"
 msgstr "Claude (30j) : $"
 
-#: package/contents/ui/main.qml:3140
+#: package/contents/ui/main.qml:3146
 msgid "OpenAI (30d): $"
 msgstr "OpenAI (30j) : $"
 
-#: package/contents/ui/main.qml:3143
+#: package/contents/ui/main.qml:3149
 msgid "OpenRouter (all-time): $"
 msgstr "OpenRouter (total) : $"
 
-#: package/contents/ui/main.qml:3152
+#: package/contents/ui/main.qml:3158
 msgid "updated "
 msgstr "mis à jour "
 
-#: package/contents/ui/main.qml:3152
+#: package/contents/ui/main.qml:3158
 msgid " · stale"
 msgstr " · obsolète"
 
@@ -2570,7 +2562,7 @@ msgstr ""
 "Suivi multi-services de quotas IA avec ventilation des coûts (Claude, "
 "Antigravity, OpenAI, Grok, Kiro, OpenRouter & Mistral)"
 
-#: package/contents/tools/aiusage/collect.py:108
+#: package/contents/tools/aiusage/collect.py:107
 msgid "parse error"
 msgstr "erreur d'analyse"
 
@@ -2635,6 +2627,10 @@ msgstr "%s (hors ligne)"
 msgid "unavailable"
 msgstr "indisponible"
 
+#: package/contents/tools/aiusage/http.py:78
+msgid "offline"
+msgstr "hors ligne"
+
 #: package/contents/tools/aiusage/http.py:80
 msgid "token expired"
 msgstr "jeton expiré"
@@ -2642,6 +2638,10 @@ msgstr "jeton expiré"
 #: package/contents/tools/aiusage/http.py:82
 msgid "access denied"
 msgstr "accès refusé"
+
+#: package/contents/tools/aiusage/http.py:84
+msgid "rate limited"
+msgstr "limite de débit atteinte"
 
 #: package/contents/tools/aiusage/http.py:85
 #, python-format
@@ -3231,46 +3231,46 @@ msgstr "Jetons Z.AI (7 j) : %s%%"
 msgid "Z.AI tools: %s%%"
 msgstr "Outils Z.AI : %s%%"
 
-#: package/contents/tools/aiusage/providers/antigravity.py:369
+#: package/contents/tools/aiusage/providers/antigravity.py:368
 msgid "Antigravity language server found but could not connect to API"
 msgstr ""
 "Serveur linguistique Antigravity trouvé mais impossible de se connecter à "
 "l'API"
 
-#: package/contents/tools/aiusage/providers/antigravity.py:371
+#: package/contents/tools/aiusage/providers/antigravity.py:370
 msgid "Finding Antigravity on this platform needs the psutil package"
 msgstr "Trouver Antigravity sur cette plateforme nécessite le paquet psutil"
 
-#: package/contents/tools/aiusage/providers/antigravity.py:372
+#: package/contents/tools/aiusage/providers/antigravity.py:371
 msgid "Antigravity is not running. Please open your IDE."
 msgstr "Antigravity n'est pas en cours d'exécution. Veuillez ouvrir votre IDE."
 
-#: package/contents/tools/aiusage/providers/copilot.py:253
+#: package/contents/tools/aiusage/providers/copilot.py:252
 msgid "Invalid GitHub token"
 msgstr "Jeton GitHub invalide"
 
-#: package/contents/tools/aiusage/providers/copilot.py:257
+#: package/contents/tools/aiusage/providers/copilot.py:256
 msgid "GitHub username missing"
 msgstr "Nom d'utilisateur GitHub manquant"
 
-#: package/contents/tools/aiusage/providers/copilot.py:268
+#: package/contents/tools/aiusage/providers/copilot.py:267
 msgid "GitHub token cannot read Copilot premium request usage"
 msgstr ""
 "Le jeton GitHub ne peut pas lire l'utilisation des demandes premium Copilot"
 
-#: package/contents/tools/aiusage/providers/copilot.py:273
+#: package/contents/tools/aiusage/providers/copilot.py:272
 msgid "GitHub Copilot invalid JSON"
 msgstr "JSON Copilot GitHub invalide"
 
-#: package/contents/tools/aiusage/providers/cursor.py:156
+#: package/contents/tools/aiusage/providers/cursor.py:155
 msgid "login expired — run cursor-agent login"
 msgstr "Connexion expirée — exécutez cursor-agent login"
 
-#: package/contents/tools/aiusage/providers/cursor.py:160
+#: package/contents/tools/aiusage/providers/cursor.py:159
 msgid "login rejected — run cursor-agent login"
 msgstr "Connexion rejetée — exécutez cursor-agent login"
 
-#: package/contents/tools/aiusage/providers/cursor.py:165
+#: package/contents/tools/aiusage/providers/cursor.py:164
 msgid "usage response could not be parsed"
 msgstr "La réponse d'utilisation n'a pas pu être analysée"
 
@@ -3318,39 +3318,39 @@ msgid "Kimi Code login expired — run kimi once to refresh it"
 msgstr ""
 "Connexion Kimi Code expirée — exécutez kimi une fois pour la rafraîchir"
 
-#: package/contents/tools/aiusage/providers/kiro.py:168
+#: package/contents/tools/aiusage/providers/kiro.py:167
 msgid "No Kiro usage snapshot — open Kiro and let it refresh"
 msgstr ""
 "Aucun instantané d'utilisation Kiro — ouvrez Kiro et laissez-le se rafraîchir"
 
-#: package/contents/tools/aiusage/providers/kiro.py:170
+#: package/contents/tools/aiusage/providers/kiro.py:169
 msgid "Kiro usage payload could not be parsed"
 msgstr "La charge d'utilisation Kiro n'a pas pu être analysée"
 
-#: package/contents/tools/aiusage/providers/kiro.py:247
+#: package/contents/tools/aiusage/providers/kiro.py:246
 msgid "Kiro usage response could not be parsed"
 msgstr "La réponse d'utilisation Kiro n'a pas pu être analysée"
 
-#: package/contents/tools/aiusage/providers/kiro.py:254
+#: package/contents/tools/aiusage/providers/kiro.py:253
 msgid "Kiro usage response has no credit breakdown"
 msgstr ""
 "La réponse d'utilisation Kiro ne contient pas de ventilation des crédits"
 
-#: package/contents/tools/aiusage/providers/kiro.py:284
+#: package/contents/tools/aiusage/providers/kiro.py:283
 msgid "kiro-cli is not signed in — run kiro-cli login"
 msgstr "kiro-cli n'est pas connecté — exécutez kiro-cli login"
 
-#: package/contents/tools/aiusage/providers/kiro.py:287
+#: package/contents/tools/aiusage/providers/kiro.py:286
 msgid "kiro-cli login expired — run kiro-cli once to refresh it"
 msgstr ""
 "Connexion kiro-cli expirée — exécutez kiro-cli une fois pour la rafraîchir"
 
-#: package/contents/tools/aiusage/providers/kiro.py:299
+#: package/contents/tools/aiusage/providers/kiro.py:298
 msgid "kiro-cli login rejected — run kiro-cli once to refresh it"
 msgstr ""
 "Connexion kiro-cli rejetée — exécutez kiro-cli une fois pour la rafraîchir"
 
-#: package/contents/tools/aiusage/providers/kiro.py:318
+#: package/contents/tools/aiusage/providers/kiro.py:317
 msgid "No Kiro state found — sign in to Kiro IDE or kiro-cli once"
 msgstr ""
 "Aucun état Kiro trouvé — connectez-vous à Kiro IDE ou exécutez kiro-cli une "

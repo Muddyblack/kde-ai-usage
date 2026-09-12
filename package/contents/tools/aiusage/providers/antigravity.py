@@ -20,9 +20,8 @@ import subprocess
 import urllib.error
 import urllib.request
 
-from .. import paths
+from .. import N_, paths
 from ..http import as_json
-from ..i18n import _
 
 _HAS_PROC = os.path.isdir("/proc/self")
 
@@ -366,7 +365,7 @@ def get_antigravity_usage():
             return _format_agy_usage(agy_data)
 
     if found_any_process:
-        return {"error": _("Antigravity language server found but could not connect to API")}
+        return {"error": N_("Antigravity language server found but could not connect to API")}
     if not _HAS_PROC and _psutil() is None:
-        return {"error": _("Finding Antigravity on this platform needs the psutil package")}
-    return {"error": _("Antigravity is not running. Please open your IDE.")}
+        return {"error": N_("Finding Antigravity on this platform needs the psutil package")}
+    return {"error": N_("Antigravity is not running. Please open your IDE.")}

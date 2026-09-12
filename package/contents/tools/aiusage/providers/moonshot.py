@@ -2,9 +2,9 @@
 
 import os
 
+from .. import N_
 from ..contract import num
 from ..http import as_json, error_json, fetch_json, http_error_json, resolve_key
-from ..i18n import _
 
 
 def _moonshot_key():
@@ -32,14 +32,14 @@ def get_moonshot_balance():
         fixture_path=os.environ.get("MOONSHOT_BALANCE_RESPONSE_FILE"),
     )
     if result.status != 200:
-        return http_error_json("Kimi", result.status, _("Invalid Moonshot API key"))
+        return http_error_json("Kimi", result.status, N_("Invalid Moonshot API key"))
 
     body = as_json(result.body)
     if not isinstance(body, dict):
-        return error_json(_("Kimi invalid JSON"))
+        return error_json(N_("Kimi invalid JSON"))
     data = body.get("data")
     if body.get("status") is False or not isinstance(data, dict):
-        return {"hasKey": True, "keyValid": False, "error": body.get("message") or body.get("msg") or _("Kimi unexpected response")}
+        return {"hasKey": True, "keyValid": False, "error": body.get("message") or body.get("msg") or N_("Kimi unexpected response")}
 
     return {
         "hasKey": True,

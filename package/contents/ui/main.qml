@@ -1046,6 +1046,12 @@ PlasmoidItem {
     // Rate-limit tier shown in the Claude header, with the known words
     // localized ("default_claude_ai" → "Par défaut", "default_max_20x" →
     // "Par défaut Max 20x", …). Unknown words keep a capitalized form.
+    // Backend strings travel as stable English tokens (the wire contract is not
+    // localized); the QML translates them only when it shows them.
+    function tr(text) {
+        return text ? i18n(text) : text;
+    }
+
     function claudeTierLabel() {
         var raw = root.claudeRateLimitTier;
         if (!raw)
@@ -1380,11 +1386,11 @@ PlasmoidItem {
             return;
         }
         root.stale = root.lastUpdate !== "";
-        // The backend's error vocabulary is translated, so match either the
-        // canonical English token or its translation.
-        if (activeError === "offline" || activeError === i18n("offline")) {
+        // The backend emits these as stable English tokens (the wire contract is
+        // not localized); only the displayed string is translated, by tr().
+        if (activeError === "offline") {
             offlineRetryTimer.restart();
-        } else if (activeError === "rate limited" || activeError === i18n("rate limited")) {
+        } else if (activeError === "rate limited") {
             root.backoffMs = 300000;
             backoffTimer.interval = root.backoffMs;
             backoffTimer.restart();
@@ -1902,7 +1908,7 @@ PlasmoidItem {
                 lines.push(root.mistralAvailableModels.length + i18n(" models available"));
 
             if (root.mistralError)
-                lines.push("⚠ " + root.mistralError);
+                lines.push("⚠ " + root.tr(root.mistralError));
         } else if (tab === "openrouter") {
             if (root.openrouterLabel)
                 lines.push(root.openrouterLabel);
@@ -1925,7 +1931,7 @@ PlasmoidItem {
 
             lines.push(root.grokSessionCount + i18n(" local CLI sessions"));
             if (root.grokError)
-                lines.push("⚠ " + root.grokError);
+                lines.push("⚠ " + root.tr(root.grokError));
         } else if (tab === "zai") {
             lines.push(i18n("Z.AI tokens: ") + Math.round(root.zaiTokenPct) + "%" + (root.zaiTokenCountdown ? " (" + root.zaiTokenCountdown + ")" : ""));
             if (root.zaiTokenUsed !== null && root.zaiTokenLimit !== null && root.zaiTokenLimit > 0)
@@ -1942,7 +1948,7 @@ PlasmoidItem {
                 lines.push(root.zaiModels.length + i18n(" models available"));
 
             if (root.zaiError)
-                lines.push("⚠ " + root.zaiError);
+                lines.push("⚠ " + root.tr(root.zaiError));
         } else if (tab === "copilot") {
             lines.push(i18n("Copilot: ") + Math.round(root.copilotPct) + "%" + (root.copilotCountdown ? " (" + root.copilotCountdown + ")" : ""));
             if (root.copilotQuota > 0)
@@ -1952,14 +1958,14 @@ PlasmoidItem {
                 lines.push(root.copilotUsername);
 
             if (root.copilotError)
-                lines.push("⚠ " + root.copilotError);
+                lines.push("⚠ " + root.tr(root.copilotError));
         } else if (tab === "deepseek") {
             if (root.deepseekKeyValid) {
                 lines.push(i18n("Balance: ") + root.formatMoney(root.deepseekPrimaryTotal, root.deepseekPrimaryCurrency));
                 lines.push(root.deepseekIsAvailable ? i18n("Available for API calls") : i18n("Balance unavailable"));
             }
             if (root.deepseekError)
-                lines.push("⚠ " + root.deepseekError);
+                lines.push("⚠ " + root.tr(root.deepseekError));
         } else if (tab === "kimi") {
             for (var k = 0; k < root.kimiPlanWindows.length; k++)
                 lines.push(root.kimiPlanWindows[k].label + ": " + Math.round(root.kimiPlanWindows[k].pct) + "%");
@@ -1971,7 +1977,7 @@ PlasmoidItem {
                 lines.push(i18n("Moonshot balance: ") + root.formatMoney(root.kimiAvailableBalance, "USD"));
 
             if (root.kimiError)
-                lines.push("⚠ " + root.kimiError);
+                lines.push("⚠ " + root.tr(root.kimiError));
         } else if (tab === "cursor") {
             if (root.cursorPlanName)
                 lines.push(i18n("Plan: ") + root.cursorPlanName);
@@ -1986,7 +1992,7 @@ PlasmoidItem {
                 lines.push(i18n("Resets: ") + root.cursorResetTime + (root.cursorCountdown ? " (" + root.cursorCountdown + ")" : ""));
 
             if (root.cursorError)
-                lines.push("⚠ " + root.cursorError);
+                lines.push("⚠ " + root.tr(root.cursorError));
         } else if (tab === "cline") {
             if (root.clineStats.available === true) {
                 lines.push(i18n("Tokens: ") + root.formatTokens(root.clineStats.totalTokens || 0) + i18n(" (all time)"));
@@ -1996,7 +2002,7 @@ PlasmoidItem {
             }
 
             if (root.clineError)
-                lines.push("⚠ " + root.clineError);
+                lines.push("⚠ " + root.tr(root.clineError));
         } else if (tab === "muse") {
             lines.push("Muse" + (root.museModel ? " · " + root.museModel : ""));
             if (root.museCurrentAvailable)
@@ -2008,10 +2014,10 @@ PlasmoidItem {
             if (root.museCostUSD > 0)
                 lines.push(i18n("Spend (est.): ") + root.formatMoney(root.museCostUSD, root.museCurrency));
             if (root.museError)
-                lines.push("⚠ " + root.museError);
+                lines.push("⚠ " + root.tr(root.museError));
         }
         if (root.errorMsg !== "")
-            lines.push("⚠ " + root.errorMsg);
+            lines.push("⚠ " + root.tr(root.errorMsg));
         else if (root.lastUpdate !== "")
             lines.push(i18n("Updated ") + root.lastUpdate + (root.stale ? i18n(" (stale)") : ""));
         return lines.join("\n");
@@ -3093,7 +3099,7 @@ PlasmoidItem {
 
                 PlasmaComponents.Label {
                     visible: root.errorMsg !== ""
-                    text: root.errorMsg
+                    text: root.tr(root.errorMsg)
                     color: root.dangerColor
                     font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                     Layout.alignment: Qt.AlignVCenter

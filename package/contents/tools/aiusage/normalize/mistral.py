@@ -1,5 +1,5 @@
+from .. import N_
 from ..contract import flat_window, money, monthly_window, num, provider_base, provider_error
-from ..i18n import _
 
 
 def normalize_mistral(raw):
@@ -12,7 +12,7 @@ def normalize_mistral(raw):
             "Mistral",
             "#ff7000",
             now,
-            _("Mistral: no API key configured"),
+            N_("Mistral: no API key configured"),
             {"hasKey": False, "keyValid": False},
         )
 
@@ -46,16 +46,16 @@ def normalize_mistral(raw):
     r["summary"] = {
         "pct": pct,
         "text": money(cost, "USD"),
-        "detail": _("%s models available") % len(models),
+        "detail": N_("%s models available") % len(models),
         "hasChart": True,
     }
-    qw = flat_window("mistral", _("vibe CLI spend"), pct, 0, _("%s total") % money(cost, "USD"), True)
-    qw["resetText"] = _("$50 soft cap")
+    qw = flat_window("mistral", N_("vibe CLI spend"), pct, 0, N_("%s total") % money(cost, "USD"), True)
+    qw["resetText"] = N_("$50 soft cap")
     r["quotaWindows"] = [qw]
     if cost > 0:
         text = money(cost, "USD")
     elif valid:
-        text = _("✓ key")
+        text = N_("✓ key")
     else:
         text = "—"
     r["slots"] = [
@@ -65,8 +65,8 @@ def normalize_mistral(raw):
             "text": text,
             "tooltip": (
                 "Mistral AI"
-                + (_("\nAPI key configured") if valid else _("\nNo key set"))
-                + (_("\nSpend (vibe): %s") % money(cost, "USD") if cost > 0 else "")
+                + (N_("\nAPI key configured") if valid else N_("\nNo key set"))
+                + (N_("\nSpend (vibe): %s") % money(cost, "USD") if cost > 0 else "")
             ),
         }
     ]

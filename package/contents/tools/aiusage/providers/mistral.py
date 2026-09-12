@@ -9,8 +9,8 @@ Ported from tools/sh/get-mistral-usage. Mistral has no public billing API, so:
 import os
 import re
 
+from .. import N_
 from ..http import as_json, fetch_json, resolve_key
-from ..i18n import _
 
 
 def _vibe_key():
@@ -122,7 +122,7 @@ def get_mistral_usage():
     if result.status == 200:
         body = as_json(result.body)
         if body is None:
-            return {**base, "hasKey": True, "keyValid": False, "error": _("Mistral invalid JSON")}
+            return {**base, "hasKey": True, "keyValid": False, "error": N_("Mistral invalid JSON")}
         return {
             **base,
             "hasKey": True,
@@ -130,9 +130,9 @@ def get_mistral_usage():
             "availableModels": [m.get("id") for m in (body.get("data") or []) if m.get("id")],
         }
     if result.status in (401, 403):
-        return {**base, "hasKey": True, "keyValid": False, "error": _("Invalid API key (401)")}
+        return {**base, "hasKey": True, "keyValid": False, "error": N_("Invalid API key (401)")}
     if result.status == 429:
-        return {**base, "hasKey": True, "keyValid": True, "error": _("Rate limited (429)")}
+        return {**base, "hasKey": True, "keyValid": True, "error": N_("Rate limited (429)")}
     if result.status in (0, None, ""):
-        return {**base, "hasKey": True, "keyValid": False, "error": _("Mistral network error")}
-    return {**base, "hasKey": True, "keyValid": False, "error": _("HTTP %s") % result.status}
+        return {**base, "hasKey": True, "keyValid": False, "error": N_("Mistral network error")}
+    return {**base, "hasKey": True, "keyValid": False, "error": N_("HTTP %s") % result.status}

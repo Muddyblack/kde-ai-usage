@@ -129,7 +129,7 @@ ColumnLayout {
             color: "#ef4444"
         }
         PlasmaComponents.Label {
-            text: rootItem.kimiError
+            text: rootItem.tr(rootItem.kimiError)
             font.pixelSize: 10
             opacity: 0.7
             color: Kirigami.Theme.textColor
@@ -181,7 +181,7 @@ ColumnLayout {
                 RowLayout {
                     Layout.fillWidth: true
                     PlasmaComponents.Label {
-                        text: modelData.label
+                        text: rootItem.tr(modelData.label)
                         font.pixelSize: 11
                         opacity: 0.65
                         color: Kirigami.Theme.textColor

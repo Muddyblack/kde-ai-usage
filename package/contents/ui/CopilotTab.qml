@@ -107,7 +107,7 @@ ColumnLayout {
         }
 
         PlasmaComponents.Label {
-            text: rootItem.copilotError
+            text: rootItem.tr(rootItem.copilotError)
             font.pixelSize: 10
             opacity: 0.7
             color: Kirigami.Theme.textColor

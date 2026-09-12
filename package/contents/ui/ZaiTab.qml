@@ -100,7 +100,7 @@ ColumnLayout {
         }
 
         PlasmaComponents.Label {
-            text: rootItem.zaiError
+            text: rootItem.tr(rootItem.zaiError)
             font.pixelSize: 10
             opacity: 0.7
             color: Kirigami.Theme.textColor

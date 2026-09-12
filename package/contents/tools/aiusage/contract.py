@@ -10,7 +10,7 @@ import datetime
 import math
 import re
 
-from .i18n import _
+from . import N_
 
 SCHEMA_VERSION = 1
 
@@ -208,30 +208,30 @@ def rolling_windows(session_id, day_id, weekly_id, session_key, weekly_key, sess
     has_weekly = bool(weekly and weekly.get("available"))
 
     if has_session:
-        out.append(resetting(chart_window(session_id, session_key, _("5H"), 18000000, "5h"), 18000000, session))
-        out.append(resetting(chart_window(day_id, session_key, _("24H"), 86400000, "24h"), 18000000, session))
+        out.append(resetting(chart_window(session_id, session_key, N_("5H"), 18000000, "5h"), 18000000, session))
+        out.append(resetting(chart_window(day_id, session_key, N_("24H"), 86400000, "24h"), 18000000, session))
     elif has_weekly:
-        out.append(resetting(chart_window(session_id, weekly_key, _("5H"), 18000000, "5h"), 604800000, weekly))
-        out.append(resetting(chart_window(day_id, weekly_key, _("24H"), 86400000, "24h"), 604800000, weekly))
+        out.append(resetting(chart_window(session_id, weekly_key, N_("5H"), 18000000, "5h"), 604800000, weekly))
+        out.append(resetting(chart_window(day_id, weekly_key, N_("24H"), 86400000, "24h"), 604800000, weekly))
 
     if has_weekly:
         m_id = monthly_id or f"{weekly_id}_30d"
-        out.append(resetting(chart_window(weekly_id, weekly_key, _("7D"), 604800000, "7d"), 604800000, weekly))
-        out.append(resetting(chart_window(m_id, weekly_key, _("30D"), 2592000000, "30d"), 604800000, weekly))
+        out.append(resetting(chart_window(weekly_id, weekly_key, N_("7D"), 604800000, "7d"), 604800000, weekly))
+        out.append(resetting(chart_window(m_id, weekly_key, N_("30D"), 2592000000, "30d"), 604800000, weekly))
     elif has_session:
         m_id = monthly_id or f"{session_id}_30d"
-        out.append(resetting(chart_window(weekly_id, session_key, _("7D"), 604800000, "7d"), 18000000, session))
-        out.append(resetting(chart_window(m_id, session_key, _("30D"), 2592000000, "30d"), 18000000, session))
+        out.append(resetting(chart_window(weekly_id, session_key, N_("7D"), 604800000, "7d"), 18000000, session))
+        out.append(resetting(chart_window(m_id, session_key, N_("30D"), 2592000000, "30d"), 18000000, session))
 
     return out
 
 
 def monthly_window(id_prefix, key, raw):
     return [
-        {**chart_window(f"{id_prefix}_5h", key, _("5H"), 18000000, "5h"), "raw": raw},
-        {**chart_window(f"{id_prefix}_24h", key, _("24H"), 86400000, "24h"), "raw": raw},
-        {**chart_window(f"{id_prefix}_7d", key, _("7D"), 604800000, "7d"), "raw": raw},
-        {**chart_window(f"{id_prefix}_30d", key, _("30D"), 2592000000, "30d"), "raw": raw},
+        {**chart_window(f"{id_prefix}_5h", key, N_("5H"), 18000000, "5h"), "raw": raw},
+        {**chart_window(f"{id_prefix}_24h", key, N_("24H"), 86400000, "24h"), "raw": raw},
+        {**chart_window(f"{id_prefix}_7d", key, N_("7D"), 604800000, "7d"), "raw": raw},
+        {**chart_window(f"{id_prefix}_30d", key, N_("30D"), 2592000000, "30d"), "raw": raw},
     ]
 
 
@@ -295,7 +295,7 @@ _COMPONENT_INDICATOR = {
     "major_outage": "critical",
 }
 _INDICATOR_RANK = {"none": 0, "minor": 1, "major": 2, "critical": 3}
-_SCOPED_DESCRIPTION = {"none": _("operational"), "minor": _("degraded"), "major": _("partial outage"), "critical": _("major outage")}
+_SCOPED_DESCRIPTION = {"none": N_("operational"), "minor": N_("degraded"), "major": N_("partial outage"), "critical": N_("major outage")}
 
 
 def status_summary(d, id_=""):
@@ -328,7 +328,7 @@ def _statuspage_summary(d, url, only):
         indicator = max((_COMPONENT_INDICATOR.get(c.get("status"), "none") for c in rows), key=_INDICATOR_RANK.get, default="none")
         if indicator == "none" and incidents:
             indicator = "minor"
-        description = _("%s %s") % (only, _SCOPED_DESCRIPTION[indicator])
+        description = N_("%s %s") % (only, _SCOPED_DESCRIPTION[indicator])
     body = ""
     for inc in incidents:
         updates = inc.get("incident_updates") or []
@@ -367,15 +367,15 @@ def _gatus_summary(d, url):
     if checked == 0:
         return empty_status(url)
     if not down:
-        indicator, description = "none", _("All Systems Operational")
+        indicator, description = "none", N_("All Systems Operational")
     elif len(down) == checked:
-        indicator, description = "critical", _("All checks failing")
+        indicator, description = "critical", N_("All checks failing")
     else:
-        indicator, description = "major", _("%s of %s checks failing") % (len(down), checked)
+        indicator, description = "major", N_("%s of %s checks failing") % (len(down), checked)
     return {
         "indicator": indicator,
         "description": description,
-        "components": [_("%s (down)") % name for name in down],
+        "components": [N_("%s (down)") % name for name in down],
         "incidents": [],
         "latestUpdate": "",
         "url": url,
@@ -406,7 +406,7 @@ def provider_error(id_, label, accent, now, error, details):
     r["ok"] = False
     r["stale"] = True
     r["error"] = error
-    r["summary"] = {"pct": 0, "text": _("unavailable"), "detail": error, "hasChart": True}
+    r["summary"] = {"pct": 0, "text": N_("unavailable"), "detail": error, "hasChart": True}
     r["slots"] = [{"pct": 0, "color": accent, "text": "—", "tooltip": error}]
     r["details"] = details
     return r

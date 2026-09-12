@@ -1,5 +1,5 @@
+from .. import N_
 from ..contract import epoch_of, flat_window, jround, monthly_window, num, pct_clamp, provider_base, provider_error
-from ..i18n import _
 
 
 def _family(m):
@@ -16,12 +16,12 @@ def normalize_antigravity(raw):
     res = raw["inputs"].get("usage") or {}
 
     if not isinstance(res, dict) or not res:
-        return provider_error("antigravity", "Antigravity", "#4285f4", now, _("Antigravity not configured"), {})
+        return provider_error("antigravity", "Antigravity", "#4285f4", now, N_("Antigravity not configured"), {})
 
     if res.get("error") is not None:
         first_line = (res["error"] or "").split("\n")[0]
         if "Antigravity is not running" in first_line:
-            first_line = _("Antigravity is not running in IDE")
+            first_line = N_("Antigravity is not running in IDE")
         return provider_error("antigravity", "Antigravity", "#4285f4", now, first_line, {})
 
     models = []
@@ -60,7 +60,7 @@ def normalize_antigravity(raw):
         groups.append(
             {
                 "key": key,
-                "label": _("Gemini Models") if key == "gemini" else _("Claude & GPT Models"),
+                "label": N_("Gemini Models") if key == "gemini" else N_("Claude & GPT Models"),
                 "usedPct": _avg([m["usedPct"] for m in group_quoted]),
                 "resetAt": min(group_resets) if group_resets else 0,
                 "isExhausted": any(m["isExhausted"] for m in group),
@@ -77,7 +77,7 @@ def normalize_antigravity(raw):
     for grp in groups:
         detail = ""
         if grp["key"] == "gemini" and num(credits.get("monthly")) > 0:
-            detail = _("%s / %s credits") % (num(credits.get("available")), num(credits.get("monthly")))
+            detail = N_("%s / %s credits") % (num(credits.get("available")), num(credits.get("monthly")))
         qw = flat_window(grp["key"], grp["label"], grp["usedPct"], grp["resetAt"], detail, True)
         qw["color"] = "#4285f4" if grp["key"] == "gemini" else "#34a853"
         quota_windows.append(qw)
@@ -87,13 +87,13 @@ def normalize_antigravity(raw):
             "pct": gpct,
             "color": "#4285f4",
             "text": None,
-            "tooltip": _("Gemini (Google) quota: %s%%") % jround(gpct) + (_("\nPlan: %s") % plan if plan != "" else ""),
+            "tooltip": N_("Gemini (Google) quota: %s%%") % jround(gpct) + (N_("\nPlan: %s") % plan if plan != "" else ""),
         },
         {
             "pct": epct,
             "color": "#34a853",
             "text": None,
-            "tooltip": _("External models quota: %s%%") % jround(epct) + (_("\nPlan: %s") % plan if plan != "" else ""),
+            "tooltip": N_("External models quota: %s%%") % jround(epct) + (N_("\nPlan: %s") % plan if plan != "" else ""),
         },
     ]
     r["chartWindows"] = monthly_window("antigravity", "ag", False)
