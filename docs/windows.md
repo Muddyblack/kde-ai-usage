@@ -1,5 +1,56 @@
 # The Windows tray app
 
+A tray app with the same popup as the Hyprland panel — the QML is shared, not
+copied — backed by the same provider package. Preview quality.
+
+## Installing it
+
+Download `AI-Usage-Setup-<version>.exe` from a release and run it: no admin
+rights, a Start menu entry, an optional *Start when I sign in*, and an
+uninstaller under *Installed apps*; running a newer one updates in place. (Or
+take `ai-usage-windows-<version>.zip`, unzip it anywhere and run
+`AI Usage.exe`.) The app isn't code-signed yet, so SmartScreen asks once:
+*More info → Run anyway*. Nothing else to install — Python and Qt ship inside
+the folder.
+
+## Using it
+
+It sits in the notification area: click the icon for the popup, right-click for
+**Refresh**, **Settings**, **Tray style**, **Floating pill**, **Start with
+Windows** and **Quit**. Three tray styles (also under *Settings → Display*):
+
+- **Ring** (default) — a single icon, the logo inside a usage ring: one icon to
+  keep in view.
+- **Logo and percent** — like the panel pill: for each value of the active tab,
+  the provider's logo tinted by level, then `NN%`. Windows gives every tray icon
+  the same square, so that is two icons per value.
+- **Numbers** — the logo once, then each value as plain coloured digits.
+
+**Floating pill** adds the panel's own pill as a small always-on-top window —
+drag it anywhere, it stays where it was left; a click opens the popup beside it.
+
+Windows 11 puts new tray icons in the `^` overflow at first — which is why the
+very first start opens the popup by itself: drag the icon onto the taskbar
+once, or turn it on under *Settings → Personalization → Taskbar → Other system
+tray icons*. Starting AI Usage again from the Start menu while it runs opens
+the popup too.
+
+## Where it keeps its files
+
+It reads the same logins as on Linux, which the CLIs keep under your profile on
+Windows too (`%USERPROFILE%\.claude`, `.codex`, `.gemini`, `.copilot`, …). The
+VS Code-family IDEs (Cursor, Kiro) are read from `%APPDATA%`. Its own files:
+
+| What | Where |
+|---|---|
+| Settings (same format as Hyprland's) | `%APPDATA%\ai-usage-widget\hyprland-settings.json` |
+| Usage history | `%LOCALAPPDATA%\ai-usage-widget\` |
+| Log (Qt warnings and Python errors; the previous one is `tray.log.1`) | `%LOCALAPPDATA%\ai-usage-widget\tray.log` |
+
+Antigravity is found through `psutil`, which the build bundles.
+
+## How it fits together
+
 `windows/` is a PySide6 host for the same popup the Hyprland panel draws. It
 adds no provider logic of its own:
 
