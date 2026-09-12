@@ -1272,7 +1272,11 @@ PlasmoidItem {
     // touch it. Reuses envAssign's base64 round-trip because a path may contain
     // spaces or shell metacharacters.
     function pythonEnv() {
-        return root.envAssign("PYTHON3", String(Plasmoid.configuration.pythonPath || "").trim());
+        var env = root.envAssign("PYTHON3", String(Plasmoid.configuration.pythonPath || "").trim());
+        // Let the backend load the catalog of the applet it is actually
+        // installed as — the test copy renames its .mo to its own id.
+        env += root.envAssign("AI_USAGE_I18N_DOMAIN", "plasma_applet_" + (Plasmoid.metaData ? Plasmoid.metaData.pluginId : ""));
+        return env;
     }
 
     function backendCommand(ids) {

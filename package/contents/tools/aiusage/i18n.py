@@ -12,7 +12,11 @@ locale, gettext falls back to the English msgid — the previous behaviour.
 import gettext
 import os
 
-DOMAIN = "plasma_applet_org.muddyblack.aiUsageWidget"
+# The QML passes its own translation domain (plasma_applet_<pluginId>) so the
+# backend follows the applet even when it is installed under a different id
+# (the test copy). Falls back to the release id for a bare CLI run.
+DEFAULT_DOMAIN = "plasma_applet_org.muddyblack.aiUsageWidget"
+DOMAIN = os.environ.get("AI_USAGE_I18N_DOMAIN") or DEFAULT_DOMAIN
 
 # contents/tools/aiusage/i18n.py -> contents/locale
 _LOCALEDIR = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "locale"))
