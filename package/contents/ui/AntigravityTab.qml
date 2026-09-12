@@ -25,7 +25,7 @@ ColumnLayout {
             opacity: 0.7
         }
         PlasmaComponents.Label {
-            text: rootItem.antigravityEmail || "Gemini Code Assist"
+            text: rootItem.antigravityEmail || i18n("Gemini Code Assist")
             font.pixelSize: 10
             opacity: 0.6
             color: Kirigami.Theme.textColor
@@ -58,13 +58,13 @@ ColumnLayout {
 
     PopupRow {
         visible: rootItem.antigravityPromptCreditsMonthly > 0
-        label: "Prompt Credits"
-        resetText: rootItem.antigravityResetTime ? "resets " + rootItem.antigravityResetTime : ""
-        countdownText: rootItem.antigravityCountdown === "resetting..." ? "resetting..." : (rootItem.antigravityCountdown ? "in " + rootItem.antigravityCountdown : "")
+        label: i18n("Prompt Credits")
+        resetText: rootItem.antigravityResetTime ? i18n("resets ") + rootItem.antigravityResetTime : ""
+        countdownText: rootItem.antigravityCountdown === "resetting..." ? i18n("resetting...") : (rootItem.antigravityCountdown ? i18n("in ") + rootItem.antigravityCountdown : "")
         value: rootItem.antigravityPromptCreditsMonthly > 0 ? (1 - rootItem.antigravityPromptCreditsAvailable / rootItem.antigravityPromptCreditsMonthly) * 100 : 0
         barColor: rootItem.googleBlue
-        tokenText: rootItem.antigravityPromptCreditsAvailable + " / " + rootItem.formatTokens(rootItem.antigravityPromptCreditsMonthly) + " left"
-        tooltipText: "Prompt Credits\nUsed: " + Math.round(value) + "%  ·  " + rootItem.antigravityPromptCreditsAvailable + " / " + rootItem.formatTokens(rootItem.antigravityPromptCreditsMonthly) + " left" + (rootItem.antigravityResetTime ? "\nResets: " + rootItem.antigravityResetTime : "")
+        tokenText: rootItem.antigravityPromptCreditsAvailable + " / " + rootItem.formatTokens(rootItem.antigravityPromptCreditsMonthly) + i18n(" left")
+        tooltipText: i18n("Prompt Credits\nUsed: ") + Math.round(value) + "%  ·  " + rootItem.antigravityPromptCreditsAvailable + " / " + rootItem.formatTokens(rootItem.antigravityPromptCreditsMonthly) + i18n(" left") + (rootItem.antigravityResetTime ? i18n("\nResets: ") + rootItem.antigravityResetTime : "")
     }
 
     // Only when it says something the family rows below do not: with one model
@@ -74,14 +74,14 @@ ColumnLayout {
         visible: rootItem.antigravityPromptCreditsMonthly === 0 && Object.keys(rootItem.antigravityModels).length > 0 && (rootItem.antigravityGroups.length === 0 || rootItem.antigravityGroups.some(function (g) {
                 return (g.models || []).length > 1;
             }))
-        label: "Overall Quota"
-        resetText: rootItem.antigravityResetTime ? "resets " + rootItem.antigravityResetTime : ""
-        countdownText: rootItem.antigravityCountdown === "resetting..." ? "resetting..." : (rootItem.antigravityCountdown ? "in " + rootItem.antigravityCountdown : "")
+        label: i18n("Overall Quota")
+        resetText: rootItem.antigravityResetTime ? i18n("resets ") + rootItem.antigravityResetTime : ""
+        countdownText: rootItem.antigravityCountdown === "resetting..." ? i18n("resetting...") : (rootItem.antigravityCountdown ? i18n("in ") + rootItem.antigravityCountdown : "")
         value: rootItem.antigravityPct
         barColor: rootItem.googleBlue
         etaText: rootItem.usageHistory.length >= 0 ? rootItem.etaToFull("ag", rootItem.antigravityPct) : ""
-        deltaText: rootItem.usageHistory.length >= 0 ? rootItem.periodDelta("ag", rootItem.antigravityPct, 30 * 24 * 3600000, "last month") : ""
-        tooltipText: "Average quota usage across Gemini models\n" + Math.round(rootItem.antigravityPct) + "% used" + (rootItem.antigravityResetTime ? "\nResets: " + rootItem.antigravityResetTime : "")
+        deltaText: rootItem.usageHistory.length >= 0 ? rootItem.periodDelta("ag", rootItem.antigravityPct, 30 * 24 * 3600000, i18n("last month")) : ""
+        tooltipText: i18n("Average quota usage across Gemini models\n") + Math.round(rootItem.antigravityPct) + i18n("% used") + (rootItem.antigravityResetTime ? i18n("\nResets: ") + rootItem.antigravityResetTime : "")
     }
 
     // ── Model Quotas, grouped by pooled-quota family ───────────────────────────
@@ -111,7 +111,7 @@ ColumnLayout {
         }
         PlasmaComponents.Label {
             visible: groupsSection.perModel
-            text: "Model Quotas"
+            text: i18n("Model Quotas")
             font.bold: true
             font.pixelSize: 11
             opacity: 0.7
@@ -166,7 +166,7 @@ ColumnLayout {
                         visible: groupCol.group.resetDate !== null
                         text: {
                             var cd = rootItem.formatCountdown(groupCol.group.resetDate);
-                            return cd && cd !== "resetting..." ? "· resets in " + cd : (cd === "resetting..." ? "· resetting…" : "");
+                            return cd && cd !== "resetting..." ? i18n("· resets in ") + cd : (cd === "resetting..." ? i18n("· resetting…") : "");
                         }
                         font.pixelSize: 9
                         opacity: 0.45
@@ -212,11 +212,11 @@ ColumnLayout {
                                 var m = rootItem.antigravityModels[modelData];
                                 if (!m)
                                     return modelData;
-                                var txt = (m.displayName || modelData) + "\n" + Math.round(m.usedPct) + "% used";
+                                var txt = (m.displayName || modelData) + "\n" + Math.round(m.usedPct) + i18n("% used");
                                 if (m.isExhausted)
-                                    txt += "\n⚠ Quota exhausted";
+                                    txt += i18n("\n⚠ Quota exhausted");
                                 if (m.resetTime)
-                                    txt += "\nResets: " + Qt.formatDateTime(new Date(m.resetTime), "MMM d, hh:mm");
+                                    txt += i18n("\nResets: ") + Qt.formatDateTime(new Date(m.resetTime), "MMM d, hh:mm");
                                 return txt;
                             }
                         }

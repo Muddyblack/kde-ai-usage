@@ -153,8 +153,8 @@ PlasmoidItem {
     // ── Kiro data ─────────────────────────────────────────────────────────────
     property bool kiroUsageAvailable: false
     property string kiroPlanType: ""
-    property string kiroDisplayName: "Credit"
-    property string kiroDisplayNamePlural: "Credits"
+    property string kiroDisplayName: i18n("Credit")
+    property string kiroDisplayNamePlural: i18n("Credits")
     property real kiroCurrentUsage: 0
     property real kiroUsageLimit: 0
     property real kiroPct: 0
@@ -537,7 +537,7 @@ PlasmoidItem {
             color: root.mistralOrange,
             icon: "mistral-color.svg",
             keyConfig: "mistralApiKey",
-            keyPlaceholder: "or $MISTRAL_API_KEY"
+            keyPlaceholder: i18n("empty → $MISTRAL_API_KEY")
         },
         {
             id: "openrouter",
@@ -545,7 +545,7 @@ PlasmoidItem {
             color: root.openrouterPurple,
             icon: "openrouter.svg",
             keyConfig: "openrouterApiKey",
-            keyPlaceholder: "or $OPENROUTER_API_KEY"
+            keyPlaceholder: i18n("empty → $OPENROUTER_API_KEY")
         },
         {
             id: "grok",
@@ -553,7 +553,7 @@ PlasmoidItem {
             color: root.grokWhite,
             icon: "grok.svg",
             keyConfig: "grokApiKey",
-            keyPlaceholder: "or $GROK_API_KEY"
+            keyPlaceholder: i18n("empty → $GROK_API_KEY")
         },
         {
             id: "zai",
@@ -561,7 +561,7 @@ PlasmoidItem {
             color: root.zaiBlue,
             icon: "zai.svg",
             keyConfig: "zaiToken",
-            keyPlaceholder: "or $ZAI_TOKEN"
+            keyPlaceholder: i18n("empty → $ZAI_TOKEN")
         },
         {
             id: "copilot",
@@ -569,7 +569,7 @@ PlasmoidItem {
             color: root.copilotPurple,
             icon: "githubcopilot.svg",
             keyConfig: "githubToken",
-            keyPlaceholder: "optional — gh/Copilot login is used"
+            keyPlaceholder: i18n("optional — gh/Copilot login is used")
         },
         {
             id: "deepseek",
@@ -577,7 +577,7 @@ PlasmoidItem {
             color: root.deepseekBlue,
             icon: "deepseek-color.svg",
             keyConfig: "deepseekApiKey",
-            keyPlaceholder: "or $DEEPSEEK_API_KEY"
+            keyPlaceholder: i18n("empty → $DEEPSEEK_API_KEY")
         },
         {
             id: "kimi",
@@ -585,7 +585,7 @@ PlasmoidItem {
             color: root.kimiBlue,
             icon: "kimi.svg",
             keyConfig: "moonshotApiKey",
-            keyPlaceholder: "or $MOONSHOT_API_KEY"
+            keyPlaceholder: i18n("empty → $MOONSHOT_API_KEY")
         },
         {
             id: "muse",
@@ -593,7 +593,7 @@ PlasmoidItem {
             color: root.museBlue,
             icon: "muse-color.svg",
             keyConfig: "museApiKey",
-            keyPlaceholder: "optional — the CLI login is used"
+            keyPlaceholder: i18n("optional — the CLI login is used")
         },
         {
             id: "cursor",
@@ -986,17 +986,21 @@ PlasmoidItem {
             grabItem.grabToImage(function (result) {
                 root._exportHideHeader = false;
                 if (!result.saveToFile(tmpPng)) {
-                    exportSaveSource.disconnectSource("notify-send 'AI Usage Widget' 'Export failed: could not capture image'");
-                    exportSaveSource.connectSource("notify-send 'AI Usage Widget' 'Export failed: could not capture image'");
+                    var failCmd = "notify-send " + root.shellQuote(i18n("AI Usage Widget")) + " " + root.shellQuote(i18n("Export failed: could not capture image"));
+                    exportSaveSource.disconnectSource(failCmd);
+                    exportSaveSource.connectSource(failCmd);
                     return;
                 }
-                // Use $HOME in the shell so it always resolves correctly regardless of QML context
-                var destPath = "$HOME/Downloads/" + baseName + "." + format;
-                var cmd = "mkdir -p \"$HOME/Downloads\" && " + root.pythonEnv() + root.scriptPath("export-snapshot") + " " + root.shellQuote(format) + " " + root.shellQuote(tmpPng) + " \"" + destPath + "\"";
+                // Save into the XDG Downloads directory, whose name is localized
+                // (~/Téléchargements in French, ~/Downloads elsewhere). xdg-user-dir
+                // ships with every freedesktop desktop; fall back to the
+                // conventional English name only when it is missing.
+                var fileName = baseName + "." + format;
+                var cmd = "dl=\"$(xdg-user-dir DOWNLOAD 2>/dev/null || printf %s \"$HOME/Downloads\")\"; mkdir -p \"$dl\" && " + root.pythonEnv() + root.scriptPath("export-snapshot") + " " + root.shellQuote(format) + " " + root.shellQuote(tmpPng) + " \"$dl/" + fileName + "\"";
                 if (format === "svg")
                     cmd += " " + root._exportW + " " + root._exportH;
 
-                cmd += " && notify-send 'AI Usage Widget' 'Saved to ~/Downloads/" + baseName + "." + format + "'";
+                cmd += " && notify-send " + root.shellQuote(i18n("AI Usage Widget")) + " \"$(printf %s " + root.shellQuote(i18n("Saved to ")) + ")$dl/" + fileName + "\"";
                 exportSaveSource.disconnectSource(cmd);
                 exportSaveSource.connectSource(cmd);
             });
@@ -1114,12 +1118,12 @@ PlasmoidItem {
             return "";
 
         if (hoursLeft < 1)
-            return "~" + Math.max(1, Math.round(hoursLeft * 60)) + "m to 100%";
+            return i18n("~%1m to 100%", Math.max(1, Math.round(hoursLeft * 60)));
 
         if (hoursLeft < 24)
-            return "~" + hoursLeft.toFixed(1).replace(/\.0$/, "") + "h to 100%";
+            return i18n("~%1h to 100%", hoursLeft.toFixed(1).replace(/\.0$/, ""));
 
-        return "~" + Math.round(hoursLeft / 24) + "d to 100%";
+        return i18n("~%1d to 100%", Math.round(hoursLeft / 24));
     }
 
     // Period-over-period comparison: current value vs the sample closest to `periodMs` ago.
@@ -1153,9 +1157,9 @@ PlasmoidItem {
 
         var diff = Math.round(currentPct - best);
         if (diff === 0)
-            return "≈ same as " + periodLabel;
+            return i18n("≈ same as %1", periodLabel);
 
-        return (diff > 0 ? "+" : "") + diff + "% vs " + periodLabel;
+        return i18n("%1 vs %2", (diff > 0 ? "+" : "") + diff + "%", periodLabel);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -1297,7 +1301,7 @@ PlasmoidItem {
         try {
             snapshot = JSON.parse(text);
         } catch (_) {
-            root.errorMsg = "usage backend unavailable";
+            root.errorMsg = i18n("usage backend unavailable");
             root.stale = root.lastUpdate !== "";
             return;
         }
@@ -1541,8 +1545,8 @@ PlasmoidItem {
     function applyKiro(d) {
         root.kiroUsageAvailable = d.available === true;
         root.kiroPlanType = d.planType || "";
-        root.kiroDisplayName = d.displayName || "Credit";
-        root.kiroDisplayNamePlural = d.displayNamePlural || "Credits";
+        root.kiroDisplayName = d.displayName || i18n("Credit");
+        root.kiroDisplayNamePlural = d.displayNamePlural || i18n("Credits");
         root.kiroCurrentUsage = d.currentUsage || 0;
         root.kiroUsageLimit = d.usageLimit || 0;
         root.kiroPct = d.pct || 0;
@@ -1782,77 +1786,77 @@ PlasmoidItem {
     }
 
     Plasmoid.backgroundHints: root.backgroundHints
-    toolTipMainText: "AI API Usage"
+    toolTipMainText: i18n("AI API Usage")
     toolTipSubText: {
         var lines = [];
         var tab = root.enabledTabs[root.activeTab];
         if (tab === "claude") {
-            var fCountdown = root.sessionCountdown === "resetting..." ? " · resetting..." : (root.sessionCountdown ? " (" + root.sessionCountdown + ")" : "");
-            var sCountdown = root.weeklyCountdown === "resetting..." ? " · resetting..." : (root.weeklyCountdown ? " (" + root.weeklyCountdown + ")" : "");
+            var fCountdown = root.sessionCountdown === "resetting..." ? i18n(" · resetting...") : (root.sessionCountdown ? " (" + root.sessionCountdown + ")" : "");
+            var sCountdown = root.weeklyCountdown === "resetting..." ? i18n(" · resetting...") : (root.weeklyCountdown ? " (" + root.weeklyCountdown + ")" : "");
             if (root.sessionAvailable) {
-                lines.push("Claude 5H: " + Math.round(root.sessionPct) + "%" + fCountdown);
+                lines.push(i18n("Claude 5H: ") + Math.round(root.sessionPct) + "%" + fCountdown);
                 if (root.sessionTokenLimit > 0)
-                    lines.push("  " + root.formatTokens(root.sessionTokensUsed) + " / " + root.formatTokens(root.sessionTokenLimit) + " tokens");
+                    lines.push("  " + root.formatTokens(root.sessionTokensUsed) + " / " + root.formatTokens(root.sessionTokenLimit) + i18n(" tokens"));
             }
 
             if (root.weeklyAvailable)
-                lines.push("Claude 7D: " + Math.round(root.weeklyPct) + "%" + sCountdown);
+                lines.push(i18n("Claude 7D: ") + Math.round(root.weeklyPct) + "%" + sCountdown);
             if (root.claudeExtraTokens > 0)
-                lines.push("Extra budget: " + root.formatTokens(root.claudeExtraTokens) + " tokens left");
+                lines.push(i18n("Extra budget: ") + root.formatTokens(root.claudeExtraTokens) + i18n(" tokens left"));
 
             if (root.claudeExtraUsageEnabled && root.claudeExtraUsageLimit > 0)
-                lines.push("Extra usage: " + root.claudeExtraUsageUsed.toFixed(2) + " / " + root.claudeExtraUsageLimit.toFixed(2) + " " + root.claudeExtraUsageCurrency);
+                lines.push(i18n("Extra usage: ") + root.claudeExtraUsageUsed.toFixed(2) + " / " + root.claudeExtraUsageLimit.toFixed(2) + " " + root.claudeExtraUsageCurrency);
 
             if (root.claudeTotalCostUSD > 0)
-                lines.push("API Cost (30d): $" + root.claudeTotalCostUSD.toFixed(2));
+                lines.push(i18n("API Cost (30d): $") + root.claudeTotalCostUSD.toFixed(2));
         } else if (tab === "antigravity") {
-            lines.push("Gemini: " + Math.round(root.antigravityPct) + "%");
+            lines.push(i18n("Gemini: ") + Math.round(root.antigravityPct) + "%");
             if (root.antigravityPlanType)
-                lines.push("Plan: " + root.antigravityPlanType);
+                lines.push(i18n("Plan: ") + root.antigravityPlanType);
 
             if (root.antigravityPromptCreditsMonthly > 0)
-                lines.push("Credits: " + root.antigravityPromptCreditsAvailable + " / " + root.antigravityPromptCreditsMonthly);
+                lines.push(i18n("Credits: ") + root.antigravityPromptCreditsAvailable + " / " + root.antigravityPromptCreditsMonthly);
 
             if (root.antigravityResetTime)
-                lines.push("Resets: " + root.antigravityResetTime);
+                lines.push(i18n("Resets: ") + root.antigravityResetTime);
         } else if (tab === "openai") {
             if (root.openaiHasApiKey)
-                lines.push("API usage: configured");
+                lines.push(i18n("API usage: configured"));
 
             if (root.openaiTotalCostUSD > 0)
-                lines.push("API cost (30d): $" + root.openaiTotalCostUSD.toFixed(2));
+                lines.push(i18n("API cost (30d): $") + root.openaiTotalCostUSD.toFixed(2));
 
             if (root.openaiCodexLoggedIn)
-                lines.push("Codex: signed in" + (root.openaiEmail ? " as " + root.openaiEmail : ""));
+                lines.push(i18n("Codex: signed in") + (root.openaiEmail ? i18n(" as ") + root.openaiEmail : ""));
 
             if (root.codexSessionAvailable)
-                lines.push("Codex 5H left: " + Math.round(100 - root.codexSessionPct) + "%" + (root.codexSessionCountdown ? " (resets in " + root.codexSessionCountdown + ")" : ""));
+                lines.push(i18n("Codex 5H left: ") + Math.round(100 - root.codexSessionPct) + "%" + (root.codexSessionCountdown ? i18n(" (resets in ") + root.codexSessionCountdown + ")" : ""));
 
             if (root.codexWeeklyAvailable)
-                lines.push("Codex weekly left: " + Math.round(100 - root.codexWeeklyPct) + "%" + (root.codexWeeklyCountdown ? " (resets in " + root.codexWeeklyCountdown + ")" : ""));
+                lines.push(i18n("Codex weekly left: ") + Math.round(100 - root.codexWeeklyPct) + "%" + (root.codexWeeklyCountdown ? i18n(" (resets in ") + root.codexWeeklyCountdown + ")" : ""));
             if (root.openaiPlanType)
-                lines.push("Plan: " + root.openaiPlanType);
+                lines.push(i18n("Plan: ") + root.openaiPlanType);
 
             if (root.openaiCodexLoggedIn && !root.openaiHasApiKey)
-                lines.push("API usage needs an OpenAI API key");
+                lines.push(i18n("API usage needs an OpenAI API key"));
         } else if (tab === "kiro") {
             if (root.kiroPlanType)
-                lines.push("Plan: " + root.kiroPlanType.toUpperCase());
+                lines.push(i18n("Plan: ") + root.kiroPlanType.toUpperCase());
 
             if (root.kiroUsageLimit > 0)
-                lines.push("Credits: " + root.kiroCurrentUsage.toFixed(2) + " / " + root.kiroUsageLimit.toFixed(0));
+                lines.push(i18n("Credits: ") + root.kiroCurrentUsage.toFixed(2) + " / " + root.kiroUsageLimit.toFixed(0));
 
             if (root.kiroResetTime)
-                lines.push("Resets: " + root.kiroResetTime + (root.kiroCountdown ? " (" + root.kiroCountdown + ")" : ""));
+                lines.push(i18n("Resets: ") + root.kiroResetTime + (root.kiroCountdown ? " (" + root.kiroCountdown + ")" : ""));
 
             if (root.kiroCurrentOverages > 0 || root.kiroOverageCharges > 0)
-                lines.push("Overage: " + root.kiroCurrencySymbol + root.kiroOverageCharges.toFixed(2));
+                lines.push(i18n("Overage: ") + root.kiroCurrencySymbol + root.kiroOverageCharges.toFixed(2));
         } else if (tab === "mistral") {
             if (root.mistralKeyValid)
-                lines.push("API key: configured");
+                lines.push(i18n("API key: configured"));
 
             if (root.mistralAvailableModels.length > 0)
-                lines.push(root.mistralAvailableModels.length + " models available");
+                lines.push(root.mistralAvailableModels.length + i18n(" models available"));
 
             if (root.mistralError)
                 lines.push("⚠ " + root.mistralError);
@@ -1861,45 +1865,45 @@ PlasmoidItem {
                 lines.push(root.openrouterLabel);
 
             if (root.openrouterUsageUSD > 0)
-                lines.push("Spent: $" + root.openrouterUsageUSD.toFixed(4));
+                lines.push(i18n("Spent: $") + root.openrouterUsageUSD.toFixed(4));
 
             if (root.openrouterLimitUSD !== null)
-                lines.push("Limit: $" + root.openrouterLimitUSD.toFixed(2));
+                lines.push(i18n("Limit: $") + root.openrouterLimitUSD.toFixed(2));
 
             if (root.openrouterIsFreeTier)
-                lines.push("Free tier");
+                lines.push(i18n("Free tier"));
         } else if (tab === "grok") {
-            lines.push(root.grokHasBilling ? ("Grok credits: " + Math.round(root.grokPct) + "% used") : "Grok CLI connected; billing quota unavailable");
+            lines.push(root.grokHasBilling ? (i18n("Grok credits: ") + Math.round(root.grokPct) + i18n("% used")) : i18n("Grok CLI connected; billing quota unavailable"));
             if (root.grokTeamName || root.grokEmail)
                 lines.push(root.grokTeamName || root.grokEmail);
 
             if (root.grokBillingPeriodEnd)
-                lines.push("Resets: " + root.grokBillingPeriodEnd);
+                lines.push(i18n("Resets: ") + root.grokBillingPeriodEnd);
 
-            lines.push(root.grokSessionCount + " local CLI sessions");
+            lines.push(root.grokSessionCount + i18n(" local CLI sessions"));
             if (root.grokError)
                 lines.push("⚠ " + root.grokError);
         } else if (tab === "zai") {
-            lines.push("Z.AI tokens: " + Math.round(root.zaiTokenPct) + "%" + (root.zaiTokenCountdown ? " (" + root.zaiTokenCountdown + ")" : ""));
+            lines.push(i18n("Z.AI tokens: ") + Math.round(root.zaiTokenPct) + "%" + (root.zaiTokenCountdown ? " (" + root.zaiTokenCountdown + ")" : ""));
             if (root.zaiTokenUsed !== null && root.zaiTokenLimit !== null && root.zaiTokenLimit > 0)
-                lines.push(root.formatTokens(root.zaiTokenUsed) + " / " + root.formatTokens(root.zaiTokenLimit) + " tokens");
+                lines.push(root.formatTokens(root.zaiTokenUsed) + " / " + root.formatTokens(root.zaiTokenLimit) + i18n(" tokens"));
 
-            lines.push("Tools: " + Math.round(root.zaiToolsPct) + "%" + (root.zaiToolsCountdown ? " (" + root.zaiToolsCountdown + ")" : ""));
+            lines.push(i18n("Tools: ") + Math.round(root.zaiToolsPct) + "%" + (root.zaiToolsCountdown ? " (" + root.zaiToolsCountdown + ")" : ""));
             if (root.zaiToolsRemaining > 0)
-                lines.push("Tools left: " + root.zaiToolsRemaining);
+                lines.push(i18n("Tools left: ") + root.zaiToolsRemaining);
 
             if (root.zaiLevel)
-                lines.push("Level: " + root.zaiLevel);
+                lines.push(i18n("Level: ") + root.zaiLevel);
 
             if (root.zaiModels.length > 0)
-                lines.push(root.zaiModels.length + " models available");
+                lines.push(root.zaiModels.length + i18n(" models available"));
 
             if (root.zaiError)
                 lines.push("⚠ " + root.zaiError);
         } else if (tab === "copilot") {
-            lines.push("Copilot: " + Math.round(root.copilotPct) + "%" + (root.copilotCountdown ? " (" + root.copilotCountdown + ")" : ""));
+            lines.push(i18n("Copilot: ") + Math.round(root.copilotPct) + "%" + (root.copilotCountdown ? " (" + root.copilotCountdown + ")" : ""));
             if (root.copilotQuota > 0)
-                lines.push(root.copilotUsed + " / " + root.copilotQuota + " requests");
+                lines.push(root.copilotUsed + " / " + root.copilotQuota + i18n(" requests"));
 
             if (root.copilotUsername)
                 lines.push(root.copilotUsername);
@@ -1908,8 +1912,8 @@ PlasmoidItem {
                 lines.push("⚠ " + root.copilotError);
         } else if (tab === "deepseek") {
             if (root.deepseekKeyValid) {
-                lines.push("Balance: " + root.formatMoney(root.deepseekPrimaryTotal, root.deepseekPrimaryCurrency));
-                lines.push(root.deepseekIsAvailable ? "Available for API calls" : "Balance unavailable");
+                lines.push(i18n("Balance: ") + root.formatMoney(root.deepseekPrimaryTotal, root.deepseekPrimaryCurrency));
+                lines.push(root.deepseekIsAvailable ? i18n("Available for API calls") : i18n("Balance unavailable"));
             }
             if (root.deepseekError)
                 lines.push("⚠ " + root.deepseekError);
@@ -1918,34 +1922,34 @@ PlasmoidItem {
                 lines.push(root.kimiPlanWindows[k].label + ": " + Math.round(root.kimiPlanWindows[k].pct) + "%");
 
             if (root.kimiPlanExhausted)
-                lines.push("Kimi Code: " + (root.kimiPlanMessage || "plan quota used up"));
+                lines.push(i18n("Kimi Code: ") + (root.kimiPlanMessage || i18n("plan quota used up")));
 
             if (root.kimiKeyValid)
-                lines.push("Moonshot balance: " + root.formatMoney(root.kimiAvailableBalance, "USD"));
+                lines.push(i18n("Moonshot balance: ") + root.formatMoney(root.kimiAvailableBalance, "USD"));
 
             if (root.kimiError)
                 lines.push("⚠ " + root.kimiError);
         } else if (tab === "cursor") {
             if (root.cursorPlanName)
-                lines.push("Plan: " + root.cursorPlanName);
+                lines.push(i18n("Plan: ") + root.cursorPlanName);
 
             if (root.cursorAvailable)
-                lines.push("Included usage: " + Math.round(root.cursorTotalPct) + "%");
+                lines.push(i18n("Included usage: ") + Math.round(root.cursorTotalPct) + "%");
 
             if (root.cursorHasSplit)
-                lines.push("Auto: " + Math.round(root.cursorAutoPct) + "% · API: " + Math.round(root.cursorApiPct) + "%");
+                lines.push(i18n("Auto: ") + Math.round(root.cursorAutoPct) + "%" + i18n(" · API: ") + Math.round(root.cursorApiPct) + "%");
 
             if (root.cursorResetTime)
-                lines.push("Resets: " + root.cursorResetTime + (root.cursorCountdown ? " (" + root.cursorCountdown + ")" : ""));
+                lines.push(i18n("Resets: ") + root.cursorResetTime + (root.cursorCountdown ? " (" + root.cursorCountdown + ")" : ""));
 
             if (root.cursorError)
                 lines.push("⚠ " + root.cursorError);
         } else if (tab === "cline") {
             if (root.clineStats.available === true) {
-                lines.push("Tokens: " + root.formatTokens(root.clineStats.totalTokens || 0) + " (all time)");
-                lines.push("Sessions: " + Math.round(root.clineStats.totalSessions || 0));
+                lines.push(i18n("Tokens: ") + root.formatTokens(root.clineStats.totalTokens || 0) + i18n(" (all time)"));
+                lines.push(i18n("Sessions: ") + Math.round(root.clineStats.totalSessions || 0));
                 if ((root.clineStats.totalCostUSD || 0) > 0)
-                    lines.push("Spend: " + root.formatMoney(root.clineStats.totalCostUSD, "USD"));
+                    lines.push(i18n("Spend: ") + root.formatMoney(root.clineStats.totalCostUSD, "USD"));
             }
 
             if (root.clineError)
@@ -1953,20 +1957,20 @@ PlasmoidItem {
         } else if (tab === "muse") {
             lines.push("Muse" + (root.museModel ? " · " + root.museModel : ""));
             if (root.museCurrentAvailable)
-                lines.push("Current: " + Math.round(root.museCurrentPct) + "%" + (root.museCurrentCountdown ? " (" + root.museCurrentCountdown + ")" : ""));
+                lines.push(i18n("Current: ") + Math.round(root.museCurrentPct) + "%" + (root.museCurrentCountdown ? " (" + root.museCurrentCountdown + ")" : ""));
             if (root.museWeeklyAvailable)
-                lines.push("Weekly: " + Math.round(root.museWeeklyPct) + "%");
+                lines.push(i18n("Weekly: ") + Math.round(root.museWeeklyPct) + "%");
             if (root.museTotalTokens > 0)
-                lines.push(root.formatTokens(root.museTotalTokens) + " tokens · " + root.museStatsTotalSessions + " sessions");
+                lines.push(root.formatTokens(root.museTotalTokens) + i18n(" tokens · ") + root.museStatsTotalSessions + i18n(" sessions"));
             if (root.museCostUSD > 0)
-                lines.push("Spend (est.): " + root.formatMoney(root.museCostUSD, root.museCurrency));
+                lines.push(i18n("Spend (est.): ") + root.formatMoney(root.museCostUSD, root.museCurrency));
             if (root.museError)
                 lines.push("⚠ " + root.museError);
         }
         if (root.errorMsg !== "")
             lines.push("⚠ " + root.errorMsg);
         else if (root.lastUpdate !== "")
-            lines.push("Updated " + root.lastUpdate + (root.stale ? " (stale)" : ""));
+            lines.push(i18n("Updated ") + root.lastUpdate + (root.stale ? i18n(" (stale)") : ""));
         return lines.join("\n");
     }
     onChartWindowChanged: {
@@ -2059,7 +2063,7 @@ PlasmoidItem {
                     return;
                 }
                 if (res.path) {
-                    root.historyIOMsg = "Exported to " + res.path;
+                    root.historyIOMsg = i18n("Exported to ") + res.path;
                     return;
                 }
                 if (op === "autoload") {
@@ -2084,7 +2088,7 @@ PlasmoidItem {
                     root.flushHistoryConfig();
                     // Only the manual Import button announces a count; autoload is silent.
                     if (op === "import")
-                        root.historyIOMsg = "Imported " + imported.length + " points";
+                        root.historyIOMsg = i18n("Imported %1 points", imported.length);
                 }
             } catch (e) {
                 if (op === "save")
@@ -2094,7 +2098,7 @@ PlasmoidItem {
                     root.releaseHistoryMirror();
 
                 if (op === "import" || op === "export")
-                    root.historyIOMsg = "⚠ history I/O failed";
+                    root.historyIOMsg = i18n("⚠ history I/O failed");
             }
         }
     }
@@ -2102,7 +2106,7 @@ PlasmoidItem {
     ColorDialog {
         id: colorDialog
 
-        title: colorTarget === "popup" ? "Choose Popup Background Color" : "Choose Card Background Color"
+        title: colorTarget === "popup" ? i18n("Choose Popup Background Color") : i18n("Choose Card Background Color")
         onAccepted: {
             var hex = selectedColor.toString().substring(0, 7);
             if (hex.charAt(0) !== '#')
@@ -2241,7 +2245,7 @@ PlasmoidItem {
                 iconText: "C"
                 stale: root.stale && root.panelShows("claude")
                 visible: root.panelShows("claude") && root.sessionAvailable
-                tooltipText: "Claude 5-hour: " + Math.round(root.sessionPct) + "%" + (root.sessionTokenLimit > 0 ? "\n" + root.formatTokens(root.sessionTokensUsed) + " / " + root.formatTokens(root.sessionTokenLimit) : "")
+                tooltipText: i18n("Claude 5-hour: ") + Math.round(root.sessionPct) + "%" + (root.sessionTokenLimit > 0 ? "\n" + root.formatTokens(root.sessionTokensUsed) + " / " + root.formatTokens(root.sessionTokenLimit) : "")
             }
 
             Rectangle {
@@ -2260,7 +2264,7 @@ PlasmoidItem {
                 iconText: "7D"
                 stale: root.stale && root.panelShows("claude")
                 visible: root.panelShows("claude") && root.weeklyAvailable
-                tooltipText: "Claude 7-day: " + Math.round(root.weeklyPct) + "%" + (root.weeklyTokenLimit > 0 ? "\n" + root.formatTokens(root.weeklyTokensUsed) + " / " + root.formatTokens(root.weeklyTokenLimit) : "")
+                tooltipText: i18n("Claude 7-day: ") + Math.round(root.weeklyPct) + "%" + (root.weeklyTokenLimit > 0 ? "\n" + root.formatTokens(root.weeklyTokensUsed) + " / " + root.formatTokens(root.weeklyTokenLimit) : "")
             }
 
             PanelSlot {
@@ -2270,7 +2274,7 @@ PlasmoidItem {
                 iconText: "G"
                 stale: root.stale && root.panelShows("antigravity")
                 visible: root.panelShows("antigravity")
-                tooltipText: "Gemini (Google) quota: " + Math.round(root.antigravityGooglePct) + "%" + (root.antigravityPlanType ? "\nPlan: " + root.antigravityPlanType : "") + (root.antigravityEmail ? "\n" + root.antigravityEmail : "")
+                tooltipText: i18n("Gemini (Google) quota: ") + Math.round(root.antigravityGooglePct) + "%" + (root.antigravityPlanType ? i18n("\nPlan: ") + root.antigravityPlanType : "") + (root.antigravityEmail ? "\n" + root.antigravityEmail : "")
             }
 
             Rectangle {
@@ -2289,7 +2293,7 @@ PlasmoidItem {
                 iconText: "X"
                 stale: root.stale && root.panelShows("antigravity")
                 visible: root.panelShows("antigravity")
-                tooltipText: "External models quota: " + Math.round(root.antigravityExternalPct) + "%" + (root.antigravityPlanType ? "\nPlan: " + root.antigravityPlanType : "") + (root.antigravityEmail ? "\n" + root.antigravityEmail : "")
+                tooltipText: i18n("External models quota: ") + Math.round(root.antigravityExternalPct) + "%" + (root.antigravityPlanType ? i18n("\nPlan: ") + root.antigravityPlanType : "") + (root.antigravityEmail ? "\n" + root.antigravityEmail : "")
             }
 
             PanelSlot {
@@ -2302,7 +2306,7 @@ PlasmoidItem {
                 visible: root.panelShows("openai") && (root.codexSessionAvailable || !root.codexUsageAvailable)
                 showCost: !root.codexUsageAvailable
                 costText: root.openaiTotalCostUSD > 0 ? "$" + root.openaiTotalCostUSD.toFixed(2) : (root.openaiHasApiKey ? "API" : (root.openaiCodexLoggedIn ? "Codex" : "—"))
-                tooltipText: "OpenAI" + (root.codexSessionAvailable ? "\nCodex 5h: " + Math.round(100 - root.codexSessionPct) + "% left" : "") + (root.codexWeeklyAvailable ? "\nCodex weekly: " + Math.round(100 - root.codexWeeklyPct) + "% left" : "") + (root.openaiHasApiKey ? "\nAPI usage configured\nCost (30d): $" + root.openaiTotalCostUSD.toFixed(2) + "\nIn: " + root.formatTokens(root.openaiTotalInputTokens) + "  Out: " + root.formatTokens(root.openaiTotalOutputTokens) : "\nAPI usage needs an OpenAI API key") + (root.openaiCodexLoggedIn ? "\nCodex signed in" + (root.openaiEmail ? ": " + root.openaiEmail : "") : "")
+                tooltipText: "OpenAI" + (root.codexSessionAvailable ? i18n("\nCodex 5h: ") + Math.round(100 - root.codexSessionPct) + i18n("% left") : "") + (root.codexWeeklyAvailable ? i18n("\nCodex weekly: ") + Math.round(100 - root.codexWeeklyPct) + i18n("% left") : "") + (root.openaiHasApiKey ? i18n("\nAPI usage configured\nCost (30d): $") + root.openaiTotalCostUSD.toFixed(2) + i18n("\nIn: ") + root.formatTokens(root.openaiTotalInputTokens) + i18n("  Out: ") + root.formatTokens(root.openaiTotalOutputTokens) : i18n("\nAPI usage needs an OpenAI API key")) + (root.openaiCodexLoggedIn ? i18n("\nCodex signed in") + (root.openaiEmail ? ": " + root.openaiEmail : "") : "")
             }
 
             Rectangle {
@@ -2322,7 +2326,7 @@ PlasmoidItem {
                 stale: root.stale && root.panelShows("openai")
                 visible: root.panelShows("openai") && root.codexWeeklyAvailable
                 showCost: false
-                tooltipText: "OpenAI Codex weekly: " + Math.round(100 - root.codexWeeklyPct) + "% left"
+                tooltipText: i18n("OpenAI Codex weekly: ") + Math.round(100 - root.codexWeeklyPct) + i18n("% left")
             }
 
             PanelSlot {
@@ -2334,7 +2338,7 @@ PlasmoidItem {
                 visible: root.panelShows("kiro")
                 showCost: !root.kiroUsageAvailable
                 costText: root.kiroUsageAvailable ? "" : "—"
-                tooltipText: "Kiro" + (root.kiroPlanType ? "\nPlan: " + root.kiroPlanType.toUpperCase() : "") + (root.kiroUsageLimit > 0 ? "\nCredits: " + root.kiroCurrentUsage.toFixed(2) + " / " + root.kiroUsageLimit.toFixed(0) : "") + (root.kiroResetTime ? "\nResets: " + root.kiroResetTime : "")
+                tooltipText: "Kiro" + (root.kiroPlanType ? i18n("\nPlan: ") + root.kiroPlanType.toUpperCase() : "") + (root.kiroUsageLimit > 0 ? i18n("\nCredits: ") + root.kiroCurrentUsage.toFixed(2) + " / " + root.kiroUsageLimit.toFixed(0) : "") + (root.kiroResetTime ? i18n("\nResets: ") + root.kiroResetTime : "")
             }
 
             PanelSlot {
@@ -2345,8 +2349,8 @@ PlasmoidItem {
                 stale: root.stale && root.panelShows("mistral")
                 visible: root.panelShows("mistral")
                 showCost: true
-                costText: root.mistralVibeTotalCost > 0 ? "$" + root.mistralVibeTotalCost.toFixed(2) : (root.mistralKeyValid ? "✓ key" : "—")
-                tooltipText: "Mistral AI" + (root.mistralKeyValid ? "\nAPI key configured" : "\nNo key set") + (root.mistralVibeTotalCost > 0 ? "\nSpend (vibe): $" + root.mistralVibeTotalCost.toFixed(4) : "") + (root.mistralAvailableModels.length > 0 ? "\n" + root.mistralAvailableModels.length + " models" : "")
+                costText: root.mistralVibeTotalCost > 0 ? "$" + root.mistralVibeTotalCost.toFixed(2) : (root.mistralKeyValid ? i18n("✓ key") : "—")
+                tooltipText: "Mistral AI" + (root.mistralKeyValid ? i18n("\nAPI key configured") : i18n("\nNo key set")) + (root.mistralVibeTotalCost > 0 ? i18n("\nSpend (vibe): $") + root.mistralVibeTotalCost.toFixed(4) : "") + (root.mistralAvailableModels.length > 0 ? "\n" + root.mistralAvailableModels.length + i18n(" models") : "")
             }
 
             PanelSlot {
@@ -2357,8 +2361,8 @@ PlasmoidItem {
                 stale: root.stale && root.panelShows("openrouter")
                 visible: root.panelShows("openrouter") && !root.showSettings
                 showCost: true
-                costText: root.openrouterKeyValid ? (root.openrouterUsageUSD > 0 ? "$" + root.openrouterUsageUSD.toFixed(3) : "✓ key") : "—"
-                tooltipText: "OpenRouter" + (root.openrouterLabel ? "\n" + root.openrouterLabel : "") + (root.openrouterUsageUSD > 0 ? "\nUsed: $" + root.openrouterUsageUSD.toFixed(4) : "") + (root.openrouterLimitUSD !== null ? "\nLimit: $" + root.openrouterLimitUSD.toFixed(2) : "")
+                costText: root.openrouterKeyValid ? (root.openrouterUsageUSD > 0 ? "$" + root.openrouterUsageUSD.toFixed(3) : i18n("✓ key")) : "—"
+                tooltipText: "OpenRouter" + (root.openrouterLabel ? "\n" + root.openrouterLabel : "") + (root.openrouterUsageUSD > 0 ? i18n("\nUsed: $") + root.openrouterUsageUSD.toFixed(4) : "") + (root.openrouterLimitUSD !== null ? i18n("\nLimit: $") + root.openrouterLimitUSD.toFixed(2) : "")
             }
 
             PanelSlot {
@@ -2370,7 +2374,7 @@ PlasmoidItem {
                 visible: root.panelShows("grok") && !root.showSettings
                 showCost: !root.grokHasBilling
                 costText: root.grokHasBilling ? "" : "CLI"
-                tooltipText: root.grokHasBilling ? ("Grok credits: " + Math.round(root.grokPct) + "% used" + (root.grokBillingPeriodEnd ? "\nResets: " + root.grokBillingPeriodEnd : "")) : "Grok CLI connected; billing quota is not exposed"
+                tooltipText: root.grokHasBilling ? (i18n("Grok credits: ") + Math.round(root.grokPct) + i18n("% used") + (root.grokBillingPeriodEnd ? i18n("\nResets: ") + root.grokBillingPeriodEnd : "")) : i18n("Grok CLI connected; billing quota is not exposed")
             }
 
             PanelSlot {
@@ -2380,7 +2384,7 @@ PlasmoidItem {
                 iconText: "Z"
                 stale: root.stale && root.panelShows("zai")
                 visible: root.panelShows("zai")
-                tooltipText: "Z.AI tokens: " + Math.round(root.zaiTokenPct) + "%" + (root.zaiTokenUsed !== null && root.zaiTokenLimit !== null && root.zaiTokenLimit > 0 ? "\n" + root.formatTokens(root.zaiTokenUsed) + " / " + root.formatTokens(root.zaiTokenLimit) + " tokens" : "") + (root.zaiTokenCountdown ? "\nToken reset: " + root.zaiTokenCountdown : "") + "\nTools: " + Math.round(root.zaiToolsPct) + "%" + (root.zaiToolsRemaining > 0 ? "\nTools left: " + root.zaiToolsRemaining : "")
+                tooltipText: i18n("Z.AI tokens: ") + Math.round(root.zaiTokenPct) + "%" + (root.zaiTokenUsed !== null && root.zaiTokenLimit !== null && root.zaiTokenLimit > 0 ? "\n" + root.formatTokens(root.zaiTokenUsed) + " / " + root.formatTokens(root.zaiTokenLimit) + i18n(" tokens") : "") + (root.zaiTokenCountdown ? i18n("\nToken reset: ") + root.zaiTokenCountdown : "") + i18n("\nTools: ") + Math.round(root.zaiToolsPct) + "%" + (root.zaiToolsRemaining > 0 ? i18n("\nTools left: ") + root.zaiToolsRemaining : "")
             }
 
             PanelSlot {
@@ -2390,7 +2394,7 @@ PlasmoidItem {
                 iconText: "CP"
                 stale: root.stale && root.panelShows("copilot")
                 visible: root.panelShows("copilot")
-                tooltipText: "Copilot: " + Math.round(root.copilotPct) + "%" + (root.copilotQuota > 0 ? "\n" + root.copilotUsed + " / " + root.copilotQuota + " requests" : "") + (root.copilotCountdown ? "\nResets: " + root.copilotCountdown : "") + (root.copilotUsername ? "\n" + root.copilotUsername : "")
+                tooltipText: i18n("Copilot: ") + Math.round(root.copilotPct) + "%" + (root.copilotQuota > 0 ? "\n" + root.copilotUsed + " / " + root.copilotQuota + i18n(" requests") : "") + (root.copilotCountdown ? i18n("\nResets: ") + root.copilotCountdown : "") + (root.copilotUsername ? "\n" + root.copilotUsername : "")
             }
 
             PanelSlot {
@@ -2402,7 +2406,7 @@ PlasmoidItem {
                 visible: root.panelShows("deepseek")
                 showCost: true
                 costText: root.deepseekKeyValid ? root.formatMoney(root.deepseekPrimaryTotal, root.deepseekPrimaryCurrency) : "—"
-                tooltipText: "DeepSeek" + (root.deepseekKeyValid ? "\nBalance: " + root.formatMoney(root.deepseekPrimaryTotal, root.deepseekPrimaryCurrency) + "\nGranted: " + root.formatMoney(root.deepseekPrimaryGranted, root.deepseekPrimaryCurrency) + "\nTopped up: " + root.formatMoney(root.deepseekPrimaryToppedUp, root.deepseekPrimaryCurrency) : "\nNo API key set")
+                tooltipText: "DeepSeek" + (root.deepseekKeyValid ? i18n("\nBalance: ") + root.formatMoney(root.deepseekPrimaryTotal, root.deepseekPrimaryCurrency) + i18n("\nGranted: ") + root.formatMoney(root.deepseekPrimaryGranted, root.deepseekPrimaryCurrency) + i18n("\nTopped up: ") + root.formatMoney(root.deepseekPrimaryToppedUp, root.deepseekPrimaryCurrency) : i18n("\nNo API key set"))
             }
 
             PanelSlot {
@@ -2421,11 +2425,11 @@ PlasmoidItem {
                     for (var i = 0; i < root.kimiPlanWindows.length; i++)
                         t += "\n" + root.kimiPlanWindows[i].label + ": " + Math.round(root.kimiPlanWindows[i].pct) + "%";
                     if (root.kimiPlanExhausted)
-                        t += "\n" + (root.kimiPlanMessage || "Plan quota used up");
+                        t += "\n" + (root.kimiPlanMessage || i18n("Plan quota used up"));
                     if (root.kimiKeyValid)
-                        t += "\nBalance: " + root.formatMoney(root.kimiAvailableBalance, "USD") + "\nVoucher: " + root.formatMoney(root.kimiVoucherBalance, "USD") + "\nCash: " + root.formatMoney(root.kimiCashBalance, "USD");
+                        t += i18n("\nBalance: ") + root.formatMoney(root.kimiAvailableBalance, "USD") + i18n("\nVoucher: ") + root.formatMoney(root.kimiVoucherBalance, "USD") + i18n("\nCash: ") + root.formatMoney(root.kimiCashBalance, "USD");
                     else if (!root.kimiPlanAvailable)
-                        t += "\nNo Moonshot API key or Kimi Code login";
+                        t += i18n("\nNo Moonshot API key or Kimi Code login");
                     return t;
                 }
             }
@@ -2442,11 +2446,11 @@ PlasmoidItem {
                 costText: root.clineStats.available === true ? root.formatTokens(root.clineMonthTokens) : "—"
                 tooltipText: {
                     if (root.clineStats.available !== true)
-                        return "Cline\n" + (root.clineError || "No sessions yet");
+                        return "Cline\n" + (root.clineError || i18n("No sessions yet"));
                     var t = "Cline";
                     for (var i = 0; i < root.clinePeriods.length; i++) {
                         var p = root.clinePeriods[i];
-                        t += "\n" + p.label + ": " + root.formatTokens(p.tokens || 0) + " tokens · " + p.sessions + (p.sessions === 1 ? " session" : " sessions");
+                        t += "\n" + p.label + ": " + root.formatTokens(p.tokens || 0) + i18n(" tokens · ") + p.sessions + (p.sessions === 1 ? i18n(" session") : i18n(" sessions"));
                     }
                     return t;
                 }
@@ -2461,7 +2465,7 @@ PlasmoidItem {
                 visible: root.panelShows("cursor")
                 showCost: !root.cursorAvailable
                 costText: root.cursorAvailable ? "" : "—"
-                tooltipText: "Cursor" + (root.cursorPlanName ? "\nPlan: " + root.cursorPlanName : "") + (root.cursorAvailable ? "\nIncluded usage: " + Math.round(root.cursorTotalPct) + "%" : "\n" + (root.cursorError || "Not signed in")) + (root.cursorResetTime ? "\nResets: " + root.cursorResetTime : "")
+                tooltipText: "Cursor" + (root.cursorPlanName ? i18n("\nPlan: ") + root.cursorPlanName : "") + (root.cursorAvailable ? i18n("\nIncluded usage: ") + Math.round(root.cursorTotalPct) + "%" : "\n" + (root.cursorError || i18n("Not signed in"))) + (root.cursorResetTime ? i18n("\nResets: ") + root.cursorResetTime : "")
             }
 
             PanelSlot {
@@ -2475,7 +2479,7 @@ PlasmoidItem {
                 // the pill carries the lifetime total instead of an empty bar.
                 showCost: !root.museCurrentAvailable
                 costText: root.museTotalTokens > 0 ? root.formatTokens(root.museTotalTokens) : "—"
-                tooltipText: "Muse" + (root.museCurrentAvailable ? "\nCurrent: " + Math.round(root.museCurrentPct) + "%" + (root.museCurrentCountdown ? " (" + root.museCurrentCountdown + ")" : "") : "") + (root.museWeeklyAvailable ? "\nWeekly: " + Math.round(root.museWeeklyPct) + "%" : "") + (root.museModel ? "\n" + root.museModel : "") + (root.museTotalTokens > 0 ? "\n" + root.formatTokens(root.museTotalTokens) + " tokens · " + root.museStatsTotalSessions + " sessions" : "\nNo local sessions yet") + (root.museCostUSD > 0 ? "\nSpend (est.): " + root.formatMoney(root.museCostUSD, root.museCurrency) : "")
+                tooltipText: "Muse" + (root.museCurrentAvailable ? i18n("\nCurrent: ") + Math.round(root.museCurrentPct) + "%" + (root.museCurrentCountdown ? " (" + root.museCurrentCountdown + ")" : "") : "") + (root.museWeeklyAvailable ? i18n("\nWeekly: ") + Math.round(root.museWeeklyPct) + "%" : "") + (root.museModel ? "\n" + root.museModel : "") + (root.museTotalTokens > 0 ? "\n" + root.formatTokens(root.museTotalTokens) + i18n(" tokens · ") + root.museStatsTotalSessions + i18n(" sessions") : i18n("\nNo local sessions yet")) + (root.museCostUSD > 0 ? i18n("\nSpend (est.): ") + root.formatMoney(root.museCostUSD, root.museCurrency) : "")
             }
         }
     }
@@ -2687,49 +2691,49 @@ PlasmoidItem {
                     PlasmaComponents.Label {
                         text: {
                             if (root.showSettings)
-                                return "Settings";
+                                return i18n("Settings");
 
                             var tab = root.enabledTabs[root.activeTab];
                             if (tab === "claude")
-                                return "Claude Usage";
+                                return i18n("Claude Usage");
 
                             if (tab === "antigravity")
-                                return "Antigravity Usage";
+                                return i18n("Antigravity Usage");
 
                             if (tab === "openai")
-                                return "OpenAI Usage";
+                                return i18n("OpenAI Usage");
 
                             if (tab === "kiro")
-                                return "Kiro Usage";
+                                return i18n("Kiro Usage");
 
                             if (tab === "mistral")
-                                return "Mistral Usage";
+                                return i18n("Mistral Usage");
 
                             if (tab === "openrouter")
-                                return "OpenRouter Usage";
+                                return i18n("OpenRouter Usage");
 
                             if (tab === "grok")
-                                return "Grok Usage";
+                                return i18n("Grok Usage");
 
                             if (tab === "zai")
-                                return "Z.AI Usage";
+                                return i18n("Z.AI Usage");
 
                             if (tab === "copilot")
-                                return "Copilot Usage";
+                                return i18n("Copilot Usage");
 
                             if (tab === "deepseek")
-                                return "DeepSeek Balance";
+                                return i18n("DeepSeek Balance");
 
                             if (tab === "kimi")
-                                return root.kimiPlanAvailable ? "Kimi Usage" : "Kimi Balance";
+                                return root.kimiPlanAvailable ? i18n("Kimi Usage") : i18n("Kimi Balance");
 
                             if (tab === "cursor")
-                                return "Cursor Usage";
+                                return i18n("Cursor Usage");
 
                             if (tab === "cline")
-                                return "Cline Stats";
+                                return i18n("Cline Stats");
 
-                            return "AI Usage Monitor";
+                            return i18n("AI Usage Monitor");
                         }
                         font.bold: true
                         font.pixelSize: 15
@@ -2742,15 +2746,15 @@ PlasmoidItem {
                         // you are rather than repeating what the page is.
                         text: {
                             if (root.settingsTab === "appearance")
-                                return "Colors, chart and popup style";
+                                return i18n("Colors, chart and popup style");
 
                             if (root.settingsTab === "data")
-                                return "Refresh interval and usage history";
+                                return i18n("Refresh interval and usage history");
 
                             if (root.settingsTab === "advanced")
-                                return "Python interpreter and terminal tool";
+                                return i18n("Python interpreter and terminal tool");
 
-                            return "Turn providers on and set their keys";
+                            return i18n("Turn providers on and set their keys");
                         }
                         font.pixelSize: 10
                         opacity: 0.5
@@ -2772,20 +2776,20 @@ PlasmoidItem {
                     opacity: hovered ? 1 : 0.6
                     QQC2.ToolTip.visible: hovered && !exportMenu.visible
                     QQC2.ToolTip.delay: 400
-                    QQC2.ToolTip.text: "Export current tab as PNG or SVG"
+                    QQC2.ToolTip.text: i18n("Export current tab as PNG or SVG")
                     onClicked: exportMenu.popup()
 
                     QQC2.Menu {
                         id: exportMenu
 
                         QQC2.MenuItem {
-                            text: "Export as PNG"
+                            text: i18n("Export as PNG")
                             icon.name: "image-x-generic"
                             onTriggered: root.doExportSnapshot(mainColumn, "png")
                         }
 
                         QQC2.MenuItem {
-                            text: "Export as SVG"
+                            text: i18n("Export as SVG")
                             icon.name: "image-svg+xml"
                             onTriggered: root.doExportSnapshot(mainColumn, "svg")
                         }
@@ -2947,7 +2951,7 @@ PlasmoidItem {
                                 onClicked: root.togglePin(modelData)
                                 QQC2.ToolTip.visible: containsMouse
                                 QQC2.ToolTip.delay: 400
-                                QQC2.ToolTip.text: root.isPinned(modelData) ? "Unpin from panel" : "Pin on panel"
+                                QQC2.ToolTip.text: root.isPinned(modelData) ? i18n("Unpin from panel") : i18n("Pin on panel")
                             }
                         }
 
@@ -3085,15 +3089,15 @@ PlasmoidItem {
                         QQC2.ToolTip.visible: containsMouse
                         QQC2.ToolTip.delay: 300
                         QQC2.ToolTip.text: {
-                            var l = ["Combined API spend"];
+                            var l = [i18n("Combined API spend")];
                             if (root.claudeTotalCostUSD > 0)
-                                l.push("Claude (30d): $" + root.claudeTotalCostUSD.toFixed(2));
+                                l.push(i18n("Claude (30d): $") + root.claudeTotalCostUSD.toFixed(2));
 
                             if (root.openaiTotalCostUSD > 0)
-                                l.push("OpenAI (30d): $" + root.openaiTotalCostUSD.toFixed(2));
+                                l.push(i18n("OpenAI (30d): $") + root.openaiTotalCostUSD.toFixed(2));
 
                             if (root.openrouterUsageUSD > 0)
-                                l.push("OpenRouter (all-time): $" + root.openrouterUsageUSD.toFixed(2));
+                                l.push(i18n("OpenRouter (all-time): $") + root.openrouterUsageUSD.toFixed(2));
 
                             return l.join("\n");
                         }
@@ -3102,7 +3106,7 @@ PlasmoidItem {
 
                 PlasmaComponents.Label {
                     visible: root.lastUpdate !== "" && root.errorMsg === ""
-                    text: "updated " + root.lastUpdate + (root.stale ? " · stale" : "")
+                    text: i18n("updated ") + root.lastUpdate + (root.stale ? i18n(" · stale") : "")
                     opacity: 0.45
                     font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                 }

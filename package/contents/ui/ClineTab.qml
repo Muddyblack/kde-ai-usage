@@ -20,7 +20,7 @@ ColumnLayout {
         Layout.fillWidth: true
         Layout.topMargin: 8
         horizontalAlignment: Text.AlignHCenter
-        text: "No Cline sessions yet.\nRun the Cline CLI and its session logs in ~/.cline will appear here."
+        text: i18n("No Cline sessions yet.\nRun the Cline CLI and its session logs in ~/.cline will appear here.")
         font.pixelSize: 10
         opacity: 0.5
         color: Kirigami.Theme.textColor
@@ -35,7 +35,7 @@ ColumnLayout {
         rows: rootItem.clinePeriods.map(function (p) {
             return {
                 label: p.label,
-                value: rootItem.formatTokens(p.tokens || 0) + " tok · " + p.sessions + (p.sessions === 1 ? " session" : " sessions") + ((p.cost || 0) > 0 ? " · " + rootItem.formatMoney(p.cost, "USD") : ""),
+                value: rootItem.formatTokens(p.tokens || 0) + i18n(" tok · ") + i18np("1 session", "%1 sessions", p.sessions) + ((p.cost || 0) > 0 ? " · " + rootItem.formatMoney(p.cost, "USD") : ""),
                 strong: p.key === "cline_30d"
             };
         })
@@ -50,7 +50,7 @@ ColumnLayout {
             Layout.fillWidth: true
             spacing: 8
             PlasmaComponents.Label {
-                text: "Activity Stats"
+                text: i18n("Activity Stats")
                 font.bold: true
                 font.pixelSize: 11
                 opacity: 0.7
@@ -60,7 +60,7 @@ ColumnLayout {
                 Layout.fillWidth: true
             }
             PlasmaComponents.Label {
-                text: "Cline CLI · all time"
+                text: i18n("Cline CLI · all time")
                 font.pixelSize: 9
                 opacity: 0.45
                 color: Kirigami.Theme.textColor
@@ -79,52 +79,52 @@ ColumnLayout {
 
             StatTile {
                 tileValue: rootItem.formatTokens(clineTabRoot.stats.totalTokens || 0)
-                tileLabel: "tokens"
-                tileTip: rootItem.formatTokens(clineTabRoot.stats.totalOutputTokens || 0) + " output · " + rootItem.formatTokens(clineTabRoot.stats.totalInputTokens || 0) + " input · " + rootItem.formatTokens(clineTabRoot.stats.totalCachedTokens || 0) + " cache read"
+                tileLabel: i18nc("stat label", "tokens")
+                tileTip: rootItem.formatTokens(clineTabRoot.stats.totalOutputTokens || 0) + i18n(" output · ") + rootItem.formatTokens(clineTabRoot.stats.totalInputTokens || 0) + i18n(" input · ") + rootItem.formatTokens(clineTabRoot.stats.totalCachedTokens || 0) + i18n(" cache read")
             }
             StatTile {
                 visible: (clineTabRoot.stats.totalCostUSD || 0) > 0
                 tileValue: rootItem.formatMoney(clineTabRoot.stats.totalCostUSD || 0, "USD")
-                tileLabel: "spend"
-                tileTip: "Cost Cline recorded per session"
+                tileLabel: i18nc("stat label", "spend")
+                tileTip: i18n("Cost Cline recorded per session")
             }
             StatTile {
                 tileValue: Math.round(clineTabRoot.stats.totalSessions || 0).toString()
-                tileLabel: "sessions"
+                tileLabel: i18nc("stat label", "sessions")
             }
             StatTile {
                 tileValue: Math.round(clineTabRoot.stats.activeDays || 0) + ((clineTabRoot.stats.spanDays || 0) > 0 ? "/" + Math.round(clineTabRoot.stats.spanDays) : "")
-                tileLabel: "active days"
-                tileTip: clineTabRoot.stats.firstDate ? "Since " + Qt.formatDate(new Date(clineTabRoot.stats.firstDate), "MMM d, yyyy") : ""
+                tileLabel: i18n("active days")
+                tileTip: clineTabRoot.stats.firstDate ? i18n("Since ") + Qt.formatDate(new Date(clineTabRoot.stats.firstDate), "MMM d, yyyy") : ""
             }
             StatTile {
                 tileValue: Math.round(clineTabRoot.stats.currentStreak || 0) + "d"
-                tileLabel: "streak"
-                tileSub: "best " + Math.round(clineTabRoot.stats.longestStreak || 0) + "d"
+                tileLabel: i18nc("stat label", "streak")
+                tileSub: i18n("best ") + Math.round(clineTabRoot.stats.longestStreak || 0) + "d"
             }
             StatTile {
                 visible: (clineTabRoot.stats.longestSessionMs || 0) > 0
                 tileValue: rootItem.formatDuration(clineTabRoot.stats.longestSessionMs || 0)
-                tileLabel: "longest session"
+                tileLabel: i18n("longest session")
             }
             StatTile {
                 visible: clineTabRoot.stats.peakHour !== undefined && clineTabRoot.stats.peakHour >= 0
                 tileValue: clineTabRoot.stats.peakHour >= 0 ? (clineTabRoot.stats.peakHour < 10 ? "0" : "") + clineTabRoot.stats.peakHour + ":00" : "—"
-                tileLabel: "peak hour"
-                tileTip: "Hour of day when most sessions started"
+                tileLabel: i18n("peak hour")
+                tileTip: i18n("Hour of day when most sessions started")
             }
         }
 
         StatsSparkline {
             series: clineTabRoot.stats.dailySeries || []
-            unit: "tokens"
+            unit: i18n("tokens")
             barColor: rootItem.clineWhite
             formatValue: rootItem.formatTokens
         }
 
         StatsTopList {
             entries: clineTabRoot.stats.topWorkspaces || []
-            label: "Top workspaces"
+            label: i18n("Top workspaces")
             accent: rootItem.clineWhite
         }
 
@@ -154,7 +154,7 @@ ColumnLayout {
                     Layout.fillWidth: true
                 }
                 PlasmaComponents.Label {
-                    text: rootItem.formatTokens(parent.entry.total || 0) + " tok"
+                    text: rootItem.formatTokens(parent.entry.total || 0) + i18n(" tok")
                     font.pixelSize: 10
                     opacity: 0.6
                     color: Kirigami.Theme.textColor

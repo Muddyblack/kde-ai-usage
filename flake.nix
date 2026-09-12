@@ -150,6 +150,7 @@
               qt6.qtdeclarative
               kdePackages.kpackage
               kdePackages.plasma-sdk
+              gettext
               pre-commit
               zip
               python3
