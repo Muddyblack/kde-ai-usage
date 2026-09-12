@@ -31,8 +31,13 @@ def kinds(entries):
 
 @unittest.skipUnless(HAS_PYSIDE, "PySide6 not installed")
 class TrayEntriesTest(unittest.TestCase):
-    def test_default_reads_like_the_panel_pill(self):
-        entries = app.tray_entries({"icon": CLAUDE_LOGO, "slots": TWO})
+    def test_default_is_the_ring_on_windows_only(self):
+        self.assertEqual(app.DEFAULT_TRAY_STYLE, "ring" if os.name == "nt" else "icons")
+        self.assertEqual(app.tray_style({}), app.DEFAULT_TRAY_STYLE)
+        self.assertEqual(app.tray_style({"style": "bogus"}), app.DEFAULT_TRAY_STYLE)
+
+    def test_icons_style_reads_like_the_panel_pill(self):
+        entries = app.tray_entries({"style": "icons", "icon": CLAUDE_LOGO, "slots": TWO})
         self.assertEqual(kinds(entries), ["tinted", "percent", "tinted", "percent"])
         self.assertEqual([(e["value"], e["color"]) for e in entries if e["kind"] == "percent"], [(5, "#ff4d4d"), (83, "#ffa64d")])
         self.assertEqual([e["color"] for e in entries if e["kind"] == "tinted"], ["#ff4d4d", "#ffa64d"])
@@ -42,7 +47,7 @@ class TrayEntriesTest(unittest.TestCase):
         # As on the panel pill: the logo has the provider's colour, the number
         # stays neutral ("") below 70 %, then amber, then red from 90 %.
         values = [slot(5), slot(83), slot(95)]
-        entries = app.tray_entries({"slots": values})
+        entries = app.tray_entries({"style": "icons", "slots": values})
         self.assertEqual([e["textColor"] for e in entries if e["kind"] == "percent"], ["", "#ffa64d", "#ff4d4d"])
         if os.name != "nt":
             # Windows reads its taskbar's light/dark setting instead.
@@ -57,11 +62,10 @@ class TrayEntriesTest(unittest.TestCase):
         ring = [{"kind": "ring", "value": 5, "color": "#ff4d4d", "icon": CLAUDE_LOGO, "tooltip": app.APP_NAME}]
         self.assertEqual(app.tray_entries({"style": "ring", "icon": CLAUDE_LOGO, "slots": TWO}), ring)
         self.assertEqual(app.tray_entries({"numbers": False, "icon": CLAUDE_LOGO, "slots": TWO}), ring)
-        self.assertEqual(app.tray_style({"style": "bogus"}), "icons")
 
     def test_full_windows_and_non_percentages(self):
-        self.assertEqual(app.tray_entries({"slots": [slot(99.7)]})[1]["value"], 100)
-        self.assertEqual(kinds(app.tray_entries({"slots": [slot(0, text="$49.59")]})), ["ring"])
+        self.assertEqual(app.tray_entries({"style": "icons", "slots": [slot(99.7)]})[1]["value"], 100)
+        self.assertEqual(kinds(app.tray_entries({"style": "icons", "slots": [slot(0, text="$49.59")]})), ["ring"])
         self.assertEqual(app.tray_entries({})[0]["value"], -1)
 
     def test_every_kind_draws(self):

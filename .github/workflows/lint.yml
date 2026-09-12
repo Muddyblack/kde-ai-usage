@@ -14,7 +14,7 @@ jobs:
   qml:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: cachix/install-nix-action@v27
 
@@ -27,17 +27,17 @@ jobs:
   backend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: ruff check
-        uses: astral-sh/ruff-action@v3
+        uses: astral-sh/ruff-action@v4.1.0
         with:
-          args: "check package/contents/tools/aiusage"
+          args: "check package/contents/tools/aiusage windows tests/python"
 
       - name: ruff format check
-        uses: astral-sh/ruff-action@v3
+        uses: astral-sh/ruff-action@v4.1.0
         with:
-          args: "format --check package/contents/tools/aiusage"
+          args: "format --check package/contents/tools/aiusage windows tests/python"
 
       - name: provider contract tests
         run: ./tests/get-ai-usage.test.sh
@@ -47,6 +47,12 @@ jobs:
 
       - name: credential discovery tests
         run: ./tests/credentials.test.sh
+
+      - name: interpreter resolution tests
+        run: ./tests/python-interp.test.sh
+
+      - name: shared history file tests
+        run: ./tests/history-io.test.sh
 
       - name: codex helper tests
         run: |

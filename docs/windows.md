@@ -55,10 +55,16 @@ every provider switched off, so it needs no network.
 On Windows (PyInstaller does not cross-compile):
 
 ```powershell
-pip install -r windows/requirements.txt pyinstaller pillow
+pip install -r windows/build-requirements.txt
 pyinstaller --noconfirm windows/ai-usage.spec
 "dist\AI Usage\AI Usage.exe" --selftest
 ```
+
+`windows/build-requirements.txt` pins the exact PySide6, PyInstaller and Pillow
+the releases are built with, so a tag rebuilt later gives the same `.exe`.
+`windows/requirements.txt` keeps the ranges the app itself needs; CI's test job
+installs those as they come, so a new PySide6 is tried there before a bump of
+the pins ships it.
 
 The result is a folder, `dist\AI Usage\`, rather than a single file: a one-file
 build unpacks itself to a temp directory on every start. Zip the folder to ship
@@ -74,11 +80,17 @@ It installs per user (no admin rights) to `%LOCALAPPDATA%\Programs\AI Usage`,
 adds a Start menu entry, optionally a desktop shortcut and *Start when I sign
 in* (the same registry value as the tray menu's switch), stops a running copy
 before replacing it, and registers an uninstaller. Keep its `AppId` as it is:
-that is how a newer installer finds and updates the installed app.
+that is how a newer installer finds and updates the installed app. An update
+does not offer *Start when I sign in* again — it leaves the setting as the app
+last had it — and a silent update (`/SILENT`, winget) starts the app again if
+it was running.
 
-CI does all of this on every push (`.github/workflows/windows.yml`, as a
-workflow artifact), and tagged releases attach both the installer and the zip
-(`release.yml`).
+CI does all of this on every push and pull request
+(`.github/workflows/windows.yml`, kept as a workflow artifact for two weeks),
+and on demand from any branch (*Actions → Windows → Run workflow*). A tag runs
+the same workflow from `release.yml`, which attaches the installer and the zip
+to the release once they have passed — after the `.plasmoid`, which a failing
+Windows build does not hold back.
 
 ## Testing on real Windows
 
@@ -103,7 +115,12 @@ Worth checking by hand in a VM, since no test covers it:
 
 - the popup opens against the taskbar next to the icon, with the taskbar on each
   edge;
-- each tray style (Logo and percent, Numbers, Ring) reads at 100 %, 125 % and
+- the first start after installing opens the popup by itself, and only that
+  once; starting the app again from the Start menu opens it *with focus*, so a
+  click elsewhere closes it;
+- an update keeps *Start with Windows* as it was, and a `/SILENT` update of a
+  running app starts it again;
+- each tray style (Ring — the default here — Logo and percent, Numbers) reads at 100 %, 125 % and
   150 % display scaling, on a light and a dark taskbar, and the icons keep their
   places (and "show in taskbar" choice) across a restart;
 - each logo sits to the left of its number: the icons are created newest-last

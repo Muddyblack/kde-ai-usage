@@ -229,19 +229,21 @@ right-click for **Refresh**, **Settings**, **Tray style**, **Floating pill**,
 **Start with Windows** and **Quit**. Three tray styles (also under *Settings →
 Display*):
 
-- **Logo and percent** (default) — like the panel pill: for each value of the
-  active tab, the provider's logo tinted by level, then `NN%`. Windows gives
-  every tray icon the same square, so that is two icons per value.
+- **Ring** (default) — a single icon, the logo inside a usage ring: one icon to
+  keep in view.
+- **Logo and percent** — like the panel pill: for each value of the active tab,
+  the provider's logo tinted by level, then `NN%`. Windows gives every tray icon
+  the same square, so that is two icons per value.
 - **Numbers** — the logo once, then each value as plain coloured digits.
-- **Ring** — a single icon, the logo inside a usage ring.
 
 **Floating pill** adds the panel's own pill as a small always-on-top window —
 drag it anywhere, it stays where it was left; a click opens the popup beside it.
 
-Windows 11 puts new tray icons in the `^` overflow at first: drag them onto the
-taskbar once, or turn them on under *Settings → Personalization → Taskbar →
-Other system tray icons*. Nothing to install — Python and Qt ship inside the
-folder.
+Windows 11 puts new tray icons in the `^` overflow at first — which is why the
+very first start opens the popup by itself: drag the icon onto the taskbar
+once, or turn it on under *Settings → Personalization → Taskbar → Other system
+tray icons*. Starting AI Usage again from the Start menu while it runs opens
+the popup too. Nothing to install — Python and Qt ship inside the folder.
 
 It reads the same logins as on Linux, which the CLIs keep under your profile on
 Windows too (`%USERPROFILE%\.claude`, `.codex`, `.gemini`, `.copilot`, …). The
@@ -251,7 +253,7 @@ VS Code-family IDEs (Cursor, Kiro) are read from `%APPDATA%`. Its own files:
 |---|---|
 | Settings (same format as Hyprland's) | `%APPDATA%\ai-usage-widget\hyprland-settings.json` |
 | Usage history | `%LOCALAPPDATA%\ai-usage-widget\` |
-| Log (Qt warnings and Python errors) | `%LOCALAPPDATA%\ai-usage-widget\tray.log` |
+| Log (Qt warnings and Python errors; the previous one is `tray.log.1`) | `%LOCALAPPDATA%\ai-usage-widget\tray.log` |
 
 Antigravity is found through `psutil`, which the build bundles. Running from a
 checkout instead:

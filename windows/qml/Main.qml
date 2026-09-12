@@ -62,7 +62,7 @@ Window {
             showChart: true,
             museQuota: false,
             antigravityChartFilter: "both",
-            trayStyle: "icons",
+            trayStyle: backend.defaultTrayStyle,
             floatingPill: false
         })
     property bool showSettings: false
@@ -81,8 +81,9 @@ Window {
         s.showChart = d.showChart !== false;
         s.museQuota = d.museQuota === true;
         s.antigravityChartFilter = d.antigravityChartFilter || "both";
-        // trayNumbers was the on/off switch before there were three styles.
-        s.trayStyle = d.trayStyle || (d.trayNumbers === false ? "ring" : "icons");
+        // trayNumbers was the on/off switch before there were three styles;
+        // with neither, the platform's default (app.py, DEFAULT_TRAY_STYLE).
+        s.trayStyle = d.trayStyle || (d.trayNumbers === false ? "ring" : d.trayNumbers === true ? "icons" : backend.defaultTrayStyle);
         delete s.trayNumbers;
         s.floatingPill = d.floatingPill === true;
         root.settings = s;
@@ -214,7 +215,7 @@ Window {
             });
         }
         backend.publishTrayState(JSON.stringify({
-            style: root.settings.trayStyle || "icons",
+            style: root.settings.trayStyle || backend.defaultTrayStyle,
             floatingPill: root.settings.floatingPill === true,
             // The active provider's logo leads the numbers, or sits inside the ring.
             icon: p ? root.providerIcon(p) : "",
@@ -385,6 +386,10 @@ Window {
 
     Component.onCompleted: {
         root.loadSettings();
+        // The first start (no settings file yet): write one now, so that what
+        // app.py does for a first start — open the popup — happens only once.
+        if (backend.firstRun)
+            root.saveSettings();
         backend.history("autoload", "");
     }
 

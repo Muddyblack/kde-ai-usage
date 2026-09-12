@@ -17,6 +17,7 @@ brings PySide6 (or `make run-windows`), else `pip install -r windows/requirement
                                          into F (PNG) and exit
 """
 
+import getpass
 import json
 import os
 import re
@@ -37,7 +38,22 @@ from aiusage import config, history, historyio, paths  # noqa: E402
 from aiusage.__main__ import snapshot  # noqa: E402
 
 APP_NAME = "AI Usage"
-SERVER_NAME = "ai-usage-widget-tray"
+
+
+def _server_name():
+    """The single-instance socket's name, one per user. On Windows it is a
+    named pipe, which every session on the machine shares: with one name for
+    everybody, a second signed-in user's start was handed to the first user's
+    copy instead of starting their own."""
+    try:
+        user = getpass.getuser()
+    except (ImportError, KeyError, OSError):
+        user = ""
+    user = re.sub(r"[^A-Za-z0-9_.-]", "_", user)
+    return f"ai-usage-widget-tray-{user}" if user else "ai-usage-widget-tray"
+
+
+SERVER_NAME = _server_name()
 ICON_PATH = ROOT / "package" / "contents" / "icons" / "org.muddyblack.aiUsageWidget.svg"
 MAIN_QML = ROOT / "windows" / "qml" / "Main.qml"
 
@@ -48,12 +64,23 @@ _env_lock = threading.Lock()
 
 def collect_snapshot():
     with _env_lock:
-        saved = os.environ.copy()
+        saved = dict(os.environ)
         try:
             return json.dumps(snapshot(), separators=(",", ":"), ensure_ascii=False)
         finally:
-            os.environ.clear()
-            os.environ.update(saved)
+            _restore_environ(saved)
+
+
+def _restore_environ(saved):
+    """Put os.environ back as `saved` had it, touching only what differs.
+    Clearing it and filling it again would leave the process without PATH or
+    SYSTEMROOT for a moment, while other threads — a history save, Qt — may be
+    reading them."""
+    for key in [key for key in os.environ if key not in saved]:
+        del os.environ[key]
+    for key, value in saved.items():
+        if os.environ.get(key) != value:
+            os.environ[key] = value
 
 
 # ── Start with Windows ───────────────────────────────────────────────────────
@@ -103,8 +130,14 @@ def set_autostart(enabled):
 _PERCENT_RE = re.compile(r"^\s*(\d{1,3})(?:\.\d+)?\s*%\s*$")
 
 
-# (setting value, tray menu label), in menu order. The first is the default.
+# (setting value, tray menu label), in menu order.
 TRAY_STYLES = [("icons", "Logo and percent"), ("numbers", "Numbers"), ("ring", "Ring")]
+# The ring on Windows: Windows 11 hides every new tray icon behind the ^
+# overflow until it is dragged onto the taskbar, and the ring is one icon to
+# pin where the other styles are two or more — whose places, all sharing one
+# Qt icon id, Windows is not guaranteed to remember. Elsewhere, the look of the
+# panel pill.
+DEFAULT_TRAY_STYLE = "ring" if paths.IS_WINDOWS else "icons"
 
 
 def tray_style(state):
@@ -113,13 +146,13 @@ def tray_style(state):
     style = state.get("style")
     if style in dict(TRAY_STYLES):
         return style
-    return "ring" if state.get("numbers") is False else TRAY_STYLES[0][0]
+    return "ring" if state.get("numbers") is False else DEFAULT_TRAY_STYLE
 
 
 def tray_entries(state):
     """What the tray shows for a state Main.qml published: one entry per icon.
 
-    "icons" (the default) reads like the panel pill: for every value, the
+    "icons" reads like the panel pill: for every value, the
     provider's logo tinted in the value's colour, then the value as "NN%":
       {"kind": "tinted", …} {"kind": "percent", "value": 0..100, …}
     "numbers": the logo once — its tooltip lists every provider — then each
@@ -236,11 +269,12 @@ class Backend(QObject):
     settingRequested = Signal(str, str)
     popupToggleRequested = Signal()
 
-    def __init__(self):
+    def __init__(self, first_run=False):
         super().__init__()
         self._pool = ThreadPoolExecutor(max_workers=3, thread_name_prefix="aiusage")
         self._busy = False
         self._autostart = autostart_enabled()
+        self._first_run = first_run
 
     # ── Data ──
     def _get_busy(self):
@@ -283,6 +317,16 @@ class Backend(QObject):
                 return fh.read()
         except OSError:
             return "{}"
+
+    @Property(bool, constant=True)
+    def firstRun(self):
+        """No settings file when the app started. Main.qml writes one straight
+        away, and main() opens the popup by itself — both once."""
+        return self._first_run
+
+    @Property(str, constant=True)
+    def defaultTrayStyle(self):
+        return DEFAULT_TRAY_STYLE
 
     @Slot(str)
     def saveSettings(self, text):
@@ -572,7 +616,7 @@ class TrayApp:
             item.setActionGroup(self.style_group)
             item.triggered.connect(lambda _checked=False, key=key: request("trayStyle", key))
             self.style_actions[key] = item
-        self.style_actions[TRAY_STYLES[0][0]].setChecked(True)
+        self.style_actions[DEFAULT_TRAY_STYLE].setChecked(True)
         self.pill_action = QAction("Floating pill")
         self.pill_action.setCheckable(True)
         self.pill_action.toggled.connect(lambda on: request("floatingPill", on))
@@ -929,14 +973,28 @@ def _kwin_keep_pill_above():
     return lambda: scripting.call("unloadScript", KWIN_PLUGIN)
 
 
+_LOG_LIMIT = 1024 * 1024
+
+
 def _install_log():
     """Frozen, the app has no console: sys.stdout and sys.stderr are None and
     Qt's warnings go nowhere. All three go to a file instead, so a traceback
     from a slot — or --selftest's warnings, in CI — can still be read."""
     log_dir = paths.history_dir()
+    path = os.path.join(log_dir, "tray.log")
     try:
         os.makedirs(log_dir, exist_ok=True)
-        log = open(os.path.join(log_dir, "tray.log"), "a", encoding="utf-8", buffering=1)
+    except OSError:
+        return
+    # One older log is kept: a start that finds this one over the limit moves
+    # it to tray.log.1, over the one before.
+    try:
+        if os.path.getsize(path) > _LOG_LIMIT:
+            os.replace(path, path + ".1")
+    except OSError:
+        pass
+    try:
+        log = open(path, "a", encoding="utf-8", buffering=1)
     except OSError:
         return
 
@@ -1018,6 +1076,14 @@ def _hand_off_to_running_instance():
     socket.connectToServer(SERVER_NAME)
     if not socket.waitForConnected(300):
         return False
+    if paths.IS_WINDOWS:
+        # The user just started this process, so Windows lets it bring a
+        # window to the front; hand that on to the running copy. Without it
+        # the popup can open without focus, and a popup that never had focus
+        # never closes on a click elsewhere.
+        import ctypes
+
+        ctypes.windll.user32.AllowSetForegroundWindow(-1)  # ASFW_ANY
     socket.write(b"toggle\n")
     socket.waitForBytesWritten(300)
     socket.disconnectFromServer()
@@ -1049,7 +1115,10 @@ def main(argv):
         # this log when it fails, the .exe having no console to write to.
         _install_log()
 
-    backend = Backend()
+    # No settings file yet: the first start after installing. Main.qml writes
+    # one as it loads (Backend.firstRun), so this holds only once.
+    first_run = not headless and not os.path.isfile(config.config_path())
+    backend = Backend(first_run)
     engine = QQmlApplicationEngine()
     warnings = []
     engine.warnings.connect(lambda errors: warnings.extend(e.toString() for e in errors))
@@ -1063,6 +1132,10 @@ def main(argv):
         return _run_headless(app, engine, backend, warnings, screenshot, "--settings" in argv)
 
     tray = TrayApp(app, engine, backend)
+    if first_run:
+        # Windows 11 puts a new tray icon out of sight, behind the ^ overflow:
+        # the popup opening by itself shows the app is there, the first time.
+        QTimer.singleShot(1500, tray.show)
     server = QLocalServer()
     QLocalServer.removeServer(SERVER_NAME)
     server.listen(SERVER_NAME)

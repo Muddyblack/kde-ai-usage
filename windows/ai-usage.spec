@@ -1,6 +1,6 @@
 # PyInstaller spec for the Windows tray app. From the repository root:
 #
-#   pip install -r windows/requirements.txt pyinstaller pillow
+#   pip install -r windows/build-requirements.txt
 #   pyinstaller --noconfirm windows/ai-usage.spec
 #
 # Produces dist/AI Usage/AI Usage.exe (one folder: starts faster than a
