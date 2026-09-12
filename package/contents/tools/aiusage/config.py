@@ -7,6 +7,8 @@ values through WIDGET_* environment variables. Environment always wins.
 import json
 import os
 
+from . import paths
+
 ALL_PROVIDERS = [
     "claude",
     "antigravity",
@@ -45,16 +47,18 @@ _KEY_EXPORTS = [
 
 
 def config_path():
+    # The name predates the Windows frontend, which shares the same file and
+    # format — renaming it would orphan every existing Hyprland config.
     return os.environ.get(
         "AI_USAGE_CONFIG",
-        os.path.join(os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")), "ai-usage-widget", "hyprland-settings.json"),
+        os.path.join(paths.config_home(), paths.APP_DIR, "hyprland-settings.json"),
     )
 
 
 def cache_dir():
     return os.environ.get(
         "AI_USAGE_CACHE_DIR",
-        os.path.join(os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache")), "ai-usage-widget"),
+        os.path.join(paths.cache_home(), paths.APP_DIR),
     )
 
 
@@ -70,7 +74,7 @@ def load_settings():
     if not os.path.isfile(path):
         return {}
     try:
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
         return data if isinstance(data, dict) else {}
     except (OSError, ValueError):

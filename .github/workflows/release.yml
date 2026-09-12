@@ -5,14 +5,20 @@ on:
     tags:
       - "v*"
 
+# Read-only unless a job asks for more; only the jobs that publish do.
+permissions:
+  contents: read
+
 jobs:
+  # The .plasmoid release goes out on its own, so a broken Windows build cannot
+  # hold it back; the Windows files are attached to it once they have passed.
   release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -36,12 +42,14 @@ jobs:
           else
             NOTES="$(git log --pretty=format:'- %s' --no-merges)"
           fi
-          echo "notes<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$NOTES" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
+          {
+            echo "notes<<EOF"
+            echo "$NOTES"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: ${{ steps.info.outputs.version }}
           body: |
@@ -53,4 +61,32 @@ jobs:
             ```
             plasmapkg2 -i ${{ steps.info.outputs.artifact }}
             ```
-          files: ${{ steps.info.outputs.artifact }}
+
+            **Windows:** run `AI-Usage-Setup-${{ steps.info.outputs.version }}.exe` (no admin rights needed; it updates an existing install in place). Or unzip `ai-usage-windows-${{ steps.info.outputs.version }}.zip` anywhere and run `AI Usage.exe`. Either way it lives in the tray. Both are attached a few minutes after the release appears, once their build has passed.
+          files: |
+            ${{ steps.info.outputs.artifact }}
+
+  # The workflow every push runs — the tests, the build, the built .exe's own
+  # selftest, the installer — with the release's version in the file names.
+  windows:
+    uses: ./.github/workflows/windows.yml
+    with:
+      version: ${{ github.ref_name }}
+
+  windows-assets:
+    needs: [release, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: ai-usage-windows
+
+      - name: Attach the Windows build to the release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: |
+            ai-usage-windows-*.zip
+            AI-Usage-Setup-*.exe

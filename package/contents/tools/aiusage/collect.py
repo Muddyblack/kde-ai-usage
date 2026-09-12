@@ -37,7 +37,7 @@ def read_json_file(path):
     if not os.path.isfile(path):
         return None
     try:
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             return as_json(f.read())
     except OSError:
         return None
@@ -63,7 +63,7 @@ def status_json(name, url):
         if body is not None:
             try:
                 os.makedirs(config.cache_dir(), exist_ok=True)
-                with open(cache_path, "w") as f:
+                with open(cache_path, "w", encoding="utf-8") as f:
                     f.write(result.body)
             except OSError:
                 pass

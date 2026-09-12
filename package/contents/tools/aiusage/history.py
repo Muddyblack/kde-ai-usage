@@ -23,6 +23,9 @@ import math
 import os
 import re
 import sys
+import time
+
+from . import paths
 
 # Mirrors DEFAULT_LIMIT in UsageHistory.js — see the note there.
 DEFAULT_LIMIT = 10000
@@ -129,6 +132,24 @@ def _read(path):
     return data if isinstance(data, list) else None
 
 
+def replace(tmp, path):
+    """os.replace(), retried for a moment on Windows.
+
+    POSIX renames over a file that someone has open. Windows refuses with a
+    PermissionError instead, for as long as any reader holds the file — which
+    is only ever for the few milliseconds a load takes, so waiting that out is
+    enough."""
+    attempts = 40 if paths.IS_WINDOWS else 1
+    for attempt in range(attempts):
+        try:
+            os.replace(tmp, path)
+            return
+        except PermissionError:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(0.05)
+
+
 def save(path, incoming, limit=None, keep_existing=False):
     """Union `incoming` into the file at `path` and write the result back.
 
@@ -156,7 +177,7 @@ def save(path, incoming, limit=None, keep_existing=False):
             json.dump(merged, fh, separators=(",", ":"))
         # A rename is atomic, so a reader without the lock sees the whole old
         # file or the whole new one, never a half-written array.
-        os.replace(tmp, path)
+        replace(tmp, path)
     except BaseException:
         try:
             os.unlink(tmp)

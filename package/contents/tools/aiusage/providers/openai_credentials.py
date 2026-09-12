@@ -29,7 +29,7 @@ def get_openai_credentials():
     auth_path = os.path.expanduser("~/.codex/auth.json")
     if os.path.isfile(auth_path):
         try:
-            with open(auth_path) as f:
+            with open(auth_path, encoding="utf-8") as f:
                 codex_auth = as_json(f.read())
         except OSError:
             codex_auth = None

@@ -1,10 +1,14 @@
-"""Runs the antigravity-usage CLI if present, else scans /proc for the
-Antigravity language server and probes its local API directly.
+"""Runs the antigravity-usage CLI if present, else scans the process table for
+the Antigravity language server and probes its local API directly.
 
 Ported from tools/sh/get-antigravity-usage. The bash version shelled out to
-`ss`/`netstat` to find the language server's listening ports; this reads
-/proc/[pid]/fd and /proc/net/tcp[6] directly instead, which is both more
+`ss`/`netstat` to find the language server's listening ports; on Linux this
+reads /proc/[pid]/fd and /proc/net/tcp[6] directly instead, which is both more
 portable (no external tool required) and avoids a process fork per probe.
+
+Platforms without /proc (Windows, macOS) go through psutil instead. It is an
+optional import: the Windows build bundles it, and without it the provider
+says what is missing rather than claiming Antigravity is not running.
 """
 
 import datetime
@@ -16,15 +20,27 @@ import subprocess
 import urllib.error
 import urllib.request
 
+from .. import paths
 from ..http import as_json
 
+_HAS_PROC = os.path.isdir("/proc/self")
 
-def _scan_processes():
-    found = []
+
+def _psutil():
+    try:
+        import psutil
+    except ImportError:
+        return None
+    return psutil
+
+
+def _proc_cmdlines():
+    """(pid, argv) for every process whose command line is readable, read
+    straight out of /proc."""
     try:
         pids = [e for e in os.listdir("/proc") if e.isdigit()]
     except OSError:
-        return found
+        return
     for pid in pids:
         try:
             with open(f"/proc/{pid}/cmdline", "rb") as f:
@@ -34,9 +50,31 @@ def _scan_processes():
         parts = raw.split(b"\x00")
         if parts and parts[-1] == b"":
             parts = parts[:-1]
-        args = [a.decode("utf-8", "replace") for a in parts]
+        yield pid, [a.decode("utf-8", "replace") for a in parts]
+
+
+def _psutil_cmdlines():
+    psutil = _psutil()
+    if psutil is None:
+        return
+    # process_iter() with an attribute list reports a process it may not
+    # inspect as None instead of raising AccessDenied.
+    for proc in psutil.process_iter(["pid", "cmdline"]):
+        args = proc.info.get("cmdline")
+        if args:
+            yield proc.info["pid"], list(args)
+
+
+def _scan_processes():
+    found = []
+    for pid, args in _proc_cmdlines() if _HAS_PROC else _psutil_cmdlines():
         text = " ".join(args)
         argv0_name = os.path.basename(args[0]) if args else ""
+        if not _HAS_PROC:
+            # Case-insensitive file systems: the install folder is
+            # "Antigravity", and the CLI is agy.exe.
+            text = text.lower()
+            argv0_name = os.path.splitext(argv0_name)[0].lower()
         # The standalone IDE (and, when active, the VS Code extension's
         # language server) mention "antigravity" in their cmdline and carry
         # a --csrf_token flag we can read straight out of /proc. The
@@ -69,6 +107,24 @@ def _scan_processes():
 
 
 def _pid_listening_ports(pid):
+    return _proc_listening_ports(pid) if _HAS_PROC else _psutil_listening_ports(pid)
+
+
+def _psutil_listening_ports(pid):
+    psutil = _psutil()
+    if psutil is None:
+        return []
+    try:
+        proc = psutil.Process(int(pid))
+        # net_connections() is the psutil 6 name; connections() the older one.
+        lister = getattr(proc, "net_connections", None) or proc.connections
+        conns = lister(kind="tcp")
+    except (psutil.Error, ValueError):
+        return []
+    return sorted({c.laddr.port for c in conns if c.status == psutil.CONN_LISTEN and c.laddr})
+
+
+def _proc_listening_ports(pid):
     inodes = set()
     fd_dir = f"/proc/{pid}/fd"
     try:
@@ -85,7 +141,7 @@ def _pid_listening_ports(pid):
     ports = set()
     for proc_net in ("/proc/net/tcp", "/proc/net/tcp6"):
         try:
-            with open(proc_net) as f:
+            with open(proc_net, encoding="utf-8") as f:
                 lines = f.readlines()[1:]
         except OSError:
             continue
@@ -209,7 +265,11 @@ def _run_agy_usage(agy_path):
             [agy_path, "--output-format", "json", "--print=/usage"],
             capture_output=True,
             text=True,
+            # Named, or Windows decodes the CLI's UTF-8 as its ANSI code page.
+            encoding="utf-8",
+            errors="replace",
             timeout=20,
+            **paths.no_window(),
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
@@ -260,7 +320,9 @@ def get_antigravity_usage():
     cli = shutil.which("aiu") or shutil.which("antigravity-usage")
     if cli:
         try:
-            proc = subprocess.run([cli, "--json"], capture_output=True, text=True, timeout=15)
+            proc = subprocess.run(
+                [cli, "--json"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15, **paths.no_window()
+            )
         except (OSError, subprocess.TimeoutExpired):
             proc = None
         if proc is not None and proc.returncode == 0:
@@ -304,4 +366,6 @@ def get_antigravity_usage():
 
     if found_any_process:
         return {"error": "Antigravity language server found but could not connect to API"}
+    if not _HAS_PROC and _psutil() is None:
+        return {"error": "Finding Antigravity on this platform needs the psutil package"}
     return {"error": "Antigravity is not running. Please open your IDE."}

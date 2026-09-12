@@ -215,6 +215,60 @@ settings are stored locally in
 `~/.config/ai-usage-widget/hyprland-settings.json` (or under
 `$XDG_CONFIG_HOME`).
 
+### Windows *(preview)*
+
+A tray app with the same popup as the Hyprland panel — the QML is shared, not
+copied — backed by the same provider package. Download
+`AI-Usage-Setup-<version>.exe` from a release and run it: no admin rights, a
+Start menu entry, an optional *Start when I sign in*, and an uninstaller under
+*Installed apps*; running a newer one updates in place. (Or take
+`ai-usage-windows-<version>.zip`, unzip it anywhere and run `AI Usage.exe`.)
+The app isn't code-signed yet, so SmartScreen asks once: *More info → Run
+anyway*. It sits in the notification area: click the icon for the popup,
+right-click for **Refresh**, **Settings**, **Tray style**, **Floating pill**,
+**Start with Windows** and **Quit**. Three tray styles (also under *Settings →
+Display*):
+
+- **Ring** (default) — a single icon, the logo inside a usage ring: one icon to
+  keep in view.
+- **Logo and percent** — like the panel pill: for each value of the active tab,
+  the provider's logo tinted by level, then `NN%`. Windows gives every tray icon
+  the same square, so that is two icons per value.
+- **Numbers** — the logo once, then each value as plain coloured digits.
+
+**Floating pill** adds the panel's own pill as a small always-on-top window —
+drag it anywhere, it stays where it was left; a click opens the popup beside it.
+
+Windows 11 puts new tray icons in the `^` overflow at first — which is why the
+very first start opens the popup by itself: drag the icon onto the taskbar
+once, or turn it on under *Settings → Personalization → Taskbar → Other system
+tray icons*. Starting AI Usage again from the Start menu while it runs opens
+the popup too. Nothing to install — Python and Qt ship inside the folder.
+
+It reads the same logins as on Linux, which the CLIs keep under your profile on
+Windows too (`%USERPROFILE%\.claude`, `.codex`, `.gemini`, `.copilot`, …). The
+VS Code-family IDEs (Cursor, Kiro) are read from `%APPDATA%`. Its own files:
+
+| What | Where |
+|---|---|
+| Settings (same format as Hyprland's) | `%APPDATA%\ai-usage-widget\hyprland-settings.json` |
+| Usage history | `%LOCALAPPDATA%\ai-usage-widget\` |
+| Log (Qt warnings and Python errors; the previous one is `tray.log.1`) | `%LOCALAPPDATA%\ai-usage-widget\tray.log` |
+
+Antigravity is found through `psutil`, which the build bundles. Running from a
+checkout instead:
+
+```powershell
+pip install -r windows/requirements.txt
+python windows/app.py
+```
+
+The app runs on Linux as well, which is how it is developed —
+`make run-windows`, or `python windows/app.py` inside `nix develop .#windows`
+(a separate shell, so the everyday one stays free of PySide6). See
+[docs/windows.md](docs/windows.md) for building the `.exe` and testing it in a
+Windows VM.
+
 ### Terminal
 
 `ai-usage-cli` renders the same provider data as a table, with no Plasma,
@@ -297,9 +351,11 @@ Claude needs no key — a local Claude Code login is enough. See
 
 ### Shared provider backend
 
-All three frontends — the Plasma widget, the Hyprland/Quickshell shell and the
-terminal frontend — get every provider value from one executable,
-`package/contents/tools/sh/get-ai-usage`.
+All four frontends — the Plasma widget, the Hyprland/Quickshell shell, the
+Windows tray app and the terminal frontend — get every provider value from one
+package. The Linux frontends run it through
+`package/contents/tools/sh/get-ai-usage`; the Windows app, which has no shell,
+calls it in-process.
 It owns credential discovery, provider API requests, response parsing, quota
 maths, reset timestamps and error/stale state, and returns a versioned,
 frontend-neutral JSON model:
@@ -419,6 +475,12 @@ access is needed. `tests/ai-usage-cli.test.sh` renders those same fixtures
 through the terminal frontend, checking among other things that a provider which
 cannot report still gets a row instead of silently vanishing from the table.
 `tests/shared-code.test.js` covers the JavaScript both QML frontends share.
+
+`tests/python/` holds the portable suites — plain `unittest`, no shell — that
+CI also runs on Windows: platform paths, the shared history file and its lock,
+the Codex app-server client against a fake `codex.cmd`, finding Antigravity
+through `psutil`, and the tray app loading its QML headless with every settings
+section opened once (`make test-py`, or `python windows/app.py --selftest`).
 
 ---
 

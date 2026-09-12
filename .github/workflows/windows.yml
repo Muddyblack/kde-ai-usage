@@ -1,0 +1,117 @@
+name: Windows
+
+# The portable half of the tests (tests/python) on Windows and Linux, the tray
+# app's QML loaded headless on both, and the Windows build: the .exe, checked
+# with its own --selftest, zipped and wrapped in the installer. release.yml runs
+# this same workflow for a tag and attaches what it builds to the release.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+  # A build from any branch by hand: Actions → Windows → Run workflow.
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      version:
+        description: The release's version (a leading "v" is dropped); names the files and the installer
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      QT_QPA_PLATFORM: offscreen
+      PYTHONPATH: package/contents/tools
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Qt runtime libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3
+
+      # The app's ranges, not the build's pins: the newest PySide6 is tried here
+      # before a bump of windows/build-requirements.txt ships it.
+      - name: install
+        run: python -m pip install -r windows/requirements.txt
+
+      - name: unit tests
+        run: python -m unittest discover -s tests/python -v
+
+      - name: backend smoke run
+        run: python -m aiusage --provider claude,antigravity,openai
+
+      - name: tray app loads
+        run: python windows/app.py --selftest
+
+  build:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: version
+        shell: pwsh
+        env:
+          # Through the environment rather than spliced into the script.
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          $version = "$env:INPUT_VERSION".TrimStart("v")
+          if (-not $version) { $version = "0.0.0-ci" }
+          "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: build
+        run: |
+          python -m pip install -r windows/build-requirements.txt
+          pyinstaller --noconfirm windows/ai-usage.spec
+
+      - name: bundled app loads
+        shell: pwsh
+        # The selftest takes seconds; a hang (a modal error dialog nobody can
+        # click) should fail fast rather than sit out the six-hour job limit.
+        timeout-minutes: 5
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          $p = Start-Process -FilePath "dist/AI Usage/AI Usage.exe" -ArgumentList "--selftest" -Wait -PassThru
+          if ($p.ExitCode -ne 0) {
+            # The .exe has no console; its warnings and errors go to tray.log.
+            Get-Content "$env:LOCALAPPDATA\ai-usage-widget\tray.log" -ErrorAction SilentlyContinue
+            exit $p.ExitCode
+          }
+
+      - name: zip
+        shell: pwsh
+        run: Compress-Archive -Path "dist/AI Usage" -DestinationPath "ai-usage-windows-$env:VERSION.zip"
+
+      - name: installer
+        shell: pwsh
+        run: windows/build-installer.ps1 -Version $env:VERSION
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ai-usage-windows
+          path: |
+            ai-usage-windows-*.zip
+            AI-Usage-Setup-*.exe
+          if-no-files-found: error
+          # A release has its own copy attached; this one is for trying a build.
+          retention-days: 14

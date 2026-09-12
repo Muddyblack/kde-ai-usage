@@ -120,17 +120,23 @@ def normalize_openai(raw):
         return provider_error("openai", "OpenAI", "#10a37f", now, "OpenAI: no API key or Codex login", details)
 
     if codex_available:
+        # Only the windows the plan actually reports. Plans without a 5-hour
+        # window exist (OpenAI dropped it from some), and listing it anyway put
+        # an empty "0%" row in the popups and a fake 0% on the pill.
+        session_on, weekly_on = codex["session"]["available"], codex["weekly"]["available"]
+        headline = codex["session"] if session_on else codex["weekly"]
         r = provider_base("openai", "OpenAI", "#10a37f", now)
         r["summary"] = {
-            "pct": codex["session"]["pct"],
-            "text": f"{jround(codex['session']['pct'])}%",
+            "pct": headline["pct"],
+            "text": f"{jround(headline['pct'])}%",
             "detail": plan + (f" · {creds.get('email')}" if (creds.get("email") or "") != "" else ""),
             "hasChart": True,
         }
-        quota_windows = [
-            quota_window("codex_session", "Codex 5-hour", codex["session"], "ChatGPT/Codex plan window"),
-            quota_window("codex_weekly", "Codex weekly", codex["weekly"], "Secondary plan window"),
-        ]
+        quota_windows = []
+        if session_on:
+            quota_windows.append(quota_window("codex_session", "Codex 5-hour", codex["session"], "ChatGPT/Codex plan window"))
+        if weekly_on:
+            quota_windows.append(quota_window("codex_weekly", "Codex weekly", codex["weekly"], "Secondary plan window"))
         for a in codex["additional"]:
             if a["session"]["available"]:
                 quota_windows.append(
@@ -144,20 +150,25 @@ def normalize_openai(raw):
             if a["weekly"]["available"]:
                 quota_windows.append(quota_window("additional", f"{a['name']} · weekly", a["weekly"], ""))
         r["quotaWindows"] = quota_windows
-        r["slots"] = [
-            {
-                "pct": codex["session"]["pct"],
-                "color": "#10a37f",
-                "text": None,
-                "tooltip": f"Codex 5h: {jround(100 - codex['session']['pct'])}% left",
-            },
-            {
-                "pct": codex["weekly"]["pct"],
-                "color": "#10a37f",
-                "text": None,
-                "tooltip": f"Codex weekly: {jround(100 - codex['weekly']['pct'])}% left",
-            },
-        ]
+        r["slots"] = []
+        if session_on:
+            r["slots"].append(
+                {
+                    "pct": codex["session"]["pct"],
+                    "color": "#10a37f",
+                    "text": None,
+                    "tooltip": f"Codex 5h: {jround(100 - codex['session']['pct'])}% left",
+                }
+            )
+        if weekly_on:
+            r["slots"].append(
+                {
+                    "pct": codex["weekly"]["pct"],
+                    "color": "#10a37f",
+                    "text": None,
+                    "tooltip": f"Codex weekly: {jround(100 - codex['weekly']['pct'])}% left",
+                }
+            )
         r["chartWindows"] = rolling_windows(
             "codex_primary",
             "codex_day",

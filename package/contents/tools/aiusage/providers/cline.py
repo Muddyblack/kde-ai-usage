@@ -32,7 +32,7 @@ def _usage(meta):
 
 def _read_session(path):
     try:
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
     except (OSError, ValueError):
         return None
@@ -48,7 +48,7 @@ def _read_session(path):
         "endedAt": epoch_of(data.get("ended_at") or ""),
         "provider": data.get("provider") if isinstance(data.get("provider"), str) else "",
         "model": data.get("model") if isinstance(data.get("model"), str) else "",
-        "workspace": os.path.basename(workspace.rstrip("/")) if isinstance(workspace, str) else "",
+        "workspace": os.path.basename(workspace.rstrip("/\\")) if isinstance(workspace, str) else "",
         "status": data.get("status") if isinstance(data.get("status"), str) else "",
         **_usage(meta),
     }

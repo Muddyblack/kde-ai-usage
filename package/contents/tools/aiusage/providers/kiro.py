@@ -26,6 +26,7 @@ import re
 import sqlite3
 import time
 
+from .. import paths
 from ..contract import epoch_of, num
 from ..http import as_json, clean_credential, fetch_json, http_error_text
 
@@ -150,7 +151,7 @@ def _usage_record(breakdown, current, limit, percentage, reset, timestamp, sourc
 
 
 def _ide_db():
-    return os.environ.get("KIRO_IDE_DB") or os.path.expanduser("~/.config/Kiro/User/globalStorage/state.vscdb")
+    return os.environ.get("KIRO_IDE_DB") or os.path.join(paths.electron_app_data(), "Kiro", "User", "globalStorage", "state.vscdb")
 
 
 def _ide_usage():
@@ -189,8 +190,7 @@ def _ide_usage():
 def _cli_db():
     if os.environ.get("KIRO_CLI_DB"):
         return os.environ["KIRO_CLI_DB"]
-    base = os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
-    return os.path.join(base, "kiro-cli", "data.sqlite3")
+    return os.path.join(paths.data_home(), "kiro-cli", "data.sqlite3")
 
 
 def _cli_login(db_path):

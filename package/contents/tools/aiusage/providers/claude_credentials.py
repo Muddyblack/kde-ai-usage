@@ -8,7 +8,7 @@ def get_claude_credentials():
     path = os.path.expanduser("~/.claude/.credentials.json")
     if os.path.isfile(path):
         try:
-            with open(path) as f:
+            with open(path, encoding="utf-8") as f:
                 oauth_creds = as_json(f.read())
         except OSError:
             oauth_creds = None

@@ -45,6 +45,7 @@ import os
 import re
 
 from .. import config as _config
+from .. import paths
 from ..billing import price_models
 from ..contract import num
 
@@ -54,11 +55,11 @@ _VIEW_DIR = ".msp-view-v1"
 
 
 def _data_home():
-    return os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
+    return paths.data_home()
 
 
 def _config_home():
-    return os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
+    return paths.config_home()
 
 
 def sessions_root():
@@ -81,7 +82,7 @@ def _read_json(path):
     """None on anything unreadable or malformed. These are other programs'
     files: a corrupt one must cost the provider a field, never the run."""
     try:
-        with open(path, errors="replace") as f:
+        with open(path, encoding="utf-8", errors="replace") as f:
             return json.load(f)
     except (OSError, ValueError):
         return None
@@ -199,7 +200,7 @@ def _scan_file(path):
     except OSError:
         return None
     try:
-        f = open(path, errors="replace")
+        f = open(path, encoding="utf-8", errors="replace")
     except OSError:
         return None
     with f:
@@ -234,7 +235,7 @@ def _scan_file(path):
                 if isinstance(root, str) and root:
                     # Folder name only: enough to tell projects apart in the
                     # tab, without putting a filesystem layout in the envelope.
-                    workspace = os.path.basename(root.rstrip("/")) or root
+                    workspace = os.path.basename(root.rstrip("/\\")) or root
                 continue
             event = payload.get("event")
             if not isinstance(event, dict):
@@ -505,7 +506,7 @@ def get_muse_stats():
     stats = _aggregate(records, catalog)
     try:
         os.makedirs(_config.cache_dir(), exist_ok=True)
-        with open(cache_path, "w") as fh:
+        with open(cache_path, "w", encoding="utf-8") as fh:
             json.dump(stats, fh)
     except OSError:
         pass
