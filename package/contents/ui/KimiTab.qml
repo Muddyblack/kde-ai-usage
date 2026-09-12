@@ -40,11 +40,11 @@ ColumnLayout {
                     return rootItem.formatCountdown(rootItem.dateFromEpoch(modelData.resetAt));
                 }
                 label: modelData.label
-                countdownText: countdown === "resetting..." ? countdown : (countdown ? i18n("in ") + countdown : "")
+                countdownText: countdown === "resetting..." ? countdown : (countdown ? i18n("in %1", countdown) : "")
                 value: modelData.pct
                 barColor: rootItem.kimiBlue
-                tokenText: modelData.used + " / " + modelData.limit + i18n(" used")
-                tooltipText: i18n("Kimi Code ") + modelData.label.toLowerCase() + i18n("\nUsed: ") + modelData.used + " / " + modelData.limit
+                tokenText: i18n("%1 / %2 used", modelData.used, modelData.limit)
+                tooltipText: i18n("Kimi Code %1", modelData.label.toLowerCase()) + "\n" + i18n("Used: %1 / %2", modelData.used, modelData.limit)
             }
         }
 
@@ -69,7 +69,7 @@ ColumnLayout {
                 Layout.fillWidth: true
             }
             PlasmaComponents.Label {
-                text: rootItem.kimiBooster ? rootItem.formatMoney(rootItem.kimiBooster.balance, rootItem.kimiBooster.currency) + i18n(" of ") + rootItem.formatMoney(rootItem.kimiBooster.total, rootItem.kimiBooster.currency) : ""
+                text: rootItem.kimiBooster ? i18n("%1 of %2", rootItem.formatMoney(rootItem.kimiBooster.balance, rootItem.kimiBooster.currency), rootItem.formatMoney(rootItem.kimiBooster.total, rootItem.kimiBooster.currency)) : ""
                 font.pixelSize: 12
                 font.bold: true
                 color: Kirigami.Theme.textColor
@@ -89,7 +89,7 @@ ColumnLayout {
     // The plan failed while the Moonshot balance still answers.
     PlasmaComponents.Label {
         visible: rootItem.kimiPlanError !== "" && rootItem.kimiKeyValid
-        text: i18n("Kimi Code: ") + rootItem.kimiPlanError
+        text: i18n("Kimi Code: %1", rootItem.kimiPlanError)
         font.pixelSize: 10
         opacity: 0.6
         color: Kirigami.Theme.textColor

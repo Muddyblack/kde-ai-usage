@@ -27,7 +27,7 @@ ColumnLayout {
         }
 
         PlasmaComponents.Label {
-            text: rootItem.museFullName !== "" ? i18n("Muse Code · ") + rootItem.museFullName : "Muse Code"
+            text: rootItem.museFullName !== "" ? i18n("Muse Code · %1", rootItem.museFullName) : "Muse Code"
             font.pixelSize: 10
             opacity: 0.65
             color: Kirigami.Theme.textColor
@@ -98,8 +98,8 @@ ColumnLayout {
             label: i18n("Current")
             value: rootItem.museCurrentPct
             barColor: rootItem.museBlue
-            countdownText: rootItem.museCurrentCountdown !== "" ? i18n("in ") + rootItem.museCurrentCountdown : ""
-            tooltipText: i18n("Muse current window") + (rootItem.museCurrentCountdown !== "" ? i18n("\nResets in ") + rootItem.museCurrentCountdown : "")
+            countdownText: rootItem.museCurrentCountdown !== "" ? i18n("in %1", rootItem.museCurrentCountdown) : ""
+            tooltipText: i18n("Muse current window") + (rootItem.museCurrentCountdown !== "" ? "\n" + i18n("Resets in %1", rootItem.museCurrentCountdown) : "")
         }
 
         PopupRow {
@@ -107,8 +107,8 @@ ColumnLayout {
             label: i18n("Weekly")
             value: rootItem.museWeeklyPct
             barColor: rootItem.museBlue
-            countdownText: rootItem.museWeeklyCountdown !== "" ? i18n("in ") + rootItem.museWeeklyCountdown : ""
-            tooltipText: i18n("Muse weekly window") + (rootItem.museWeeklyCountdown !== "" ? i18n("\nResets in ") + rootItem.museWeeklyCountdown : "")
+            countdownText: rootItem.museWeeklyCountdown !== "" ? i18n("in %1", rootItem.museWeeklyCountdown) : ""
+            tooltipText: i18n("Muse weekly window") + (rootItem.museWeeklyCountdown !== "" ? "\n" + i18n("Resets in %1", rootItem.museWeeklyCountdown) : "")
         }
 
         StatValueCard {
@@ -219,7 +219,7 @@ ColumnLayout {
                 visible: rootItem.museTotalTokens > 0
                 tileValue: rootItem.formatTokens(rootItem.museTotalTokens)
                 tileLabel: i18nc("stat label", "tokens")
-                tileTip: rootItem.formatTokens(rootItem.museOutputTokens) + i18n(" output · ") + rootItem.formatTokens(rootItem.museInputTokens) + i18n(" input (context is resent each call)")
+                tileTip: i18n("%1 output", rootItem.formatTokens(rootItem.museOutputTokens)) + " · " + i18n("%1 input (context is resent each call)", rootItem.formatTokens(rootItem.museInputTokens))
             }
             StatTile {
                 visible: rootItem.museCostUSD > 0
@@ -230,23 +230,25 @@ ColumnLayout {
             StatTile {
                 tileValue: Math.round(rootItem.museStatsTotalSessions).toString()
                 tileLabel: i18nc("stat label", "sessions")
-                tileTip: rootItem.formatTokens(rootItem.museStatsTotalMessages) + i18n(" messages total")
+                tileTip: i18n("%1 messages total", rootItem.formatTokens(rootItem.museStatsTotalMessages))
             }
             StatTile {
                 tileValue: Math.round(rootItem.museStatsActiveDays) + (rootItem.museStatsSpanDays > 0 ? "/" + Math.round(rootItem.museStatsSpanDays) : "")
                 tileLabel: i18n("active days")
-                tileTip: rootItem.museStatsFirstDate ? i18n("Since ") + Qt.formatDate(new Date(rootItem.museStatsFirstDate), "MMM d, yyyy") : ""
+                tileTip: rootItem.museStatsFirstDate ? i18n("Since %1", Qt.formatDate(new Date(rootItem.museStatsFirstDate), "MMM d, yyyy")) : ""
             }
             StatTile {
-                tileValue: Math.round(rootItem.museStatsCurrentStreak) + i18n("d")
+                // xgettext:no-javascript-format
+                tileValue: i18nc("streak length in days, abbreviated", "%1d", Math.round(rootItem.museStatsCurrentStreak))
                 tileLabel: i18nc("stat label", "streak")
-                tileSub: i18n("best ") + Math.round(rootItem.museStatsLongestStreak) + i18n("d")
-                tileTip: i18n("Current consecutive-day streak\nLongest: ") + Math.round(rootItem.museStatsLongestStreak) + i18n(" days")
+                // xgettext:no-javascript-format
+                tileSub: i18nc("longest streak in days, abbreviated", "best %1d", Math.round(rootItem.museStatsLongestStreak))
+                tileTip: i18np("Current consecutive-day streak\nLongest: %1 day", "Current consecutive-day streak\nLongest: %1 days", Math.round(rootItem.museStatsLongestStreak))
             }
             StatTile {
                 tileValue: rootItem.formatDuration(rootItem.museStatsLongestSessionMs)
                 tileLabel: i18n("longest session")
-                tileSub: rootItem.museStatsLongestSessionMessages > 0 ? Math.round(rootItem.museStatsLongestSessionMessages) + i18n(" msgs") : ""
+                tileSub: rootItem.museStatsLongestSessionMessages > 0 ? i18np("%1 msg", "%1 msgs", Math.round(rootItem.museStatsLongestSessionMessages)) : ""
             }
             StatTile {
                 visible: rootItem.museStatsPeakHour >= 0
@@ -306,7 +308,7 @@ ColumnLayout {
                     Layout.fillWidth: true
                 }
                 PlasmaComponents.Label {
-                    text: rootItem.formatTokens(parent.entry.output || 0) + i18n(" out")
+                    text: i18n("%1 out", rootItem.formatTokens(parent.entry.output || 0))
                     font.pixelSize: 10
                     opacity: 0.6
                     color: Kirigami.Theme.textColor

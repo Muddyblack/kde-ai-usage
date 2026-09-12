@@ -37,7 +37,7 @@ ColumnLayout {
         }
 
         PlasmaComponents.Label {
-            text: rootItem.zaiLevel !== "" ? i18n("Z.AI · ") + rootItem.zaiLevel : "Z.AI"
+            text: rootItem.zaiLevel !== "" ? i18n("Z.AI · %1", rootItem.zaiLevel) : "Z.AI"
             font.pixelSize: 10
             opacity: 0.65
             color: Kirigami.Theme.textColor
@@ -118,18 +118,18 @@ ColumnLayout {
             label: i18n("5h Tokens")
             value: rootItem.zaiTokenPct
             barColor: rootItem.zaiBlue
-            countdownText: rootItem.zaiTokenCountdown !== "" ? i18n("in ") + rootItem.zaiTokenCountdown : ""
+            countdownText: rootItem.zaiTokenCountdown !== "" ? i18n("in %1", rootItem.zaiTokenCountdown) : ""
             tokenText: rootItem.zaiTokenUsed === null || rootItem.zaiTokenLimit === null ? "—" : zaiTabRoot.fmt(rootItem.zaiTokenUsed) + " / " + zaiTabRoot.fmt(rootItem.zaiTokenLimit)
-            tooltipText: i18n("Z.AI token quota") + (rootItem.zaiTokenCountdown !== "" ? i18n("\nResets in ") + rootItem.zaiTokenCountdown : "")
+            tooltipText: i18n("Z.AI token quota") + (rootItem.zaiTokenCountdown !== "" ? "\n" + i18n("Resets in %1", rootItem.zaiTokenCountdown) : "")
         }
 
         PopupRow {
             label: i18n("Monthly Tools")
             value: rootItem.zaiToolsPct
             barColor: rootItem.zaiBlue
-            countdownText: rootItem.zaiToolsCountdown !== "" ? i18n("in ") + rootItem.zaiToolsCountdown : ""
-            tokenText: rootItem.zaiToolsRemaining !== null ? zaiTabRoot.fmt(rootItem.zaiToolsRemaining) + i18n(" remaining") : "—"
-            tooltipText: i18n("Z.AI monthly tool quota") + (rootItem.zaiToolsCountdown !== "" ? i18n("\nResets in ") + rootItem.zaiToolsCountdown : "")
+            countdownText: rootItem.zaiToolsCountdown !== "" ? i18n("in %1", rootItem.zaiToolsCountdown) : ""
+            tokenText: rootItem.zaiToolsRemaining !== null ? i18n("%1 remaining", zaiTabRoot.fmt(rootItem.zaiToolsRemaining)) : "—"
+            tooltipText: i18n("Z.AI monthly tool quota") + (rootItem.zaiToolsCountdown !== "" ? "\n" + i18n("Resets in %1", rootItem.zaiToolsCountdown) : "")
         }
 
         Rectangle {

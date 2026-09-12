@@ -76,13 +76,13 @@ ColumnLayout {
 
         PopupRow {
             label: i18n("Included usage")
-            countdownText: rootItem.cursorCountdown === "resetting..." ? i18n("resetting...") : (rootItem.cursorCountdown ? i18n("in ") + rootItem.cursorCountdown : "")
+            countdownText: rootItem.cursorCountdown === "resetting..." ? i18n("resetting...") : (rootItem.cursorCountdown ? i18n("in %1", rootItem.cursorCountdown) : "")
             value: rootItem.cursorTotalPct
             barColor: rootItem.cursorWhite
             etaText: rootItem.usageHistory.length >= 0 ? rootItem.etaToFull("cu", rootItem.cursorTotalPct) : ""
             deltaText: rootItem.usageHistory.length >= 0 ? rootItem.periodDelta("cu", rootItem.cursorTotalPct, 30 * 24 * 3600000, i18n("last month")) : ""
-            tokenText: rootItem.cursorLimit > 0 ? rootItem.formatMoney(rootItem.cursorIncludedSpend, "USD") + " / " + rootItem.formatMoney(rootItem.cursorLimit, "USD") + i18n(" used") : Math.round(rootItem.cursorTotalPct) + i18n("% of included usage")
-            tooltipText: i18n("Cursor included usage this billing cycle") + (rootItem.cursorResetTime ? i18n("\nResets: ") + rootItem.cursorResetTime : "")
+            tokenText: rootItem.cursorLimit > 0 ? i18n("%1 / %2 used", rootItem.formatMoney(rootItem.cursorIncludedSpend, "USD"), rootItem.formatMoney(rootItem.cursorLimit, "USD")) : i18n("%1% of included usage", Math.round(rootItem.cursorTotalPct))
+            tooltipText: i18n("Cursor included usage this billing cycle") + (rootItem.cursorResetTime ? "\n" + i18n("Resets: %1", rootItem.cursorResetTime) : "")
         }
 
         // Cursor meters Auto/Composer and hand-picked API models separately.
@@ -221,7 +221,7 @@ ColumnLayout {
                 visible: (cursorTabRoot.stats.totalTokens || 0) > 0
                 tileValue: rootItem.formatTokens(cursorTabRoot.stats.totalTokens || 0)
                 tileLabel: i18nc("stat label", "tokens")
-                tileTip: rootItem.formatTokens(cursorTabRoot.stats.totalOutputTokens || 0) + i18n(" output · ") + rootItem.formatTokens(cursorTabRoot.stats.totalInputTokens || 0) + i18n(" input · ") + rootItem.formatTokens(cursorTabRoot.stats.totalCachedTokens || 0) + i18n(" cache read")
+                tileTip: i18n("%1 output", rootItem.formatTokens(cursorTabRoot.stats.totalOutputTokens || 0)) + " · " + i18n("%1 input", rootItem.formatTokens(cursorTabRoot.stats.totalInputTokens || 0)) + " · " + i18n("%1 cache read", rootItem.formatTokens(cursorTabRoot.stats.totalCachedTokens || 0))
             }
             StatTile {
                 visible: (cursorTabRoot.stats.totalCostUSD || 0) > 0
@@ -241,7 +241,7 @@ ColumnLayout {
             StatTile {
                 tileValue: Math.round(cursorTabRoot.stats.activeDays || 0) + ((cursorTabRoot.stats.spanDays || 0) > 0 ? "/" + Math.round(cursorTabRoot.stats.spanDays) : "")
                 tileLabel: i18n("active days")
-                tileTip: cursorTabRoot.stats.firstDate ? i18n("Since ") + Qt.formatDate(new Date(cursorTabRoot.stats.firstDate), "MMM d, yyyy") : ""
+                tileTip: cursorTabRoot.stats.firstDate ? i18n("Since %1", Qt.formatDate(new Date(cursorTabRoot.stats.firstDate), "MMM d, yyyy")) : ""
             }
             StatTile {
                 visible: cursorTabRoot.stats.peakHour !== undefined && cursorTabRoot.stats.peakHour >= 0
@@ -253,7 +253,7 @@ ColumnLayout {
                 visible: (cursorTabRoot.stats.longestSessionMs || 0) > 0
                 tileValue: rootItem.formatDuration(cursorTabRoot.stats.longestSessionMs || 0)
                 tileLabel: i18n("longest chat")
-                tileSub: (cursorTabRoot.stats.longestSessionMessages || 0) > 0 ? Math.round(cursorTabRoot.stats.longestSessionMessages) + i18n(" reqs") : ""
+                tileSub: (cursorTabRoot.stats.longestSessionMessages || 0) > 0 ? i18np("%1 req", "%1 reqs", Math.round(cursorTabRoot.stats.longestSessionMessages)) : ""
             }
         }
 
@@ -290,7 +290,7 @@ ColumnLayout {
                     Layout.fillWidth: true
                 }
                 PlasmaComponents.Label {
-                    text: rootItem.formatTokens(parent.entry.total || 0) + i18n(" tok")
+                    text: i18n("%1 tok", rootItem.formatTokens(parent.entry.total || 0))
                     font.pixelSize: 10
                     opacity: 0.6
                     color: Kirigami.Theme.textColor

@@ -164,7 +164,7 @@ ColumnLayout {
                         Layout.alignment: Qt.AlignRight
                     }
                     PlasmaComponents.Label {
-                        text: mistralTabRoot.fmtTokens(rootItem.mistralVibeTotalTokens) + i18n(" tokens")
+                        text: i18n("%1 tokens", mistralTabRoot.fmtTokens(rootItem.mistralVibeTotalTokens))
                         font.pixelSize: 11
                         opacity: 0.7
                         color: Kirigami.Theme.textColor
@@ -324,7 +324,7 @@ ColumnLayout {
                     }
                     PlasmaComponents.Label {
                         visible: rootItem.mistralVibeToolFail > 0
-                        text: "· " + rootItem.mistralVibeToolFail + i18n(" failed")
+                        text: "· " + i18n("%1 failed", rootItem.mistralVibeToolFail)
                         font.pixelSize: 10
                         color: "#ff6b6b"
                         opacity: 0.8
@@ -360,7 +360,7 @@ ColumnLayout {
                 Layout.fillWidth: true
             }
             PlasmaComponents.Label {
-                text: rootItem.mistralVibeRecent.length + i18n(" of ") + rootItem.mistralVibeSessionCount
+                text: i18n("%1 of %2", rootItem.mistralVibeRecent.length, rootItem.mistralVibeSessionCount)
                 font.pixelSize: 9
                 opacity: 0.4
                 color: Kirigami.Theme.textColor
@@ -412,7 +412,7 @@ ColumnLayout {
                                 hoverEnabled: true
                                 QQC2.ToolTip.visible: containsMouse
                                 QQC2.ToolTip.delay: 400
-                                QQC2.ToolTip.text: (modelData.title || i18n("untitled")) + "\n" + mistralTabRoot.fmtTokens(modelData.tokens || 0) + i18n(" tokens") + "  ·  $" + (modelData.cost || 0).toFixed(4) + (modelData.project ? "\n" + modelData.project : "") + (modelData.branch ? " ⎇ " + modelData.branch : "") + (modelData.start ? "\n" + Qt.formatDateTime(new Date(modelData.start), "MMM d, hh:mm") : "")
+                                QQC2.ToolTip.text: (modelData.title || i18n("untitled")) + "\n" + i18n("%1 tokens", mistralTabRoot.fmtTokens(modelData.tokens || 0)) + "  ·  $" + (modelData.cost || 0).toFixed(4) + (modelData.project ? "\n" + modelData.project : "") + (modelData.branch ? " ⎇ " + modelData.branch : "") + (modelData.start ? "\n" + Qt.formatDateTime(new Date(modelData.start), "MMM d, hh:mm") : "")
                             }
 
                             RowLayout {

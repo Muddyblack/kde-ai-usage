@@ -54,7 +54,7 @@ ColumnLayout {
             border.width: 1
             border.color: Qt.rgba(effortColor.r, effortColor.g, effortColor.b, 0.35)
             QQC2.ToolTip.visible: effortMA.containsMouse
-            QQC2.ToolTip.text: i18n("Thinking budget: ") + rootItem.claudeEffortLevel
+            QQC2.ToolTip.text: i18n("Thinking budget: %1", rootItem.claudeEffortLevel)
             QQC2.ToolTip.delay: 400
             MouseArea {
                 id: effortMA
@@ -65,7 +65,7 @@ ColumnLayout {
             PlasmaComponents.Label {
                 id: effortChipLabel
                 anchors.centerIn: parent
-                text: i18nc("effort level", "effort: ") + rootItem.effortLabel(rootItem.claudeEffortLevel)
+                text: i18nc("effort level", "effort: %1", rootItem.effortLabel(rootItem.claudeEffortLevel))
                 font.pixelSize: 9
                 font.bold: true
                 color: parent.effortColor
@@ -134,27 +134,27 @@ ColumnLayout {
     PopupRow {
         visible: claudeTabRoot.subTab === "usage" && rootItem.sessionAvailable
         label: i18n("5 Hours")
-        resetText: rootItem.sessionResetTime ? i18n("resets ") + rootItem.sessionResetTime : ""
-        countdownText: rootItem.sessionCountdown === "resetting..." ? i18n("resetting...") : (rootItem.sessionCountdown ? i18n("in ") + rootItem.sessionCountdown : "")
+        resetText: rootItem.sessionResetTime ? i18n("resets %1", rootItem.sessionResetTime) : ""
+        countdownText: rootItem.sessionCountdown === "resetting..." ? i18n("resetting...") : (rootItem.sessionCountdown ? i18n("in %1", rootItem.sessionCountdown) : "")
         value: rootItem.sessionPct
         barColor: rootItem.sessionColor
         etaText: rootItem.usageHistory.length >= 0 ? rootItem.etaToFull("s", rootItem.sessionPct) : ""
         deltaText: rootItem.usageHistory.length >= 0 ? rootItem.periodDelta("s", rootItem.sessionPct, 24 * 3600000, i18n("yesterday")) : ""
-        tokenText: rootItem.sessionTokensUsed > 0 ? rootItem.formatTokens(rootItem.sessionTokensUsed) + (rootItem.sessionTokenLimit > 0 ? " / " + rootItem.formatTokens(rootItem.sessionTokenLimit) : "") + i18n(" tokens") : ""
-        tooltipText: i18n("Claude 5-hour rolling window\nUsage: ") + Math.round(rootItem.sessionPct) + "%" + (rootItem.sessionTokensUsed > 0 ? "\n" + rootItem.formatTokens(rootItem.sessionTokensUsed) + (rootItem.sessionTokenLimit > 0 ? " / " + rootItem.formatTokens(rootItem.sessionTokenLimit) : "") + i18n(" tokens") : "") + (rootItem.sessionResetTime ? i18n("\nResets: ") + rootItem.sessionResetTime : "")
+        tokenText: rootItem.sessionTokensUsed > 0 ? i18n("%1 tokens", rootItem.formatTokens(rootItem.sessionTokensUsed) + (rootItem.sessionTokenLimit > 0 ? " / " + rootItem.formatTokens(rootItem.sessionTokenLimit) : "")) : ""
+        tooltipText: i18n("Claude 5-hour rolling window\nUsage: %1%", Math.round(rootItem.sessionPct)) + (rootItem.sessionTokensUsed > 0 ? "\n" + i18n("%1 tokens", rootItem.formatTokens(rootItem.sessionTokensUsed) + (rootItem.sessionTokenLimit > 0 ? " / " + rootItem.formatTokens(rootItem.sessionTokenLimit) : "")) : "") + (rootItem.sessionResetTime ? "\n" + i18n("Resets: %1", rootItem.sessionResetTime) : "")
     }
 
     PopupRow {
         visible: claudeTabRoot.subTab === "usage" && rootItem.weeklyAvailable
         label: i18n("7 Days")
-        resetText: rootItem.weeklyResetTime ? i18n("resets ") + rootItem.weeklyResetTime : ""
-        countdownText: rootItem.weeklyCountdown === "resetting..." ? i18n("resetting...") : (rootItem.weeklyCountdown ? i18n("in ") + rootItem.weeklyCountdown : "")
+        resetText: rootItem.weeklyResetTime ? i18n("resets %1", rootItem.weeklyResetTime) : ""
+        countdownText: rootItem.weeklyCountdown === "resetting..." ? i18n("resetting...") : (rootItem.weeklyCountdown ? i18n("in %1", rootItem.weeklyCountdown) : "")
         value: rootItem.weeklyPct
         barColor: rootItem.weeklyColor
         etaText: rootItem.usageHistory.length >= 0 ? rootItem.etaToFull("w", rootItem.weeklyPct) : ""
         deltaText: rootItem.usageHistory.length >= 0 ? rootItem.periodDelta("w", rootItem.weeklyPct, 7 * 24 * 3600000, i18n("last week")) : ""
-        tokenText: rootItem.weeklyTokensUsed > 0 ? rootItem.formatTokens(rootItem.weeklyTokensUsed) + (rootItem.weeklyTokenLimit > 0 ? " / " + rootItem.formatTokens(rootItem.weeklyTokenLimit) : "") + i18n(" tokens") : ""
-        tooltipText: i18n("Claude 7-day rolling window\nUsage: ") + Math.round(rootItem.weeklyPct) + "%" + (rootItem.weeklyTokensUsed > 0 ? "\n" + rootItem.formatTokens(rootItem.weeklyTokensUsed) + (rootItem.weeklyTokenLimit > 0 ? " / " + rootItem.formatTokens(rootItem.weeklyTokenLimit) : "") + i18n(" tokens") : "") + (rootItem.weeklyResetTime ? i18n("\nResets: ") + rootItem.weeklyResetTime : "")
+        tokenText: rootItem.weeklyTokensUsed > 0 ? i18n("%1 tokens", rootItem.formatTokens(rootItem.weeklyTokensUsed) + (rootItem.weeklyTokenLimit > 0 ? " / " + rootItem.formatTokens(rootItem.weeklyTokenLimit) : "")) : ""
+        tooltipText: i18n("Claude 7-day rolling window\nUsage: %1%", Math.round(rootItem.weeklyPct)) + (rootItem.weeklyTokensUsed > 0 ? "\n" + i18n("%1 tokens", rootItem.formatTokens(rootItem.weeklyTokensUsed) + (rootItem.weeklyTokenLimit > 0 ? " / " + rootItem.formatTokens(rootItem.weeklyTokenLimit) : "")) : "") + (rootItem.weeklyResetTime ? "\n" + i18n("Resets: %1", rootItem.weeklyResetTime) : "")
     }
 
     // ── API cost estimate (subscription users without admin API key) ───────────
@@ -178,7 +178,7 @@ ColumnLayout {
 
         QQC2.ToolTip.visible: costEstMA.containsMouse
         QQC2.ToolTip.delay: 300
-        QQC2.ToolTip.text: i18n("Estimated API cost for your 7-day token usage\n") + i18n("if billed at pay-as-you-go rates.\n\n") + i18n("Assumes 3:1 input:output token ratio.\n") + i18n("Actual cost depends on model mix used.\n\n") + i18n("Add a Claude Admin API key in settings\nfor exact per-model billing data.")
+        QQC2.ToolTip.text: i18n("Estimated API cost for your 7-day token usage\nif billed at pay-as-you-go rates.\n\nAssumes 3:1 input:output token ratio.\nActual cost depends on model mix used.\n\nAdd a Claude Admin API key in settings\nfor exact per-model billing data.")
 
         MouseArea {
             id: costEstMA
@@ -207,7 +207,7 @@ ColumnLayout {
                     color: Kirigami.Theme.textColor
                 }
                 PlasmaComponents.Label {
-                    text: "~" + rootItem.formatTokens(rootItem.weeklyTokensUsed) + i18n(" tokens")
+                    text: "~" + i18n("%1 tokens", rootItem.formatTokens(rootItem.weeklyTokensUsed))
                     font.pixelSize: 9
                     opacity: 0.35
                     color: Kirigami.Theme.textColor
@@ -318,7 +318,7 @@ ColumnLayout {
                 Layout.fillWidth: true
             }
             PlasmaComponents.Label {
-                text: rootItem.formatTokens(rootItem.claudeExtraTokens) + i18n(" tokens remaining")
+                text: i18n("%1 tokens remaining", rootItem.formatTokens(rootItem.claudeExtraTokens))
                 font.pixelSize: 11
                 color: Kirigami.Theme.textColor
                 opacity: 0.8
@@ -331,8 +331,8 @@ ColumnLayout {
         label: i18n("Extra Purchases")
         value: rootItem.claudeExtraUsagePct
         barColor: rootItem.claudeOrange
-        tokenText: rootItem.claudeExtraUsageUsed.toFixed(2) + " / " + rootItem.claudeExtraUsageLimit.toFixed(2) + " " + rootItem.claudeExtraUsageCurrency + i18n(" used")
-        tooltipText: i18n("Claude pay-as-you-go credit spend\nLimit: ") + rootItem.claudeExtraUsageLimit + " " + rootItem.claudeExtraUsageCurrency
+        tokenText: i18n("%1 / %2 %3 used", rootItem.claudeExtraUsageUsed.toFixed(2), rootItem.claudeExtraUsageLimit.toFixed(2), rootItem.claudeExtraUsageCurrency)
+        tooltipText: i18n("Claude pay-as-you-go credit spend\nLimit: %1 %2", rootItem.claudeExtraUsageLimit, rootItem.claudeExtraUsageCurrency)
     }
 
     ColumnLayout {
@@ -367,7 +367,7 @@ ColumnLayout {
             }
         }
         PlasmaComponents.Label {
-            text: rootItem.formatTokens(rootItem.claudeTotalInputTokens) + i18n(" in  ·  ") + rootItem.formatTokens(rootItem.claudeTotalOutputTokens) + i18n(" out")
+            text: i18n("%1 in", rootItem.formatTokens(rootItem.claudeTotalInputTokens)) + "  ·  " + i18n("%1 out", rootItem.formatTokens(rootItem.claudeTotalOutputTokens))
             font.pixelSize: 9
             opacity: 0.45
             color: Kirigami.Theme.textColor
@@ -395,7 +395,7 @@ ColumnLayout {
                     var m = rootItem.claudeModels[modelData];
                     if (!m)
                         return modelData;
-                    return modelData + i18n("\nInput:  ") + rootItem.formatTokens(m.input_tokens) + i18n(" tokens\nOutput: ") + rootItem.formatTokens(m.output_tokens) + i18n(" tokens\nCost:   ") + (m.priced ? "$" + m.cost_usd.toFixed(4) : i18n("unpriced"));
+                    return modelData + "\n" + i18n("Input: %1 tokens", rootItem.formatTokens(m.input_tokens)) + "\n" + i18n("Output: %1 tokens", rootItem.formatTokens(m.output_tokens)) + "\n" + i18n("Cost: %1", m.priced ? "$" + m.cost_usd.toFixed(4) : i18n("unpriced"));
                 }
                 RowLayout {
                     Layout.fillWidth: true
@@ -412,13 +412,13 @@ ColumnLayout {
                         Layout.fillWidth: true
                     }
                     PlasmaComponents.Label {
-                        text: rootItem.formatTokens(rootItem.claudeModels[modelData].input_tokens) + i18n(" in")
+                        text: i18n("%1 in", rootItem.formatTokens(rootItem.claudeModels[modelData].input_tokens))
                         font.pixelSize: 9
                         opacity: 0.4
                         color: Kirigami.Theme.textColor
                     }
                     PlasmaComponents.Label {
-                        text: rootItem.formatTokens(rootItem.claudeModels[modelData].output_tokens) + i18n(" out")
+                        text: i18n("%1 out", rootItem.formatTokens(rootItem.claudeModels[modelData].output_tokens))
                         font.pixelSize: 9
                         opacity: 0.4
                         color: Kirigami.Theme.textColor
@@ -528,23 +528,25 @@ ColumnLayout {
             StatTile {
                 tileValue: Math.round(rootItem.claudeStatsTotalSessions).toString()
                 tileLabel: i18nc("stat label", "sessions")
-                tileTip: rootItem.formatTokens(rootItem.claudeStatsTotalMessages) + i18n(" messages total")
+                tileTip: i18n("%1 messages total", rootItem.formatTokens(rootItem.claudeStatsTotalMessages))
             }
             StatTile {
                 tileValue: Math.round(rootItem.claudeStatsActiveDays) + (rootItem.claudeStatsSpanDays > 0 ? "/" + Math.round(rootItem.claudeStatsSpanDays) : "")
                 tileLabel: i18n("active days")
-                tileTip: rootItem.claudeStatsFirstDate ? i18n("Since ") + Qt.formatDate(new Date(rootItem.claudeStatsFirstDate), "MMM d, yyyy") : ""
+                tileTip: rootItem.claudeStatsFirstDate ? i18n("Since %1", Qt.formatDate(new Date(rootItem.claudeStatsFirstDate), "MMM d, yyyy")) : ""
             }
             StatTile {
-                tileValue: Math.round(rootItem.claudeStatsCurrentStreak) + i18n("d")
+                // xgettext:no-javascript-format
+                tileValue: i18nc("streak length in days, abbreviated", "%1d", Math.round(rootItem.claudeStatsCurrentStreak))
                 tileLabel: i18nc("stat label", "streak")
-                tileSub: i18n("best ") + Math.round(rootItem.claudeStatsLongestStreak) + i18n("d")
-                tileTip: i18n("Current consecutive-day streak\nLongest: ") + Math.round(rootItem.claudeStatsLongestStreak) + i18n(" days")
+                // xgettext:no-javascript-format
+                tileSub: i18nc("longest streak in days, abbreviated", "best %1d", Math.round(rootItem.claudeStatsLongestStreak))
+                tileTip: i18np("Current consecutive-day streak\nLongest: %1 day", "Current consecutive-day streak\nLongest: %1 days", Math.round(rootItem.claudeStatsLongestStreak))
             }
             StatTile {
                 tileValue: rootItem.formatDuration(rootItem.claudeStatsLongestSessionMs)
                 tileLabel: i18n("longest session")
-                tileSub: rootItem.claudeStatsLongestSessionMessages > 0 ? Math.round(rootItem.claudeStatsLongestSessionMessages) + i18n(" msgs") : ""
+                tileSub: rootItem.claudeStatsLongestSessionMessages > 0 ? i18np("%1 msg", "%1 msgs", Math.round(rootItem.claudeStatsLongestSessionMessages)) : ""
             }
             StatTile {
                 visible: rootItem.claudeStatsPeakHour >= 0
@@ -603,7 +605,7 @@ ColumnLayout {
                     var m = rootItem.claudeStatsModels[modelData];
                     if (!m)
                         return modelData;
-                    return modelData + i18n("\nInput:  ") + rootItem.formatTokens(m.input) + i18n("\nOutput: ") + rootItem.formatTokens(m.output) + i18n("\nCache read: ") + rootItem.formatTokens(m.cacheRead) + i18n("\nCache write: ") + rootItem.formatTokens(m.cacheCreation) + (m.cost > 0 ? i18n("\nCost: $") + m.cost.toFixed(2) : "") + (m.webSearches > 0 ? i18n("\nWeb searches: ") + m.webSearches : "");
+                    return modelData + "\n" + i18n("Input: %1", rootItem.formatTokens(m.input)) + "\n" + i18n("Output: %1", rootItem.formatTokens(m.output)) + "\n" + i18n("Cache read: %1", rootItem.formatTokens(m.cacheRead)) + "\n" + i18n("Cache write: %1", rootItem.formatTokens(m.cacheCreation)) + (m.cost > 0 ? "\n" + i18n("Cost: %1", "$" + m.cost.toFixed(2)) : "") + (m.webSearches > 0 ? "\n" + i18n("Web searches: %1", m.webSearches) : "");
                 }
                 RowLayout {
                     Layout.fillWidth: true
@@ -620,13 +622,13 @@ ColumnLayout {
                         Layout.fillWidth: true
                     }
                     PlasmaComponents.Label {
-                        text: rootItem.formatTokens(rootItem.claudeStatsModels[modelData].input) + i18n(" in")
+                        text: i18n("%1 in", rootItem.formatTokens(rootItem.claudeStatsModels[modelData].input))
                         font.pixelSize: 9
                         opacity: 0.4
                         color: Kirigami.Theme.textColor
                     }
                     PlasmaComponents.Label {
-                        text: rootItem.formatTokens(rootItem.claudeStatsModels[modelData].output) + i18n(" out")
+                        text: i18n("%1 out", rootItem.formatTokens(rootItem.claudeStatsModels[modelData].output))
                         font.pixelSize: 9
                         opacity: 0.4
                         color: Kirigami.Theme.textColor
@@ -679,7 +681,7 @@ ColumnLayout {
             visible: rootItem.claudeStatsComputedDate !== ""
             Layout.fillWidth: true
             horizontalAlignment: Text.AlignRight
-            text: i18n("computed ") + rootItem.claudeStatsComputedDate
+            text: i18n("computed %1", rootItem.claudeStatsComputedDate)
             font.pixelSize: 8
             opacity: 0.35
             color: Kirigami.Theme.textColor

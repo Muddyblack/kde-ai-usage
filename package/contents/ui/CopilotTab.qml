@@ -36,7 +36,7 @@ ColumnLayout {
         }
 
         PlasmaComponents.Label {
-            text: rootItem.copilotUsername !== "" ? i18n("GitHub Copilot · @") + rootItem.copilotUsername : "GitHub Copilot"
+            text: rootItem.copilotUsername !== "" ? i18n("GitHub Copilot · @%1", rootItem.copilotUsername) : "GitHub Copilot"
             font.pixelSize: 10
             opacity: 0.65
             color: Kirigami.Theme.textColor
@@ -135,9 +135,9 @@ ColumnLayout {
             label: i18n("Premium Requests")
             value: rootItem.copilotPct
             barColor: rootItem.copilotPurple
-            countdownText: rootItem.copilotCountdown !== "" ? i18n("in ") + rootItem.copilotCountdown : ""
-            tokenText: rootItem.copilotUnlimited ? copilotTabRoot.fmtRequests(rootItem.copilotUsed) + i18n(" · unlimited") : copilotTabRoot.fmtRequests(rootItem.copilotUsed) + " / " + copilotTabRoot.fmtRequests(rootItem.copilotQuota)
-            tooltipText: i18n("GitHub Copilot premium requests") + (rootItem.copilotCountdown !== "" ? i18n("\nResets in ") + rootItem.copilotCountdown : "")
+            countdownText: rootItem.copilotCountdown !== "" ? i18n("in %1", rootItem.copilotCountdown) : ""
+            tokenText: rootItem.copilotUnlimited ? copilotTabRoot.fmtRequests(rootItem.copilotUsed) + " · " + i18n("unlimited") : copilotTabRoot.fmtRequests(rootItem.copilotUsed) + " / " + copilotTabRoot.fmtRequests(rootItem.copilotQuota)
+            tooltipText: i18n("GitHub Copilot premium requests") + (rootItem.copilotCountdown !== "" ? "\n" + i18n("Resets in %1", rootItem.copilotCountdown) : "")
         }
 
         StatValueCard {
@@ -210,7 +210,7 @@ ColumnLayout {
             StatTile {
                 tileValue: Math.round(rootItem.copilotStatsTotalSessions).toString()
                 tileLabel: i18n("sessions")
-                tileTip: rootItem.formatTokens(rootItem.copilotStatsTotalMessages) + i18n(" messages total")
+                tileTip: i18n("%1 messages total", rootItem.formatTokens(rootItem.copilotStatsTotalMessages))
             }
             StatTile {
                 tileValue: rootItem.formatTokens(rootItem.copilotStatsTotalMessages)
@@ -220,18 +220,20 @@ ColumnLayout {
             StatTile {
                 tileValue: Math.round(rootItem.copilotStatsActiveDays) + (rootItem.copilotStatsSpanDays > 0 ? "/" + Math.round(rootItem.copilotStatsSpanDays) : "")
                 tileLabel: i18n("active days")
-                tileTip: rootItem.copilotStatsFirstDate ? i18n("Since ") + Qt.formatDate(new Date(rootItem.copilotStatsFirstDate), "MMM d, yyyy") : ""
+                tileTip: rootItem.copilotStatsFirstDate ? i18n("Since %1", Qt.formatDate(new Date(rootItem.copilotStatsFirstDate), "MMM d, yyyy")) : ""
             }
             StatTile {
-                tileValue: Math.round(rootItem.copilotStatsCurrentStreak) + i18n("d")
+                // xgettext:no-javascript-format
+                tileValue: i18nc("streak length in days, abbreviated", "%1d", Math.round(rootItem.copilotStatsCurrentStreak))
                 tileLabel: i18n("streak")
-                tileSub: i18n("best ") + Math.round(rootItem.copilotStatsLongestStreak) + i18n("d")
-                tileTip: i18n("Current consecutive-day streak\nLongest: ") + Math.round(rootItem.copilotStatsLongestStreak) + i18n(" days")
+                // xgettext:no-javascript-format
+                tileSub: i18nc("longest streak in days, abbreviated", "best %1d", Math.round(rootItem.copilotStatsLongestStreak))
+                tileTip: i18np("Current consecutive-day streak\nLongest: %1 day", "Current consecutive-day streak\nLongest: %1 days", Math.round(rootItem.copilotStatsLongestStreak))
             }
             StatTile {
                 tileValue: rootItem.formatDuration(rootItem.copilotStatsLongestSessionMs)
                 tileLabel: i18n("longest session")
-                tileSub: rootItem.copilotStatsLongestSessionMessages > 0 ? Math.round(rootItem.copilotStatsLongestSessionMessages) + i18n(" msgs") : ""
+                tileSub: rootItem.copilotStatsLongestSessionMessages > 0 ? i18np("%1 msg", "%1 msgs", Math.round(rootItem.copilotStatsLongestSessionMessages)) : ""
             }
             StatTile {
                 visible: rootItem.copilotStatsPeakHour >= 0

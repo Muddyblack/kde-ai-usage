@@ -62,7 +62,7 @@ ColumnLayout {
         label: i18n("Credit usage")
         value: rootItem.grokPct
         barColor: rootItem.grokWhite
-        resetText: rootItem.grokQuotaKind === "free-tier" ? rootItem.grokQuotaWindow : (rootItem.grokBillingPeriodEnd ? i18n("resets ") + rootItem.grokBillingPeriodEnd : "")
+        resetText: rootItem.grokQuotaKind === "free-tier" ? rootItem.grokQuotaWindow : (rootItem.grokBillingPeriodEnd ? i18n("resets %1", rootItem.grokBillingPeriodEnd) : "")
         tokenText: rootItem.grokMonthlyLimit > 0 ? rootItem.grokUsed.toFixed(2) + " / " + rootItem.grokMonthlyLimit.toFixed(2) : ""
         tooltipText: i18n("Grok CLI billing credits")
     }
@@ -77,7 +77,7 @@ ColumnLayout {
 
     PlasmaComponents.Label {
         visible: rootItem.grokSessionCount > 0
-        text: i18np("1 local session · ", "%1 local sessions · ", rootItem.grokSessionCount) + rootItem.formatTokens(rootItem.grokTotalTokens) + i18n(" tokens · ") + rootItem.grokTotalToolCalls + i18n(" tool calls")
+        text: i18np("1 local session", "%1 local sessions", rootItem.grokSessionCount) + " · " + i18n("%1 tokens", rootItem.formatTokens(rootItem.grokTotalTokens)) + " · " + i18np("%1 tool call", "%1 tool calls", rootItem.grokTotalToolCalls)
         font.pixelSize: 10
         opacity: 0.55
         wrapMode: Text.WordWrap

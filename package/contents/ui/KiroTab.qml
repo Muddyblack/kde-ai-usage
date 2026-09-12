@@ -55,13 +55,13 @@ ColumnLayout {
     PopupRow {
         visible: rootItem.kiroUsageAvailable
         label: rootItem.kiroDisplayNamePlural !== "" ? rootItem.kiroDisplayNamePlural : i18n("Credits")
-        countdownText: rootItem.kiroCountdown === "resetting..." ? i18n("resetting...") : (rootItem.kiroCountdown ? i18n("in ") + rootItem.kiroCountdown : "")
+        countdownText: rootItem.kiroCountdown === "resetting..." ? i18n("resetting...") : (rootItem.kiroCountdown ? i18n("in %1", rootItem.kiroCountdown) : "")
         value: rootItem.kiroPct
         barColor: rootItem.kiroPurple
         etaText: rootItem.usageHistory.length >= 0 ? rootItem.etaToFull("kr", rootItem.kiroPct) : ""
         deltaText: rootItem.usageHistory.length >= 0 ? rootItem.periodDelta("kr", rootItem.kiroPct, 30 * 24 * 3600000, i18n("last month")) : ""
-        tokenText: rootItem.kiroUsageLimit > 0 ? rootItem.kiroCurrentUsage.toFixed(2) + " / " + rootItem.kiroUsageLimit.toFixed(0) + i18n(" used") : rootItem.kiroCurrentUsage.toFixed(2) + i18n(" used")
-        tooltipText: i18n("Kiro monthly credit usage\nUsed: ") + rootItem.kiroCurrentUsage.toFixed(2) + (rootItem.kiroUsageLimit > 0 ? " / " + rootItem.kiroUsageLimit.toFixed(0) : "") + (rootItem.kiroResetTime ? i18n("\nResets: ") + rootItem.kiroResetTime : "")
+        tokenText: rootItem.kiroUsageLimit > 0 ? i18n("%1 / %2 used", rootItem.kiroCurrentUsage.toFixed(2), rootItem.kiroUsageLimit.toFixed(0)) : i18n("%1 used", rootItem.kiroCurrentUsage.toFixed(2))
+        tooltipText: i18n("Kiro monthly credit usage\nUsed: %1", rootItem.kiroCurrentUsage.toFixed(2) + (rootItem.kiroUsageLimit > 0 ? " / " + rootItem.kiroUsageLimit.toFixed(0) : "")) + (rootItem.kiroResetTime ? "\n" + i18n("Resets: %1", rootItem.kiroResetTime) : "")
     }
 
     Rectangle {

@@ -35,7 +35,7 @@ ColumnLayout {
         rows: rootItem.clinePeriods.map(function (p) {
             return {
                 label: p.label,
-                value: rootItem.formatTokens(p.tokens || 0) + i18n(" tok · ") + i18np("1 session", "%1 sessions", p.sessions) + ((p.cost || 0) > 0 ? " · " + rootItem.formatMoney(p.cost, "USD") : ""),
+                value: i18n("%1 tok", rootItem.formatTokens(p.tokens || 0)) + " · " + i18np("1 session", "%1 sessions", p.sessions) + ((p.cost || 0) > 0 ? " · " + rootItem.formatMoney(p.cost, "USD") : ""),
                 strong: p.key === "cline_30d"
             };
         })
@@ -80,7 +80,7 @@ ColumnLayout {
             StatTile {
                 tileValue: rootItem.formatTokens(clineTabRoot.stats.totalTokens || 0)
                 tileLabel: i18nc("stat label", "tokens")
-                tileTip: rootItem.formatTokens(clineTabRoot.stats.totalOutputTokens || 0) + i18n(" output · ") + rootItem.formatTokens(clineTabRoot.stats.totalInputTokens || 0) + i18n(" input · ") + rootItem.formatTokens(clineTabRoot.stats.totalCachedTokens || 0) + i18n(" cache read")
+                tileTip: i18n("%1 output", rootItem.formatTokens(clineTabRoot.stats.totalOutputTokens || 0)) + " · " + i18n("%1 input", rootItem.formatTokens(clineTabRoot.stats.totalInputTokens || 0)) + " · " + i18n("%1 cache read", rootItem.formatTokens(clineTabRoot.stats.totalCachedTokens || 0))
             }
             StatTile {
                 visible: (clineTabRoot.stats.totalCostUSD || 0) > 0
@@ -95,12 +95,14 @@ ColumnLayout {
             StatTile {
                 tileValue: Math.round(clineTabRoot.stats.activeDays || 0) + ((clineTabRoot.stats.spanDays || 0) > 0 ? "/" + Math.round(clineTabRoot.stats.spanDays) : "")
                 tileLabel: i18n("active days")
-                tileTip: clineTabRoot.stats.firstDate ? i18n("Since ") + Qt.formatDate(new Date(clineTabRoot.stats.firstDate), "MMM d, yyyy") : ""
+                tileTip: clineTabRoot.stats.firstDate ? i18n("Since %1", Qt.formatDate(new Date(clineTabRoot.stats.firstDate), "MMM d, yyyy")) : ""
             }
             StatTile {
-                tileValue: Math.round(clineTabRoot.stats.currentStreak || 0) + i18n("d")
+                // xgettext:no-javascript-format
+                tileValue: i18nc("streak length in days, abbreviated", "%1d", Math.round(clineTabRoot.stats.currentStreak || 0))
                 tileLabel: i18nc("stat label", "streak")
-                tileSub: i18n("best ") + Math.round(clineTabRoot.stats.longestStreak || 0) + i18n("d")
+                // xgettext:no-javascript-format
+                tileSub: i18nc("longest streak in days, abbreviated", "best %1d", Math.round(clineTabRoot.stats.longestStreak || 0))
             }
             StatTile {
                 visible: (clineTabRoot.stats.longestSessionMs || 0) > 0
@@ -154,7 +156,7 @@ ColumnLayout {
                     Layout.fillWidth: true
                 }
                 PlasmaComponents.Label {
-                    text: rootItem.formatTokens(parent.entry.total || 0) + i18n(" tok")
+                    text: i18n("%1 tok", rootItem.formatTokens(parent.entry.total || 0))
                     font.pixelSize: 10
                     opacity: 0.6
                     color: Kirigami.Theme.textColor

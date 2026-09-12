@@ -782,7 +782,7 @@ Rectangle {
                             Layout.alignment: Qt.AlignVCenter
                         }
                         PlasmaComponents.Label {
-                            text: chartCanvas.scrubGeminiPt ? i18n("Gemini: ") + Math.round(chartCanvas.scrubGeminiPt.v) + "%" : ""
+                            text: chartCanvas.scrubGeminiPt ? i18n("Gemini: %1%", Math.round(chartCanvas.scrubGeminiPt.v)) : ""
                             font.pixelSize: 11
                             font.bold: true
                             color: rootItem.googleBlue
@@ -808,7 +808,7 @@ Rectangle {
                             Layout.alignment: Qt.AlignVCenter
                         }
                         PlasmaComponents.Label {
-                            text: chartCanvas.scrubRestPt ? i18n("Rest: ") + Math.round(chartCanvas.scrubRestPt.v) + "%" : ""
+                            text: chartCanvas.scrubRestPt ? i18n("Rest: %1%", Math.round(chartCanvas.scrubRestPt.v)) : ""
                             font.pixelSize: 11
                             font.bold: true
                             color: rootItem.googleGreen

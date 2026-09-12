@@ -90,13 +90,13 @@ ColumnLayout {
                 border.width: 1
                 border.color: Qt.rgba(effortColor.r, effortColor.g, effortColor.b, 0.35)
                 QQC2.ToolTip.visible: codexEffortMA.containsMouse
-                QQC2.ToolTip.text: i18n("Reasoning effort: ") + rootItem.codexEffortLevel
+                QQC2.ToolTip.text: i18n("Reasoning effort: %1", rootItem.codexEffortLevel)
 
                 PlasmaComponents.Label {
                     id: codexEffortLabel
 
                     anchors.centerIn: parent
-                    text: i18nc("effort level", "effort: ") + rootItem.codexEffortLevel
+                    text: i18nc("effort level", "effort: %1", rootItem.codexEffortLevel)
                     font.pixelSize: 8
                     color: codexEffortChip.effortColor
                 }
@@ -141,24 +141,24 @@ ColumnLayout {
             PopupRow {
                 visible: rootItem.codexSessionAvailable
                 label: i18n("5 Hours")
-                countdownText: rootItem.codexSessionCountdown === "resetting..." ? i18n("resetting...") : (rootItem.codexSessionCountdown ? i18n("in ") + rootItem.codexSessionCountdown : "")
+                countdownText: rootItem.codexSessionCountdown === "resetting..." ? i18n("resetting...") : (rootItem.codexSessionCountdown ? i18n("in %1", rootItem.codexSessionCountdown) : "")
                 value: rootItem.codexSessionPct
                 barColor: rootItem.openaiGreen
                 etaText: rootItem.usageHistory.length >= 0 ? rootItem.etaToFull("cp", rootItem.codexSessionPct) : ""
                 deltaText: rootItem.usageHistory.length >= 0 ? rootItem.periodDelta("cp", rootItem.codexSessionPct, 5 * 3600000, i18n("last 5h")) : ""
-                tokenText: Math.round(100 - rootItem.codexSessionPct) + i18n("% of messages left")
-                tooltipText: i18n("Codex 5-hour limit\nUsed: ") + Math.round(rootItem.codexSessionPct) + "%  ·  " + Math.round(100 - rootItem.codexSessionPct) + i18n("% left")
+                tokenText: i18n("%1% of messages left", Math.round(100 - rootItem.codexSessionPct))
+                tooltipText: i18n("Codex 5-hour limit\nUsed: %1%", Math.round(rootItem.codexSessionPct)) + "  ·  " + i18n("%1% left", Math.round(100 - rootItem.codexSessionPct))
             }
             PopupRow {
                 visible: rootItem.codexWeeklyAvailable
                 label: i18n("Weekly")
-                countdownText: rootItem.codexWeeklyCountdown === "resetting..." ? i18n("resetting...") : (rootItem.codexWeeklyCountdown ? i18n("in ") + rootItem.codexWeeklyCountdown : "")
+                countdownText: rootItem.codexWeeklyCountdown === "resetting..." ? i18n("resetting...") : (rootItem.codexWeeklyCountdown ? i18n("in %1", rootItem.codexWeeklyCountdown) : "")
                 value: rootItem.codexWeeklyPct
                 barColor: rootItem.openaiGreen
                 etaText: rootItem.usageHistory.length >= 0 ? rootItem.etaToFull("cw", rootItem.codexWeeklyPct) : ""
                 deltaText: rootItem.usageHistory.length >= 0 ? rootItem.periodDelta("cw", rootItem.codexWeeklyPct, 7 * 24 * 3600000, i18n("last week")) : ""
-                tokenText: Math.round(100 - rootItem.codexWeeklyPct) + i18n("% of messages left")
-                tooltipText: i18n("Codex weekly limit\nUsed: ") + Math.round(rootItem.codexWeeklyPct) + "%  ·  " + Math.round(100 - rootItem.codexWeeklyPct) + i18n("% left")
+                tokenText: i18n("%1% of messages left", Math.round(100 - rootItem.codexWeeklyPct))
+                tooltipText: i18n("Codex weekly limit\nUsed: %1%", Math.round(rootItem.codexWeeklyPct)) + "  ·  " + i18n("%1% left", Math.round(100 - rootItem.codexWeeklyPct))
             }
 
             PlasmaComponents.Label {
@@ -214,12 +214,12 @@ ColumnLayout {
                             if (!modelData.session.reset)
                                 return "";
                             var cd = rootItem.formatCountdown(modelData.session.reset);
-                            return cd === "resetting..." ? i18n("resetting...") : (cd ? i18n("in ") + cd : "");
+                            return cd === "resetting..." ? i18n("resetting...") : (cd ? i18n("in %1", cd) : "");
                         }
                         value: modelData.session.pct
                         barColor: rootItem.openaiGreen
-                        tokenText: Math.round(100 - modelData.session.pct) + i18n("% of messages left")
-                        tooltipText: i18n("%1 5-hour limit\nUsed: ", modelData.name) + Math.round(modelData.session.pct) + "%  ·  " + Math.round(100 - modelData.session.pct) + i18n("% left")
+                        tokenText: i18n("%1% of messages left", Math.round(100 - modelData.session.pct))
+                        tooltipText: i18n("%1 5-hour limit\nUsed: %2%", modelData.name, Math.round(modelData.session.pct)) + "  ·  " + i18n("%1% left", Math.round(100 - modelData.session.pct))
                     }
                     PopupRow {
                         visible: modelData.weekly.available
@@ -228,12 +228,12 @@ ColumnLayout {
                             if (!modelData.weekly.reset)
                                 return "";
                             var cd = rootItem.formatCountdown(modelData.weekly.reset);
-                            return cd === "resetting..." ? i18n("resetting...") : (cd ? i18n("in ") + cd : "");
+                            return cd === "resetting..." ? i18n("resetting...") : (cd ? i18n("in %1", cd) : "");
                         }
                         value: modelData.weekly.pct
                         barColor: rootItem.openaiGreen
-                        tokenText: Math.round(100 - modelData.weekly.pct) + i18n("% of messages left")
-                        tooltipText: i18n("%1 weekly limit\nUsed: ", modelData.name) + Math.round(modelData.weekly.pct) + "%  ·  " + Math.round(100 - modelData.weekly.pct) + i18n("% left")
+                        tokenText: i18n("%1% of messages left", Math.round(100 - modelData.weekly.pct))
+                        tooltipText: i18n("%1 weekly limit\nUsed: %2%", modelData.name, Math.round(modelData.weekly.pct)) + "  ·  " + i18n("%1% left", Math.round(100 - modelData.weekly.pct))
                     }
                 }
             }
@@ -303,7 +303,7 @@ ColumnLayout {
         }
 
         PlasmaComponents.Label {
-            text: rootItem.formatTokens(rootItem.openaiTotalInputTokens) + i18n(" in  ·  ") + rootItem.formatTokens(rootItem.openaiTotalOutputTokens) + i18n(" out")
+            text: i18n("%1 in", rootItem.formatTokens(rootItem.openaiTotalInputTokens)) + "  ·  " + i18n("%1 out", rootItem.formatTokens(rootItem.openaiTotalOutputTokens))
             font.pixelSize: 9
             opacity: 0.45
             color: Kirigami.Theme.textColor
@@ -368,7 +368,7 @@ ColumnLayout {
                         var m = rootItem.openaiModels[modelData];
                         if (!m)
                             return modelData;
-                        return modelData + i18n("\nInput:  ") + rootItem.formatTokens(m.input_tokens) + i18n(" tokens\nOutput: ") + rootItem.formatTokens(m.output_tokens) + i18n(" tokens\nCost:   ") + (m.priced ? "$" + m.cost_usd.toFixed(4) : i18n("unpriced"));
+                        return modelData + "\n" + i18n("Input: %1 tokens", rootItem.formatTokens(m.input_tokens)) + "\n" + i18n("Output: %1 tokens", rootItem.formatTokens(m.output_tokens)) + "\n" + i18n("Cost: %1", m.priced ? "$" + m.cost_usd.toFixed(4) : i18n("unpriced"));
                     }
                     RowLayout {
                         Layout.fillWidth: true
@@ -385,13 +385,13 @@ ColumnLayout {
                             Layout.fillWidth: true
                         }
                         PlasmaComponents.Label {
-                            text: rootItem.formatTokens(rootItem.openaiModels[modelData].input_tokens) + i18n(" in")
+                            text: i18n("%1 in", rootItem.formatTokens(rootItem.openaiModels[modelData].input_tokens))
                             font.pixelSize: 9
                             opacity: 0.4
                             color: Kirigami.Theme.textColor
                         }
                         PlasmaComponents.Label {
-                            text: rootItem.formatTokens(rootItem.openaiModels[modelData].output_tokens) + i18n(" out")
+                            text: i18n("%1 out", rootItem.formatTokens(rootItem.openaiModels[modelData].output_tokens))
                             font.pixelSize: 9
                             opacity: 0.4
                             color: Kirigami.Theme.textColor
@@ -526,26 +526,28 @@ ColumnLayout {
             StatTile {
                 tileValue: Math.round(rootItem.codexStatsTotalSessions).toString()
                 tileLabel: i18nc("stat label", "sessions")
-                tileTip: Math.round(rootItem.codexStatsTotalMessages) + i18n(" prompts total")
+                tileTip: i18np("%1 prompt total", "%1 prompts total", Math.round(rootItem.codexStatsTotalMessages))
             }
 
             StatTile {
                 tileValue: Math.round(rootItem.codexStatsActiveDays) + (rootItem.codexStatsSpanDays > 0 ? "/" + Math.round(rootItem.codexStatsSpanDays) : "")
                 tileLabel: i18n("active days")
-                tileTip: rootItem.codexStatsFirstDate ? i18n("Since ") + rootItem.codexStatsFirstDate : ""
+                tileTip: rootItem.codexStatsFirstDate ? i18n("Since %1", rootItem.codexStatsFirstDate) : ""
             }
 
             StatTile {
-                tileValue: Math.round(rootItem.codexStatsCurrentStreak) + i18n("d")
+                // xgettext:no-javascript-format
+                tileValue: i18nc("streak length in days, abbreviated", "%1d", Math.round(rootItem.codexStatsCurrentStreak))
                 tileLabel: i18nc("stat label", "streak")
-                tileSub: i18n("best ") + Math.round(rootItem.codexStatsLongestStreak) + i18n("d")
-                tileTip: i18n("Current consecutive-day streak\nLongest: ") + Math.round(rootItem.codexStatsLongestStreak) + i18n(" days")
+                // xgettext:no-javascript-format
+                tileSub: i18nc("longest streak in days, abbreviated", "best %1d", Math.round(rootItem.codexStatsLongestStreak))
+                tileTip: i18np("Current consecutive-day streak\nLongest: %1 day", "Current consecutive-day streak\nLongest: %1 days", Math.round(rootItem.codexStatsLongestStreak))
             }
 
             StatTile {
                 tileValue: rootItem.formatDuration(rootItem.codexStatsLongestSessionMs)
                 tileLabel: i18n("longest session")
-                tileSub: rootItem.codexStatsLongestSessionMessages > 0 ? Math.round(rootItem.codexStatsLongestSessionMessages) + i18n(" msgs") : ""
+                tileSub: rootItem.codexStatsLongestSessionMessages > 0 ? i18np("%1 msg", "%1 msgs", Math.round(rootItem.codexStatsLongestSessionMessages)) : ""
             }
 
             StatTile {
@@ -606,7 +608,7 @@ ColumnLayout {
                     }
 
                     PlasmaComponents.Label {
-                        text: rootItem.codexStatsModels[parent.modelData].sessions + i18n(" sess")
+                        text: i18nc("abbreviated sessions", "%1 sess", rootItem.codexStatsModels[parent.modelData].sessions)
                         font.pixelSize: 9
                         opacity: 0.4
                         color: Kirigami.Theme.textColor
@@ -637,7 +639,7 @@ ColumnLayout {
 
             PlasmaComponents.Label {
                 visible: rootItem.codexStatsComputedDate !== ""
-                text: i18n("computed ") + rootItem.codexStatsComputedDate.substring(0, 10)
+                text: i18n("computed %1", rootItem.codexStatsComputedDate.substring(0, 10))
                 font.pixelSize: 8
                 opacity: 0.35
                 color: Kirigami.Theme.textColor

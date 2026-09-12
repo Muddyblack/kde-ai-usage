@@ -128,8 +128,8 @@ ColumnLayout {
             barColor: rootItem.openrouterPurple
             etaText: rootItem.usageHistory.length >= 0 ? rootItem.etaToFull("or", value) : ""
             deltaText: rootItem.usageHistory.length >= 0 ? rootItem.periodDelta("or", value, 30 * 24 * 3600000, i18n("last month")) : ""
-            tokenText: "$" + rootItem.openrouterUsageUSD.toFixed(4) + " / $" + (rootItem.openrouterLimitUSD !== null ? rootItem.openrouterLimitUSD.toFixed(2) : "∞") + i18n(" used")
-            tooltipText: i18n("OpenRouter credit spend\n$") + rootItem.openrouterUsageUSD.toFixed(4) + i18n(" of $") + (rootItem.openrouterLimitUSD !== null ? rootItem.openrouterLimitUSD.toFixed(2) : i18n("unlimited")) + i18n(" limit")
+            tokenText: i18n("%1 used", "$" + rootItem.openrouterUsageUSD.toFixed(4) + " / $" + (rootItem.openrouterLimitUSD !== null ? rootItem.openrouterLimitUSD.toFixed(2) : "∞"))
+            tooltipText: i18n("OpenRouter credit spend\n$%1 of $%2 limit", rootItem.openrouterUsageUSD.toFixed(4), rootItem.openrouterLimitUSD !== null ? rootItem.openrouterLimitUSD.toFixed(2) : i18n("unlimited"))
         }
 
         // Usage summary card
@@ -228,7 +228,7 @@ ColumnLayout {
                         Layout.fillWidth: true
                     }
                     PlasmaComponents.Label {
-                        text: rootItem.openrouterRateLimit.requests !== undefined ? rootItem.openrouterRateLimit.requests + i18n(" req / ") + (rootItem.openrouterRateLimit.interval || i18n("min")) : ""
+                        text: rootItem.openrouterRateLimit.requests !== undefined ? i18n("%1 req / %2", rootItem.openrouterRateLimit.requests, rootItem.openrouterRateLimit.interval || i18n("min")) : ""
                         font.pixelSize: 10
                         opacity: 0.65
                         color: Kirigami.Theme.textColor

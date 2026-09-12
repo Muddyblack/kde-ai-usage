@@ -59,12 +59,12 @@ ColumnLayout {
     PopupRow {
         visible: rootItem.antigravityPromptCreditsMonthly > 0
         label: i18n("Prompt Credits")
-        resetText: rootItem.antigravityResetTime ? i18n("resets ") + rootItem.antigravityResetTime : ""
-        countdownText: rootItem.antigravityCountdown === "resetting..." ? i18n("resetting...") : (rootItem.antigravityCountdown ? i18n("in ") + rootItem.antigravityCountdown : "")
+        resetText: rootItem.antigravityResetTime ? i18n("resets %1", rootItem.antigravityResetTime) : ""
+        countdownText: rootItem.antigravityCountdown === "resetting..." ? i18n("resetting...") : (rootItem.antigravityCountdown ? i18n("in %1", rootItem.antigravityCountdown) : "")
         value: rootItem.antigravityPromptCreditsMonthly > 0 ? (1 - rootItem.antigravityPromptCreditsAvailable / rootItem.antigravityPromptCreditsMonthly) * 100 : 0
         barColor: rootItem.googleBlue
-        tokenText: rootItem.antigravityPromptCreditsAvailable + " / " + rootItem.formatTokens(rootItem.antigravityPromptCreditsMonthly) + i18n(" left")
-        tooltipText: i18n("Prompt Credits\nUsed: ") + Math.round(value) + "%  ·  " + rootItem.antigravityPromptCreditsAvailable + " / " + rootItem.formatTokens(rootItem.antigravityPromptCreditsMonthly) + i18n(" left") + (rootItem.antigravityResetTime ? i18n("\nResets: ") + rootItem.antigravityResetTime : "")
+        tokenText: i18n("%1 / %2 left", rootItem.antigravityPromptCreditsAvailable, rootItem.formatTokens(rootItem.antigravityPromptCreditsMonthly))
+        tooltipText: i18n("Prompt Credits\nUsed: %1%", Math.round(value)) + "  ·  " + i18n("%1 / %2 left", rootItem.antigravityPromptCreditsAvailable, rootItem.formatTokens(rootItem.antigravityPromptCreditsMonthly)) + (rootItem.antigravityResetTime ? "\n" + i18n("Resets: %1", rootItem.antigravityResetTime) : "")
     }
 
     // Only when it says something the family rows below do not: with one model
@@ -75,13 +75,13 @@ ColumnLayout {
                 return (g.models || []).length > 1;
             }))
         label: i18n("Overall Quota")
-        resetText: rootItem.antigravityResetTime ? i18n("resets ") + rootItem.antigravityResetTime : ""
-        countdownText: rootItem.antigravityCountdown === "resetting..." ? i18n("resetting...") : (rootItem.antigravityCountdown ? i18n("in ") + rootItem.antigravityCountdown : "")
+        resetText: rootItem.antigravityResetTime ? i18n("resets %1", rootItem.antigravityResetTime) : ""
+        countdownText: rootItem.antigravityCountdown === "resetting..." ? i18n("resetting...") : (rootItem.antigravityCountdown ? i18n("in %1", rootItem.antigravityCountdown) : "")
         value: rootItem.antigravityPct
         barColor: rootItem.googleBlue
         etaText: rootItem.usageHistory.length >= 0 ? rootItem.etaToFull("ag", rootItem.antigravityPct) : ""
         deltaText: rootItem.usageHistory.length >= 0 ? rootItem.periodDelta("ag", rootItem.antigravityPct, 30 * 24 * 3600000, i18n("last month")) : ""
-        tooltipText: i18n("Average quota usage across Gemini models\n") + Math.round(rootItem.antigravityPct) + i18n("% used") + (rootItem.antigravityResetTime ? i18n("\nResets: ") + rootItem.antigravityResetTime : "")
+        tooltipText: i18n("Average quota usage across Gemini models") + "\n" + i18n("%1% used", Math.round(rootItem.antigravityPct)) + (rootItem.antigravityResetTime ? "\n" + i18n("Resets: %1", rootItem.antigravityResetTime) : "")
     }
 
     // ── Model Quotas, grouped by pooled-quota family ───────────────────────────
@@ -166,7 +166,7 @@ ColumnLayout {
                         visible: groupCol.group.resetDate !== null
                         text: {
                             var cd = rootItem.formatCountdown(groupCol.group.resetDate);
-                            return cd && cd !== "resetting..." ? i18n("· resets in ") + cd : (cd === "resetting..." ? i18n("· resetting…") : "");
+                            return cd && cd !== "resetting..." ? "· " + i18n("resets in %1", cd) : (cd === "resetting..." ? i18n("· resetting…") : "");
                         }
                         font.pixelSize: 9
                         opacity: 0.45
@@ -212,11 +212,11 @@ ColumnLayout {
                                 var m = rootItem.antigravityModels[modelData];
                                 if (!m)
                                     return modelData;
-                                var txt = (m.displayName || modelData) + "\n" + Math.round(m.usedPct) + i18n("% used");
+                                var txt = (m.displayName || modelData) + "\n" + i18n("%1% used", Math.round(m.usedPct));
                                 if (m.isExhausted)
                                     txt += i18n("\n⚠ Quota exhausted");
                                 if (m.resetTime)
-                                    txt += i18n("\nResets: ") + Qt.formatDateTime(new Date(m.resetTime), "MMM d, hh:mm");
+                                    txt += "\n" + i18n("Resets: %1", Qt.formatDateTime(new Date(m.resetTime), "MMM d, hh:mm"));
                                 return txt;
                             }
                         }
