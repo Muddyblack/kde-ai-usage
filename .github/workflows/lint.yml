@@ -30,6 +30,12 @@ jobs:
           filters: |
             qml:
               - 'package/contents/**/*.qml'
+              - 'package/contents/**/*.js'
+              - 'package/contents/locale/**'
+              - 'package/metadata.json'
+              - 'translate/**'
+              - 'flake.nix'
+              - 'flake.lock'
               - '.github/workflows/lint.yml'
             backend:
               - 'package/contents/tools/aiusage/**'
@@ -55,6 +61,15 @@ jobs:
 
       - name: qmlformat check
         run: nix develop --command bash -c 'find package/contents -name "*.qml" | xargs qmlformat --dry-run 2>&1 | grep -q "would reformat" && echo "Files need formatting, run qmlformat -i" && exit 1 || true'
+
+      - name: i18n catalogs complete
+        run: nix develop --command ./translate/check.sh
+
+      - name: i18n catalogs in sync with sources
+        run: |
+          nix develop --command ./translate/Messages.sh
+          nix develop --command ./translate/build.sh
+          git diff --exit-code -- package/contents/locale translate/fr.po
 
   backend:
     needs: changes
