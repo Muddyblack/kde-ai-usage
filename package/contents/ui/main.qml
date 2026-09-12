@@ -1183,15 +1183,15 @@ PlasmoidItem {
         var m = totalMins % 60;
         var parts = [];
         if (d > 0)
-            parts.push(d + "d");
+            parts.push(d + i18n("d"));
 
         if (h > 0)
-            parts.push(h + "h");
+            parts.push(h + i18n("h"));
 
         if (d === 0 && m > 0)
-            parts.push(m + "m");
+            parts.push(m + i18n("m"));
 
-        return parts.length ? parts.join(" ") : "<1m";
+        return parts.length ? parts.join(" ") : i18n("<1m");
     }
 
     function formatCountdown(targetDate) {
@@ -1339,9 +1339,11 @@ PlasmoidItem {
             return;
         }
         root.stale = root.lastUpdate !== "";
-        if (activeError === "offline") {
+        // The backend's error vocabulary is translated, so match either the
+        // canonical English token or its translation.
+        if (activeError === "offline" || activeError === i18n("offline")) {
             offlineRetryTimer.restart();
-        } else if (activeError === "rate limited") {
+        } else if (activeError === "rate limited" || activeError === i18n("rate limited")) {
             root.backoffMs = 300000;
             backoffTimer.interval = root.backoffMs;
             backoffTimer.restart();
@@ -2261,7 +2263,7 @@ PlasmoidItem {
                 iconColor: root.weeklyColor
                 iconSource: Qt.resolvedUrl("../icons/claude-color.svg")
                 iconTint: root.weeklyColor
-                iconText: "7D"
+                iconText: i18n("7D")
                 stale: root.stale && root.panelShows("claude")
                 visible: root.panelShows("claude") && root.weeklyAvailable
                 tooltipText: i18n("Claude 7-day: ") + Math.round(root.weeklyPct) + "%" + (root.weeklyTokenLimit > 0 ? "\n" + root.formatTokens(root.weeklyTokensUsed) + " / " + root.formatTokens(root.weeklyTokenLimit) : "")
@@ -2322,7 +2324,7 @@ PlasmoidItem {
                 iconColor: root.openaiGreen
                 iconSource: Qt.resolvedUrl("../icons/openai.svg")
                 iconTint: root.weeklyColor
-                iconText: "7D"
+                iconText: i18n("7D")
                 stale: root.stale && root.panelShows("openai")
                 visible: root.panelShows("openai") && root.codexWeeklyAvailable
                 showCost: false

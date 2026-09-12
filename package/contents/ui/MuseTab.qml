@@ -238,9 +238,9 @@ ColumnLayout {
                 tileTip: rootItem.museStatsFirstDate ? i18n("Since ") + Qt.formatDate(new Date(rootItem.museStatsFirstDate), "MMM d, yyyy") : ""
             }
             StatTile {
-                tileValue: Math.round(rootItem.museStatsCurrentStreak) + "d"
+                tileValue: Math.round(rootItem.museStatsCurrentStreak) + i18n("d")
                 tileLabel: i18nc("stat label", "streak")
-                tileSub: i18n("best ") + Math.round(rootItem.museStatsLongestStreak) + "d"
+                tileSub: i18n("best ") + Math.round(rootItem.museStatsLongestStreak) + i18n("d")
                 tileTip: i18n("Current consecutive-day streak\nLongest: ") + Math.round(rootItem.museStatsLongestStreak) + i18n(" days")
             }
             StatTile {

@@ -1,4 +1,5 @@
 from ..contract import flat_window, jround, money, monthly_window, pct_clamp, provider_base, provider_error, rolling_windows
+from ..i18n import _
 
 ACCENT = "#1e3a8a"
 
@@ -8,16 +9,16 @@ def _window_label(w):
         return w["name"]
     seconds = w.get("seconds") or 0
     if seconds == 604800:
-        return "Weekly limit"
+        return _("Weekly limit")
     if seconds == 86400:
-        return "Daily limit"
+        return _("Daily limit")
     if seconds and seconds % 86400 == 0:
-        return f"{seconds // 86400}-day limit"
+        return _("%s-day limit") % (seconds // 86400)
     if seconds and seconds % 3600 == 0:
-        return f"{seconds // 3600}-hour limit"
+        return _("%s-hour limit") % (seconds // 3600)
     if seconds:
-        return f"{seconds // 60}-minute limit"
-    return "Plan usage"
+        return _("%s-minute limit") % (seconds // 60)
+    return _("Plan usage")
 
 
 def _plan_windows(plan):
@@ -75,8 +76,8 @@ def normalize_moonshot(raw):
     if not has_balance and not has_plan:
         errors = [e for e in (plan.get("error"), res.get("error")) if e]
         if errors:
-            return provider_error("kimi", "Kimi", ACCENT, now, f"Kimi: {errors[0]}", details)
-        return provider_error("kimi", "Kimi", ACCENT, now, "Kimi: no Moonshot API key or Kimi Code login", details)
+            return provider_error("kimi", "Kimi", ACCENT, now, _("Kimi: %s") % errors[0], details)
+        return provider_error("kimi", "Kimi", ACCENT, now, _("Kimi: no Moonshot API key or Kimi Code login"), details)
 
     available = res.get("availableBalance") or 0
     voucher = res.get("voucherBalance") or 0
@@ -87,17 +88,23 @@ def normalize_moonshot(raw):
     for i, w in enumerate(windows):
         rows.append(flat_window(f"kimi_code_{i}", w["label"], w["pct"], w["resetAt"], f"{w['used']} / {w['limit']}", True))
     if exhausted and not windows:
-        rows.append(flat_window("kimi_code_plan", "Plan usage", 100, 0, code_plan["message"] or "Plan quota used up", True))
+        rows.append(flat_window("kimi_code_plan", _("Plan usage"), 100, 0, code_plan["message"] or _("Plan quota used up"), True))
     if code_plan["booster"]:
         b = code_plan["booster"]
         rows.append(
             flat_window(
-                "kimi_booster", "Extra usage", 0, 0, f"{money(b['balance'], b['currency'])} left", False, f"of {money(b['total'], b['currency'])}"
+                "kimi_booster",
+                _("Extra usage"),
+                0,
+                0,
+                _("%s left") % money(b["balance"], b["currency"]),
+                False,
+                _("of %s") % money(b["total"], b["currency"]),
             )
         )
     if has_balance:
-        rows.append(flat_window("kimi_balance", "Available balance", 0, 0, money(available, "USD"), False))
-        rows.append(flat_window("kimi_split", "Voucher / cash", 0, 0, f"{money(voucher, 'USD')} / {money(cash, 'USD')}", False))
+        rows.append(flat_window("kimi_balance", _("Available balance"), 0, 0, money(available, "USD"), False))
+        rows.append(flat_window("kimi_split", _("Voucher / cash"), 0, 0, f"{money(voucher, 'USD')} / {money(cash, 'USD')}", False))
 
     r = provider_base("kimi", "Kimi", ACCENT, now)
     r["quotaWindows"] = rows
@@ -109,9 +116,9 @@ def normalize_moonshot(raw):
         for w in windows:
             tip += f"\n{w['label']}: {jround(w['pct'])}%"
         if exhausted:
-            tip += f"\n{code_plan['message'] or 'Plan quota used up'}"
+            tip += "\n" + (code_plan["message"] or _("Plan quota used up"))
         if has_balance:
-            tip += f"\nMoonshot balance: {money(available, 'USD')}"
+            tip += _("\nMoonshot balance: %s") % money(available, "USD")
         r["slots"] = [{"pct": pct, "color": ACCENT, "text": None, "tooltip": tip}]
 
         # Kimi Code runs the same 5-hour + weekly pair as Claude and Codex; a
@@ -136,7 +143,7 @@ def normalize_moonshot(raw):
             r["summary"]["hasChart"] = False
     else:
         r["summary"] = {"pct": 0, "text": money(available, "USD"), "detail": "Moonshot API", "hasChart": True}
-        r["slots"] = [{"pct": 0, "color": ACCENT, "text": money(available, "USD"), "tooltip": f"Kimi balance: {money(available, 'USD')}"}]
+        r["slots"] = [{"pct": 0, "color": ACCENT, "text": money(available, "USD"), "tooltip": _("Kimi balance: %s") % money(available, "USD")}]
         r["chartWindows"] = monthly_window("kimi", "km", True)
         r["historyValues"] = {"km": available}
 

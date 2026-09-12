@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: AI Usage Monitor 2.3.1\n"
 "Report-Msgid-Bugs-To: https://github.com/Muddyblack/kde-ai-usage/issues\n"
-"POT-Creation-Date: 2026-09-12 09:32+0200\n"
+"POT-Creation-Date: 2026-09-12 09:57+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -330,6 +330,15 @@ msgstr ""
 msgid "Since "
 msgstr ""
 
+#: package/contents/ui/ClaudeTab.qml:549 package/contents/ui/ClaudeTab.qml:551
+#: package/contents/ui/ClineTab.qml:101 package/contents/ui/ClineTab.qml:103
+#: package/contents/ui/CopilotTab.qml:226
+#: package/contents/ui/CopilotTab.qml:228 package/contents/ui/main.qml:1186
+#: package/contents/ui/MuseTab.qml:241 package/contents/ui/MuseTab.qml:243
+#: package/contents/ui/OpenAiTab.qml:539 package/contents/ui/OpenAiTab.qml:541
+msgid "d"
+msgstr ""
+
 #: package/contents/ui/ClaudeTab.qml:550 package/contents/ui/ClineTab.qml:102
 #: package/contents/ui/MuseTab.qml:242 package/contents/ui/OpenAiTab.qml:540
 msgctxt "stat label"
@@ -593,10 +602,6 @@ msgstr ""
 msgid "streak"
 msgstr ""
 
-#: package/contents/ui/CopilotTab.qml:228
-msgid "d"
-msgstr ""
-
 #: package/contents/ui/CopilotTab.qml:240 package/contents/ui/MuseTab.qml:255
 msgid "Hour of day with the most activity (UTC)"
 msgstr ""
@@ -626,6 +631,7 @@ msgid "Cursor"
 msgstr ""
 
 #: package/contents/ui/CursorTab.qml:78
+#: package/contents/tools/aiusage/normalize/cursor.py:59
 msgid "Included usage"
 msgstr ""
 
@@ -638,6 +644,7 @@ msgid "Cursor included usage this billing cycle"
 msgstr ""
 
 #: package/contents/ui/CursorTab.qml:91
+#: package/contents/tools/aiusage/normalize/cursor.py:61
 msgid "Auto + Composer"
 msgstr ""
 
@@ -646,6 +653,7 @@ msgid "Share of the included usage spent by Auto and Composer"
 msgstr ""
 
 #: package/contents/ui/CursorTab.qml:99
+#: package/contents/tools/aiusage/normalize/cursor.py:62
 msgid "API models"
 msgstr ""
 
@@ -654,6 +662,7 @@ msgid "Share of the included usage spent on models picked by name"
 msgstr ""
 
 #: package/contents/ui/CursorTab.qml:129
+#: package/contents/tools/aiusage/normalize/cursor.py:66
 msgid "On-demand"
 msgstr ""
 
@@ -785,6 +794,8 @@ msgid "Run grok --oauth, or add an xAI API key in settings."
 msgstr ""
 
 #: package/contents/ui/GrokTab.qml:62
+#: package/contents/tools/aiusage/normalize/grok.py:42
+#: package/contents/tools/aiusage/normalize/openrouter.py:37
 msgid "Credit usage"
 msgstr ""
 
@@ -826,6 +837,9 @@ msgid "Kimi Code plan"
 msgstr ""
 
 #: package/contents/ui/KimiTab.qml:57 package/contents/ui/main.qml:2428
+#: package/contents/tools/aiusage/normalize/moonshot.py:91
+#: package/contents/tools/aiusage/normalize/moonshot.py:119
+#: package/contents/tools/aiusage/providers/kimi_code.py:137
 msgid "Plan quota used up"
 msgstr ""
 
@@ -834,6 +848,7 @@ msgid "Kimi Code reports the plan quota as used up for this billing cycle"
 msgstr ""
 
 #: package/contents/ui/KimiTab.qml:65
+#: package/contents/tools/aiusage/normalize/moonshot.py:97
 msgid "Extra usage"
 msgstr ""
 
@@ -866,6 +881,7 @@ msgid "Kimi / Moonshot"
 msgstr ""
 
 #: package/contents/ui/KimiTab.qml:166
+#: package/contents/tools/aiusage/normalize/moonshot.py:106
 msgid "Available balance"
 msgstr ""
 
@@ -883,6 +899,7 @@ msgstr ""
 
 #: package/contents/ui/KiroTab.qml:57 package/contents/ui/main.qml:157
 #: package/contents/ui/main.qml:1549
+#: package/contents/tools/aiusage/normalize/kiro.py:41
 msgid "Credits"
 msgstr ""
 
@@ -933,6 +950,7 @@ msgid ""
 msgstr ""
 
 #: package/contents/ui/main.qml:156 package/contents/ui/main.qml:1548
+#: package/contents/tools/aiusage/normalize/kiro.py:40
 msgid "Credit"
 msgstr ""
 
@@ -998,6 +1016,18 @@ msgstr ""
 
 #: package/contents/ui/main.qml:1162
 msgid "%1 vs %2"
+msgstr ""
+
+#: package/contents/ui/main.qml:1189
+msgid "h"
+msgstr ""
+
+#: package/contents/ui/main.qml:1192
+msgid "m"
+msgstr ""
+
+#: package/contents/ui/main.qml:1194
+msgid "<1m"
 msgstr ""
 
 #: package/contents/ui/main.qml:1304
@@ -1151,6 +1181,7 @@ msgid "Balance: "
 msgstr ""
 
 #: package/contents/ui/main.qml:1916
+#: package/contents/tools/aiusage/normalize/deepseek.py:39
 msgid "Available for API calls"
 msgstr ""
 
@@ -1243,6 +1274,13 @@ msgstr ""
 msgid "Claude 5-hour: "
 msgstr ""
 
+#: package/contents/ui/main.qml:2264 package/contents/ui/main.qml:2325
+#: package/contents/tools/aiusage/contract.py:219
+#: package/contents/tools/aiusage/contract.py:223
+#: package/contents/tools/aiusage/contract.py:233
+msgid "7D"
+msgstr ""
+
 #: package/contents/ui/main.qml:2267
 msgid "Claude 7-day: "
 msgstr ""
@@ -1320,16 +1358,20 @@ msgid ""
 msgstr ""
 
 #: package/contents/ui/main.qml:2352 package/contents/ui/main.qml:2364
+#: package/contents/tools/aiusage/normalize/mistral.py:58
+#: package/contents/tools/aiusage/normalize/openrouter.py:44
 msgid "✓ key"
 msgstr ""
 
 #: package/contents/ui/main.qml:2353
+#: package/contents/tools/aiusage/normalize/mistral.py:68
 msgid ""
 "\n"
 "API key configured"
 msgstr ""
 
 #: package/contents/ui/main.qml:2353
+#: package/contents/tools/aiusage/normalize/mistral.py:68
 msgid ""
 "\n"
 "No key set"
@@ -1358,6 +1400,7 @@ msgid ""
 msgstr ""
 
 #: package/contents/ui/main.qml:2377
+#: package/contents/tools/aiusage/normalize/grok.py:64
 msgid "Grok CLI connected; billing quota is not exposed"
 msgstr ""
 
@@ -1690,6 +1733,8 @@ msgid ""
 msgstr ""
 
 #: package/contents/ui/MuseTab.qml:98
+#: package/contents/tools/aiusage/normalize/muse.py:79
+#: package/contents/tools/aiusage/normalize/muse.py:108
 msgid "Current"
 msgstr ""
 
@@ -1699,6 +1744,8 @@ msgstr ""
 
 #: package/contents/ui/MuseTab.qml:107 package/contents/ui/OpenAiTab.qml:154
 #: package/contents/ui/OpenAiTab.qml:226
+#: package/contents/tools/aiusage/normalize/muse.py:79
+#: package/contents/tools/aiusage/normalize/muse.py:108
 msgid "Weekly"
 msgstr ""
 
@@ -2286,4 +2333,820 @@ msgstr ""
 msgid ""
 "Multi-service AI quota tracker with cost breakdown (Claude, Antigravity, "
 "OpenAI, Grok, Kiro, OpenRouter & Mistral)"
+msgstr ""
+
+#: package/contents/tools/aiusage/collect.py:108
+msgid "parse error"
+msgstr ""
+
+#: package/contents/tools/aiusage/contract.py:211
+#: package/contents/tools/aiusage/contract.py:214
+#: package/contents/tools/aiusage/contract.py:231
+msgid "5H"
+msgstr ""
+
+#: package/contents/tools/aiusage/contract.py:212
+#: package/contents/tools/aiusage/contract.py:215
+#: package/contents/tools/aiusage/contract.py:232
+msgid "24H"
+msgstr ""
+
+#: package/contents/tools/aiusage/contract.py:220
+#: package/contents/tools/aiusage/contract.py:224
+#: package/contents/tools/aiusage/contract.py:234
+msgid "30D"
+msgstr ""
+
+#: package/contents/tools/aiusage/contract.py:298
+msgid "operational"
+msgstr ""
+
+#: package/contents/tools/aiusage/contract.py:298
+msgid "degraded"
+msgstr ""
+
+#: package/contents/tools/aiusage/contract.py:298
+msgid "partial outage"
+msgstr ""
+
+#: package/contents/tools/aiusage/contract.py:298
+msgid "major outage"
+msgstr ""
+
+#: package/contents/tools/aiusage/contract.py:331
+#, python-format
+msgid "%s %s"
+msgstr ""
+
+#: package/contents/tools/aiusage/contract.py:370
+msgid "All Systems Operational"
+msgstr ""
+
+#: package/contents/tools/aiusage/contract.py:372
+msgid "All checks failing"
+msgstr ""
+
+#: package/contents/tools/aiusage/contract.py:374
+#, python-format
+msgid "%s of %s checks failing"
+msgstr ""
+
+#: package/contents/tools/aiusage/contract.py:378
+#, python-format
+msgid "%s (down)"
+msgstr ""
+
+#: package/contents/tools/aiusage/contract.py:409
+msgid "unavailable"
+msgstr ""
+
+#: package/contents/tools/aiusage/http.py:78
+msgid "offline"
+msgstr ""
+
+#: package/contents/tools/aiusage/http.py:80
+msgid "token expired"
+msgstr ""
+
+#: package/contents/tools/aiusage/http.py:82
+msgid "access denied"
+msgstr ""
+
+#: package/contents/tools/aiusage/http.py:84
+msgid "rate limited"
+msgstr ""
+
+#: package/contents/tools/aiusage/http.py:85
+#, python-format
+msgid "err %s"
+msgstr ""
+
+#: package/contents/tools/aiusage/http.py:97
+#, python-format
+msgid "Invalid %s credential"
+msgstr ""
+
+#: package/contents/tools/aiusage/http.py:99
+#, python-format
+msgid "%s network error"
+msgstr ""
+
+#: package/contents/tools/aiusage/http.py:100
+#, python-format
+msgid "%s HTTP %s"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/antigravity.py:19
+msgid "Antigravity not configured"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/antigravity.py:24
+msgid "Antigravity is not running in IDE"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/antigravity.py:63
+msgid "Gemini Models"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/antigravity.py:63
+msgid "Claude & GPT Models"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/antigravity.py:80
+#: package/contents/tools/aiusage/normalize/kiro.py:19
+#, python-format
+msgid "%s / %s credits"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/antigravity.py:90
+#, python-format
+msgid "Gemini (Google) quota: %s%%"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/antigravity.py:90
+#: package/contents/tools/aiusage/normalize/antigravity.py:96
+#: package/contents/tools/aiusage/normalize/cursor.py:76
+#: package/contents/tools/aiusage/normalize/kiro.py:32
+#, python-format
+msgid ""
+"\n"
+"Plan: %s"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/antigravity.py:96
+#, python-format
+msgid "External models quota: %s%%"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/claude.py:35
+#, python-format
+msgid "7-day %s"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/claude.py:35
+msgid "7-day scoped"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/claude.py:102
+msgid "OAuth missing — API stats only"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/claude.py:102
+msgid "Claude not logged in"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/claude.py:121
+msgid "Claude usage request failed"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/claude.py:138
+#: package/contents/tools/aiusage/normalize/claude.py:139
+#: package/contents/tools/aiusage/normalize/zai.py:81
+#, python-format
+msgid "%s / %s tokens"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/claude.py:149
+msgid "5-hour session"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/claude.py:150
+msgid "7-day window"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/claude.py:157
+#, python-format
+msgid "Claude 5-hour: %s%%"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/claude.py:163
+#, python-format
+msgid "Claude 7-day: %s%%"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/cline.py:18
+#, python-format
+msgid "%s tokens · %s session%s"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/cline.py:30
+msgid "Cline: no sessions yet — run cline once"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/cline.py:35
+#: package/contents/tools/aiusage/normalize/zai.py:33
+msgid "Today"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/cline.py:36
+msgid "Last 7 days"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/cline.py:37
+msgid "Last 30 days"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/cline.py:42
+msgid "last 30 days"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/copilot.py:35
+msgid "Copilot: no token configured"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/copilot.py:43
+#, python-format
+msgid "Copilot: %s"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/copilot.py:54
+#, python-format
+msgid "%s requests · unlimited"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/copilot.py:54
+#, python-format
+msgid "%s / %s requests"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/copilot.py:60
+msgid "Personal billing"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/copilot.py:63
+msgid "Premium requests"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/copilot.py:64
+#, python-format
+msgid "Copilot premium requests: %s"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/cursor.py:24
+msgid "Cursor: not signed in — run cursor-agent login"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/cursor.py:29
+#, python-format
+msgid "Cursor: %s"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/cursor.py:40
+msgid "Cursor: usage details are not available for this plan"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/cursor.py:58
+#, python-format
+msgid "%s%% of included usage"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/cursor.py:61
+#: package/contents/tools/aiusage/normalize/cursor.py:62
+#: package/contents/tools/aiusage/normalize/muse.py:81
+#, python-format
+msgid "%s%% used"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/cursor.py:76
+#, python-format
+msgid ""
+"\n"
+"Included usage: %s%%"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/deepseek.py:15
+msgid "DeepSeek: no API key configured"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/deepseek.py:24
+#, python-format
+msgid "DeepSeek: %s"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/deepseek.py:39
+msgid "Low balance"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/deepseek.py:43
+msgid "Total balance"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/deepseek.py:46
+msgid "Granted / topped up"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/deepseek.py:53
+#, python-format
+msgid "DeepSeek balance: %s"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/grok.py:15
+msgid "Grok: run grok --oauth or configure an xAI key"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/grok.py:27
+msgid "rolling 24h"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/grok.py:46
+msgid "Billing quota"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/grok.py:46
+msgid "Not exposed for this Grok account"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/grok.py:50
+msgid "Local CLI activity"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/grok.py:53
+#, python-format
+msgid "%s session%s · %s tokens · %s tool calls"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/grok.py:64
+#, python-format
+msgid "Grok credits: %s%% used"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/__init__.py:40
+#, python-format
+msgid "unknown provider: %s"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/kiro.py:10
+msgid "Kiro: no local usage data found"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/kiro.py:12
+#, python-format
+msgid "Kiro: %s"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/kiro.py:24
+msgid "Kiro: usage snapshot is empty"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/kiro.py:26
+msgid "Monthly credits"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/kiro.py:32
+#, python-format
+msgid ""
+"\n"
+"Credits: %s"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/mistral.py:15
+msgid "Mistral: no API key configured"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/mistral.py:49
+#, python-format
+msgid "%s models available"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/mistral.py:52
+msgid "vibe CLI spend"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/mistral.py:52
+#, python-format
+msgid "%s total"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/mistral.py:53
+msgid "$50 soft cap"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/mistral.py:69
+#, python-format
+msgid ""
+"\n"
+"Spend (vibe): %s"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/moonshot.py:12
+msgid "Weekly limit"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/moonshot.py:14
+msgid "Daily limit"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/moonshot.py:16
+#, python-format
+msgid "%s-day limit"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/moonshot.py:18
+#, python-format
+msgid "%s-hour limit"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/moonshot.py:20
+#, python-format
+msgid "%s-minute limit"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/moonshot.py:21
+#: package/contents/tools/aiusage/normalize/moonshot.py:91
+msgid "Plan usage"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/moonshot.py:79
+#, python-format
+msgid "Kimi: %s"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/moonshot.py:80
+msgid "Kimi: no Moonshot API key or Kimi Code login"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/moonshot.py:100
+#, python-format
+msgid "%s left"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/moonshot.py:102
+#, python-format
+msgid "of %s"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/moonshot.py:107
+msgid "Voucher / cash"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/moonshot.py:121
+#, python-format
+msgid ""
+"\n"
+"Moonshot balance: %s"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/moonshot.py:146
+#, python-format
+msgid "Kimi balance: %s"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/muse.py:50
+msgid "Muse: not installed"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/muse.py:64
+msgid "Muse: no sessions yet"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/muse.py:64
+msgid "Muse: not logged in"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/muse.py:87
+msgid "Tokens"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/muse.py:92
+#, python-format
+msgid "%s out · %s calls"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/muse.py:92
+#, python-format
+msgid "%s out"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/muse.py:96
+msgid "Spend (est.)"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/muse.py:104
+#, python-format
+msgid "Muse tokens: %s"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/muse.py:106
+#, python-format
+msgid ""
+"\n"
+"Spend (est.): %s"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/muse.py:109
+#, python-format
+msgid "Muse %s: %s%% used\n"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/muse.py:115
+#, python-format
+msgid "%s sessions"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/openai.py:67
+#, python-format
+msgid "Model %s"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/openai.py:121
+msgid "OpenAI: no API key or Codex login"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/openai.py:132
+msgid "Codex 5-hour"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/openai.py:132
+msgid "ChatGPT/Codex plan window"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/openai.py:133
+msgid "Codex weekly"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/openai.py:133
+msgid "Secondary plan window"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/openai.py:140
+#, python-format
+msgid "%s · 5-hour"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/openai.py:142
+msgid "Limit reached"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/openai.py:146
+#, python-format
+msgid "%s · weekly"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/openai.py:153
+#, python-format
+msgid "Codex 5h: %s%% left"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/openai.py:159
+#, python-format
+msgid "Codex weekly: %s%% left"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/openai.py:188
+#: package/contents/tools/aiusage/normalize/openai.py:203
+msgid "API key configured"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/openai.py:194
+msgid "API credentials"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/openai.py:199
+msgid "Organization usage available"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/openai.py:199
+msgid "Codex signed in; no organization API key"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/openrouter.py:15
+msgid "OpenRouter: no API key configured"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/openrouter.py:36
+msgid " / unlimited"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/openrouter.py:41
+#, python-format
+msgid ""
+"\n"
+"Used: %s"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/openrouter.py:42
+#, python-format
+msgid ""
+"\n"
+"Limit: %s"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/zai.py:34
+#, python-format
+msgid "Today (%s)"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/zai.py:39
+#, python-format
+msgid "%s tokens"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/zai.py:45
+#, python-format
+msgid "%s calls"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/zai.py:63
+msgid "Z.AI: no token configured"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/zai.py:70
+#, python-format
+msgid "Z.AI: %s"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/zai.py:85
+#, python-format
+msgid "%s remaining"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/zai.py:93
+msgid "5-hour tokens"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/zai.py:94
+msgid "7-day tokens"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/zai.py:95
+msgid "Monthly tools"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/zai.py:106
+#, python-format
+msgid "Z.AI tokens (5h): %s%%"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/zai.py:107
+#, python-format
+msgid "Z.AI tokens (7d): %s%%"
+msgstr ""
+
+#: package/contents/tools/aiusage/normalize/zai.py:108
+#, python-format
+msgid "Z.AI tools: %s%%"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/antigravity.py:307
+msgid "Antigravity language server found but could not connect to API"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/antigravity.py:308
+msgid "Antigravity is not running. Please open your IDE."
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/copilot.py:242
+msgid "Invalid GitHub token"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/copilot.py:246
+msgid "GitHub username missing"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/copilot.py:257
+msgid "GitHub token cannot read Copilot premium request usage"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/copilot.py:262
+msgid "GitHub Copilot invalid JSON"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/cursor.py:155
+msgid "login expired — run cursor-agent login"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/cursor.py:159
+msgid "login rejected — run cursor-agent login"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/cursor.py:164
+msgid "usage response could not be parsed"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/deepseek.py:29
+msgid "Invalid DeepSeek API key"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/deepseek.py:33
+msgid "DeepSeek invalid JSON"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/deepseek.py:37
+msgid "DeepSeek unexpected response"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/grok.py:237
+msgid "Grok auth expired — run grok --oauth"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/grok.py:239
+#, python-format
+msgid "Billing HTTP %s"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/kimi_code.py:145
+msgid "Kimi Code usage response could not be parsed"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/kimi_code.py:151
+msgid "Kimi Code login rejected — run kimi once to refresh it"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/kimi_code.py:152
+#, python-format
+msgid "Kimi Code %s"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/kimi_code.py:161
+msgid "Kimi Code is not signed in — run kimi and /login"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/kimi_code.py:166
+msgid "Kimi Code login expired — run kimi once to refresh it"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/kiro.py:167
+msgid "No Kiro usage snapshot — open Kiro and let it refresh"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/kiro.py:169
+msgid "Kiro usage payload could not be parsed"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/kiro.py:247
+msgid "Kiro usage response could not be parsed"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/kiro.py:254
+msgid "Kiro usage response has no credit breakdown"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/kiro.py:284
+msgid "kiro-cli is not signed in — run kiro-cli login"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/kiro.py:287
+msgid "kiro-cli login expired — run kiro-cli once to refresh it"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/kiro.py:299
+msgid "kiro-cli login rejected — run kiro-cli once to refresh it"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/kiro.py:318
+msgid "No Kiro state found — sign in to Kiro IDE or kiro-cli once"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/mistral.py:124
+msgid "Mistral invalid JSON"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/mistral.py:132
+#: package/contents/tools/aiusage/providers/openrouter.py:30
+msgid "Invalid API key (401)"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/mistral.py:134
+msgid "Rate limited (429)"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/mistral.py:136
+msgid "Mistral network error"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/mistral.py:137
+#, python-format
+msgid "HTTP %s"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/moonshot.py:35
+msgid "Invalid Moonshot API key"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/moonshot.py:39
+msgid "Kimi invalid JSON"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/moonshot.py:42
+msgid "Kimi unexpected response"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/openrouter.py:34
+msgid "OpenRouter invalid JSON"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/zai.py:145
+msgid "Invalid Z.AI token"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/zai.py:149
+msgid "Z.AI invalid JSON"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/zai.py:152
+msgid "Z.AI API error"
+msgstr ""
+
+#: package/contents/tools/aiusage/providers/zai.py:182
+msgid "Z.AI unexpected response"
 msgstr ""

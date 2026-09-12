@@ -59,6 +59,22 @@ xgettext \
     --output="$pot" \
     "${sources[@]}"
 
+# The Python backend feeds labels and errors straight to the frontend, so it
+# shares the same catalog. xgettext knows Python's gettext/_ built-ins; only the
+# extra sources and --join-existing are needed to append to the .pot above.
+mapfile -t py_sources < <(find package/contents/tools/aiusage -type f -name '*.py' | sort)
+xgettext \
+    --from-code=UTF-8 \
+    --language=Python \
+    --keyword=_ \
+    --add-comments=TRANSLATORS \
+    --package-name="AI Usage Monitor" \
+    --package-version="$version" \
+    --msgid-bugs-address="$bug_url/issues" \
+    --join-existing \
+    --output="$pot" \
+    "${py_sources[@]}"
+
 # xgettext keys the catalog header on the charmap; normalise it so the .pot is
 # stable and the merge in a fresh checkout is a no-op.
 sed -i 's/^"Content-Type: text\/plain; charset=CHARSET\\n"$/"Content-Type: text\/plain; charset=UTF-8\\n"/' "$pot"

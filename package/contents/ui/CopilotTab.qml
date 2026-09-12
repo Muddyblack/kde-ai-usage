@@ -223,7 +223,7 @@ ColumnLayout {
                 tileTip: rootItem.copilotStatsFirstDate ? i18n("Since ") + Qt.formatDate(new Date(rootItem.copilotStatsFirstDate), "MMM d, yyyy") : ""
             }
             StatTile {
-                tileValue: Math.round(rootItem.copilotStatsCurrentStreak) + "d"
+                tileValue: Math.round(rootItem.copilotStatsCurrentStreak) + i18n("d")
                 tileLabel: i18n("streak")
                 tileSub: i18n("best ") + Math.round(rootItem.copilotStatsLongestStreak) + i18n("d")
                 tileTip: i18n("Current consecutive-day streak\nLongest: ") + Math.round(rootItem.copilotStatsLongestStreak) + i18n(" days")

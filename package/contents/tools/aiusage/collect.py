@@ -12,6 +12,7 @@ import time
 from . import config
 from .contract import STATUS_FEEDS, STATUS_PAGES
 from .http import as_json, fetch_json, http_error_text
+from .i18n import _
 from .providers.antigravity import get_antigravity_usage
 from .providers.claude_credentials import get_claude_credentials
 from .providers.cline import get_cline_sessions
@@ -104,7 +105,7 @@ def collect_claude(now):
         if result.status == 200:
             usage = as_json(result.body)
             if usage is None:
-                usage_error = "parse error"
+                usage_error = _("parse error")
         else:
             usage_error = http_error_text(result.status)
 

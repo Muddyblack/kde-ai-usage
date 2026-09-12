@@ -1,4 +1,5 @@
 from ..contract import flat_window, jround, money, monthly_window, num, pct_clamp, provider_base, provider_error
+from ..i18n import _
 from ..stats import cursor_stats
 
 ACCENT = "#e6e6e6"
@@ -20,12 +21,12 @@ def normalize_cursor(raw):
             "Cursor",
             ACCENT,
             now,
-            "Cursor: not signed in — run cursor-agent login",
+            _("Cursor: not signed in — run cursor-agent login"),
             {"loggedIn": False, "source": "", "stats": {"available": False}},
         )
     base_details = {"loggedIn": res.get("loggedIn") is True, "source": res.get("source") or "", "stats": cursor_stats(res.get("stats"), now)}
     if res.get("error") is not None:
-        return provider_error("cursor", "Cursor", ACCENT, now, f"Cursor: {res['error']}", base_details)
+        return provider_error("cursor", "Cursor", ACCENT, now, _("Cursor: %s") % res["error"], base_details)
 
     usage = res.get("usage") if isinstance(res.get("usage"), dict) else {}
     plan_body = res.get("plan") if isinstance(res.get("plan"), dict) else {}
@@ -36,7 +37,7 @@ def normalize_cursor(raw):
     if not isinstance(pu, dict):
         # Enterprise seats get no plan block; cursor-agent says the same.
         return provider_error(
-            "cursor", "Cursor", ACCENT, now, "Cursor: usage details are not available for this plan", {**base_details, "planName": plan_name}
+            "cursor", "Cursor", ACCENT, now, _("Cursor: usage details are not available for this plan"), {**base_details, "planName": plan_name}
         )
 
     reset_at = _ms_epoch(usage.get("billingCycleEnd")) or _ms_epoch(plan_info.get("billingCycleEnd"))
@@ -54,15 +55,15 @@ def normalize_cursor(raw):
     od_used = num(slu.get("individualUsed")) / 100
     od_limit = num(slu.get("individualLimit")) / 100
 
-    total_detail = f"{money(included, 'USD')} / {money(limit, 'USD')}" if limit > 0 else f"{jround(total)}% of included usage"
-    windows = [flat_window("cursor_total", "Included usage", total, reset_at, total_detail, True)]
+    total_detail = f"{money(included, 'USD')} / {money(limit, 'USD')}" if limit > 0 else _("%s%% of included usage") % jround(total)
+    windows = [flat_window("cursor_total", _("Included usage"), total, reset_at, total_detail, True)]
     if has_split:
-        windows.append(flat_window("cursor_auto", "Auto + Composer", auto, reset_at, f"{jround(auto)}% used", True))
-        windows.append(flat_window("cursor_api", "API models", api, reset_at, f"{jround(api)}% used", True))
+        windows.append(flat_window("cursor_auto", _("Auto + Composer"), auto, reset_at, _("%s%% used") % jround(auto), True))
+        windows.append(flat_window("cursor_api", _("API models"), api, reset_at, _("%s%% used") % jround(api), True))
     if od_limit > 0 or od_used > 0:
         od_pct = od_used / od_limit * 100 if od_limit > 0 else 0
         od_detail = f"{money(od_used, 'USD')} / {money(od_limit, 'USD')}" if od_limit > 0 else money(od_used, "USD")
-        windows.append(flat_window("cursor_on_demand", "On-demand", od_pct, reset_at, od_detail, od_limit > 0))
+        windows.append(flat_window("cursor_on_demand", _("On-demand"), od_pct, reset_at, od_detail, od_limit > 0))
 
     r = provider_base("cursor", "Cursor", ACCENT, now)
     r["summary"] = {"pct": total, "text": f"{jround(total)}%", "detail": plan_name, "hasChart": True}
@@ -72,7 +73,7 @@ def normalize_cursor(raw):
             "pct": total,
             "color": ACCENT,
             "text": None,
-            "tooltip": "Cursor" + (f"\nPlan: {plan_name}" if plan_name else "") + f"\nIncluded usage: {jround(total)}%",
+            "tooltip": "Cursor" + (_("\nPlan: %s") % plan_name if plan_name else "") + _("\nIncluded usage: %s%%") % jround(total),
         }
     ]
     r["chartWindows"] = monthly_window("cursor", "cu", False)

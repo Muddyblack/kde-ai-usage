@@ -98,9 +98,9 @@ ColumnLayout {
                 tileTip: clineTabRoot.stats.firstDate ? i18n("Since ") + Qt.formatDate(new Date(clineTabRoot.stats.firstDate), "MMM d, yyyy") : ""
             }
             StatTile {
-                tileValue: Math.round(clineTabRoot.stats.currentStreak || 0) + "d"
+                tileValue: Math.round(clineTabRoot.stats.currentStreak || 0) + i18n("d")
                 tileLabel: i18nc("stat label", "streak")
-                tileSub: i18n("best ") + Math.round(clineTabRoot.stats.longestStreak || 0) + "d"
+                tileSub: i18n("best ") + Math.round(clineTabRoot.stats.longestStreak || 0) + i18n("d")
             }
             StatTile {
                 visible: (clineTabRoot.stats.longestSessionMs || 0) > 0

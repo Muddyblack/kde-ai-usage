@@ -536,9 +536,9 @@ ColumnLayout {
             }
 
             StatTile {
-                tileValue: Math.round(rootItem.codexStatsCurrentStreak) + "d"
+                tileValue: Math.round(rootItem.codexStatsCurrentStreak) + i18n("d")
                 tileLabel: i18nc("stat label", "streak")
-                tileSub: i18n("best ") + Math.round(rootItem.codexStatsLongestStreak) + "d"
+                tileSub: i18n("best ") + Math.round(rootItem.codexStatsLongestStreak) + i18n("d")
                 tileTip: i18n("Current consecutive-day streak\nLongest: ") + Math.round(rootItem.codexStatsLongestStreak) + i18n(" days")
             }
 

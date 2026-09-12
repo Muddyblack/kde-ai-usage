@@ -1,4 +1,5 @@
 from ..contract import flat_window, money, monthly_window, num, provider_base, provider_error
+from ..i18n import _
 
 
 def normalize_openrouter(raw):
@@ -11,7 +12,7 @@ def normalize_openrouter(raw):
             "OpenRouter",
             "#9333ea",
             now,
-            "OpenRouter: no API key configured",
+            _("OpenRouter: no API key configured"),
             {"hasKey": False, "keyValid": False},
         )
     if res.get("error") is not None:
@@ -32,15 +33,15 @@ def normalize_openrouter(raw):
 
     r = provider_base("openrouter", "OpenRouter", "#9333ea", now)
     r["summary"] = {"pct": pct, "text": money(usage, "USD"), "detail": account, "hasChart": True}
-    detail = money(usage, "USD") + (f" / {money(limit, 'USD')}" if limit is not None else " / unlimited")
-    r["quotaWindows"] = [flat_window("openrouter", "Credit usage", pct, 0, detail, True)]
+    detail = money(usage, "USD") + (f" / {money(limit, 'USD')}" if limit is not None else _(" / unlimited"))
+    r["quotaWindows"] = [flat_window("openrouter", _("Credit usage"), pct, 0, detail, True)]
     tooltip = (
         "OpenRouter"
         + (f"\n{account}" if account != "" else "")
-        + f"\nUsed: {money(usage, 'USD')}"
-        + (f"\nLimit: {money(limit, 'USD')}" if limit is not None else "")
+        + _("\nUsed: %s") % money(usage, "USD")
+        + (_("\nLimit: %s") % money(limit, "USD") if limit is not None else "")
     )
-    r["slots"] = [{"pct": pct, "color": "#9333ea", "text": money(usage, "USD") if usage > 0 else "✓ key", "tooltip": tooltip}]
+    r["slots"] = [{"pct": pct, "color": "#9333ea", "text": money(usage, "USD") if usage > 0 else _("✓ key"), "tooltip": tooltip}]
     r["chartWindows"] = monthly_window("openrouter", "or", False)
     r["historyValues"] = {"or": pct} if pct > 0 else {}
     limit_remaining = res.get("limitRemainingUSD")
