@@ -1,4 +1,4 @@
-.PHONY: help view view-h install pack tag test test-py lint-py check-pricing run-windows
+.PHONY: help view view-h install pack tag test test-py lint-py check-pricing run-windows opendesktop
 .DEFAULT_GOAL := help
 
 help: ## list targets
@@ -53,6 +53,10 @@ lint-py: ## lint + format-check the Python backend and tray app (dev only, needs
 
 check-pricing: ## report drift between billing.py and the live pricing pages (dev only)
 	@./scripts/check-pricing.py
+
+opendesktop: ## rasterize the readme SVGs to PNGs and JPGs in readme/opendesktop (needs `inkscape`)
+	@readme/export_opendesktop.sh
+
 
 pack: ## build .plasmoid archive
 	@if command -v nix >/dev/null 2>&1 && [ -f flake.nix ]; then \

@@ -1,8 +1,11 @@
 # Provider data contract (schema version 1)
 
-All three frontends — the KDE Plasma widget (`package/contents/ui`), the
-Hyprland/Quickshell shell (`hyprland/`) and the terminal frontend
-(`aiusage/render.py`) — get all of their provider data from a single backend:
+All four frontends — the KDE Plasma widget (`package/contents/ui`), the
+Hyprland/Quickshell shell (`hyprland/`), the Windows tray app (`windows/`) and
+the terminal frontend (`aiusage/render.py`) — get all of their provider data
+from a single backend. The Linux frontends run it through
+`package/contents/tools/sh/get-ai-usage`; the Windows app, which has no shell,
+calls it in-process.
 
 ```
 shared provider backend (Python, stdlib only)   package/contents/tools/aiusage
@@ -467,4 +470,4 @@ with `make test`.
 
 Adding a field is backwards compatible. Removing or repurposing one is not:
 bump `SCHEMA_VERSION` in `package/contents/tools/aiusage/contract.py`, update
-this document, and update all three frontends in the same change.
+this document, and update all four frontends in the same change.
