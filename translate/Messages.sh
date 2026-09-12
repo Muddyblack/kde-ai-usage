@@ -37,7 +37,7 @@ pot="$dir/template.pot"
 cd "$root"
 mapfile -t sources < <(
     find package/contents/ui package/contents/config package/contents/code \
-        -type f \( -name '*.qml' -o -name '*.js' \) | sort
+        -type f \( -name '*.qml' -o -name '*.js' \) | LC_ALL=C sort
 )
 # The KPlugin name and description are read from metadata.json by KJsonUtils,
 # which looks up "Name[fr]" / "Description[fr]" in the same domain. They never
@@ -62,7 +62,7 @@ xgettext \
 # The Python backend feeds labels and errors straight to the frontend, so it
 # shares the same catalog. xgettext knows Python's gettext/_ built-ins; only the
 # extra sources and --join-existing are needed to append to the .pot above.
-mapfile -t py_sources < <(find package/contents/tools/aiusage -type f -name '*.py' | sort)
+mapfile -t py_sources < <(find package/contents/tools/aiusage -type f -name '*.py' | LC_ALL=C sort)
 xgettext \
     --from-code=UTF-8 \
     --language=Python \
@@ -79,10 +79,16 @@ xgettext \
 # stable and the merge in a fresh checkout is a no-op.
 sed -i 's/^"Content-Type: text\/plain; charset=CHARSET\\n"$/"Content-Type: text\/plain; charset=UTF-8\\n"/' "$pot"
 
+# The creation date changes on every run. Drop it from the .pot and the .po so
+# a regenerated catalog is byte-identical to the committed one — the CI sync
+# check compares them with `git diff --exit-code`.
+sed -i '/^"POT-Creation-Date:/d' "$pot"
+
 shopt -s nullglob
 for po in "$dir"/*.po; do
     echo "[i18n] merge $(basename "$po")"
     msgmerge --quiet --update --backup=none --no-fuzzy-matching "$po" "$pot"
+    sed -i '/^"POT-Creation-Date:/d' "$po"
 done
 shopt -u nullglob
 
