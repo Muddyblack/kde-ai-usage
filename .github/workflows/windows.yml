@@ -24,7 +24,34 @@ permissions:
   contents: read
 
 jobs:
+  # Only meaningful for pull_request/push: a workflow_dispatch run was asked
+  # for by hand and a workflow_call run is release.yml cutting a release, so
+  # both always build regardless of what changed.
+  changes:
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      relevant: ${{ steps.filter.outputs.relevant }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            relevant:
+              - 'windows/**'
+              - 'package/contents/tools/aiusage/**'
+              - 'tests/python/**'
+              - '.github/workflows/windows.yml'
+
   test:
+    needs: changes
+    if: |
+      always() &&
+      (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' || needs.changes.outputs.relevant == 'true')
     strategy:
       fail-fast: false
       matrix:
