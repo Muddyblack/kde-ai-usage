@@ -11,7 +11,39 @@ permissions:
   contents: read
 
 jobs:
+  # Figures out which of the two jobs below actually need to run for this
+  # diff, so e.g. a docs-only or hyprland-only PR doesn't pay for a backend
+  # test run, and a QML-only PR doesn't pay for ruff/pytest.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      qml: ${{ steps.filter.outputs.qml }}
+      backend: ${{ steps.filter.outputs.backend }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            qml:
+              - 'package/contents/**/*.qml'
+              - '.github/workflows/lint.yml'
+            backend:
+              - 'package/contents/tools/aiusage/**'
+              - 'windows/**'
+              - 'tests/python/**'
+              - 'tests/fixtures/**'
+              - 'tests/*.test.sh'
+              - 'tests/*.test.js'
+              - 'pyproject.toml'
+              - '.github/workflows/lint.yml'
+
   qml:
+    needs: changes
+    if: needs.changes.outputs.qml == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -25,6 +57,8 @@ jobs:
         run: nix develop --command bash -c 'find package/contents -name "*.qml" | xargs qmlformat --dry-run 2>&1 | grep -q "would reformat" && echo "Files need formatting, run qmlformat -i" && exit 1 || true'
 
   backend:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
