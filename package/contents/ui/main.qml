@@ -1043,6 +1043,43 @@ PlasmoidItem {
         return amount + (cur ? " " + cur : "");
     }
 
+    // Rate-limit tier shown in the Claude header, with the known words
+    // localized ("default_claude_ai" → "Par défaut", "default_max_20x" →
+    // "Par défaut Max 20x", …). Unknown words keep a capitalized form.
+    function claudeTierLabel() {
+        var raw = root.claudeRateLimitTier;
+        if (!raw)
+            return "";
+        var parts = String(raw).replace(/_claude_ai$/i, "").split("_");
+        var words = [];
+        for (var i = 0; i < parts.length; i++) {
+            var w = parts[i];
+            if (w === "default")
+                words.push(i18nc("rate limit tier", "default"));
+            else if (w === "pro")
+                words.push(i18nc("rate limit tier", "pro"));
+            else if (w === "max")
+                words.push(i18nc("rate limit tier", "max"));
+            else if (w === "business")
+                words.push(i18nc("rate limit tier", "business"));
+            else if (w === "free")
+                words.push(i18nc("rate limit tier", "free"));
+            else
+                words.push(w.charAt(0).toUpperCase() + w.slice(1));
+        }
+        return words.join(" ");
+    }
+
+    function effortLabel(level) {
+        if (level === "high")
+            return i18nc("effort level", "high");
+        if (level === "low")
+            return i18nc("effort level", "low");
+        if (level === "medium")
+            return i18nc("effort level", "medium");
+        return level;
+    }
+
     // Resolve a service's accent: the Plasma highlight color when theme accent is on,
     // otherwise the service's own brand color.
     // Brand logo for a tab, or "" when the provider has no artwork yet (callers

@@ -29,17 +29,7 @@ ColumnLayout {
             opacity: 0.7
         }
         PlasmaComponents.Label {
-            text: {
-                // Prettify rateLimitTier: "default_claude_ai" → "Default"
-                // "pro_claude_ai" → "Pro", etc.
-                var tier = rootItem.claudeRateLimitTier.replace(/_claude_ai$/i, "").replace(/_/g, " ").replace(/\b\w/g, function (c) {
-                    return c.toUpperCase();
-                });
-                if (tier)
-                    return tier;
-                // Fall back to abbreviated org UUID or generic label
-                return rootItem.claudeOrganizationUuid ? rootItem.claudeOrganizationUuid.slice(0, 8) + "…" : i18n("Claude Code User");
-            }
+            text: rootItem.claudeTierLabel() || (rootItem.claudeOrganizationUuid ? rootItem.claudeOrganizationUuid.slice(0, 8) + "…" : i18n("Claude Code User"))
             font.pixelSize: 10
             opacity: 0.6
             color: Kirigami.Theme.textColor
@@ -75,7 +65,7 @@ ColumnLayout {
             PlasmaComponents.Label {
                 id: effortChipLabel
                 anchors.centerIn: parent
-                text: i18nc("effort level", "effort: ") + rootItem.claudeEffortLevel
+                text: i18nc("effort level", "effort: ") + rootItem.effortLabel(rootItem.claudeEffortLevel)
                 font.pixelSize: 9
                 font.bold: true
                 color: parent.effortColor
