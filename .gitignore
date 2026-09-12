@@ -2,6 +2,8 @@
 *.plasmoid
 notes.md
 plan.md
+readme/opendesktop
+
 
 # Nix
 result

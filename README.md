@@ -21,27 +21,27 @@
 </p>
 
 <p align="center">
-  <b>Panel — Pill &amp; Compact modes</b><br/><br/>
-  <img src="./readme/panel.svg?v=7" alt="Pill Panel view" width="160" valign="middle"/>
+  <b>Panel Pills — Live Quota Readouts</b><br/><br/>
+  <img src="./readme/claude_pill.svg?v=12" alt="Claude Panel Pill" width="160" valign="middle"/>
   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="./readme/panel_2.svg?v=8" alt="Compact Panel view" width="90" valign="middle"/>
+  <img src="./readme/agy_pill.svg?v=12" alt="Antigravity Dual-Slot Pill" width="165" valign="middle"/>
 </p>
 
 <p align="center">
-  <b>Popup — Provider tabs</b><br/><br/>
-  <img src="./readme/demo.svg?v=10" alt="Claude tab" width="340" valign="top"/>
+  <b>Popup Views — Detailed Provider Usage &amp; History</b><br/><br/>
+  <img src="./readme/claude_usage.svg?v=12" alt="Claude Usage" width="340" valign="top"/>
   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="./readme/demo_2.svg?v=10" alt="Antigravity tab" width="340" valign="top"/>
+  <img src="./readme/antigravity_usage.svg?v=12" alt="Antigravity Usage" width="340" valign="top"/>
 </p>
 <p align="center">
-  <img src="./readme/demo_3.svg?v=10" alt="OpenAI tab" width="340" valign="top"/>
+  <img src="./readme/openai_usage.svg?v=12" alt="OpenAI Usage" width="340" valign="top"/>
   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="./readme/demo_chart.svg?v=10" alt="Usage Chart" width="340" valign="top"/>
+  <img src="./readme/usage_chart.svg?v=12" alt="Usage Chart" width="340" valign="top"/>
 </p>
 
 <p align="center">
-  <b>Settings</b><br/><br/>
-  <img src="./readme/settings.svg?v=11" alt="Settings panel" width="340" valign="top"/>
+  <b>Settings &amp; Provider Configuration</b><br/><br/>
+  <img src="./readme/settings.svg?v=12" alt="Settings panel" width="340" valign="top"/>
 </p>
 
 A KDE Plasma 6 panel widget for tracking AI API quota usage across multiple services. Monitor your **Claude** subscription windows and local activity stats, **Antigravity/Google AI Studio**, **OpenAI API and Codex plan limits**, **Grok CLI**, **Kiro**, **Mistral AI**, **OpenRouter**, **Z.AI**, **GitHub Copilot**, **DeepSeek**, **Kimi / Moonshot AI**, and **Muse** usage or balance at a glance with animated segmented bars, live countdown timers, account status, and per-model breakdowns.
