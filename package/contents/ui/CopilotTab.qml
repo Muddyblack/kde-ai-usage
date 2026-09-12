@@ -36,7 +36,7 @@ ColumnLayout {
         }
 
         PlasmaComponents.Label {
-            text: rootItem.copilotUsername !== "" ? i18n("GitHub Copilot · @") + rootItem.copilotUsername : i18n("GitHub Copilot")
+            text: rootItem.copilotUsername !== "" ? i18n("GitHub Copilot · @") + rootItem.copilotUsername : "GitHub Copilot"
             font.pixelSize: 10
             opacity: 0.65
             color: Kirigami.Theme.textColor
@@ -194,7 +194,7 @@ ColumnLayout {
                 Layout.fillWidth: true
             }
             PlasmaComponents.Label {
-                text: i18n("Copilot CLI")
+                text: "Copilot CLI"
                 font.pixelSize: 9
                 opacity: 0.45
                 color: Kirigami.Theme.textColor

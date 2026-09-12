@@ -90,6 +90,9 @@ for po in "$dir"/*.po; do
     echo "[i18n] merge $(basename "$po")"
     msgmerge --quiet --update --backup=none --no-fuzzy-matching "$po" "$pot"
     sed -i '/^"POT-Creation-Date:/d' "$po"
+    # Drop entries that are no longer in the sources (e.g. brand names unwrapped
+    # from i18n()), so the catalog only ever holds live strings.
+    msgattrib --no-obsolete "$po" -o "$po"
 done
 shopt -u nullglob
 

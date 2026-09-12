@@ -31,7 +31,7 @@ ColumnLayout {
         }
 
         PlasmaComponents.Label {
-            text: i18n("DeepSeek")
+            text: "DeepSeek"
             font.pixelSize: 10
             opacity: 0.65
             color: Kirigami.Theme.textColor

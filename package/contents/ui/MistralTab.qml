@@ -46,13 +46,13 @@ ColumnLayout {
         spacing: 8
 
         PlasmaComponents.Label {
-            text: i18n("vibe")
+            text: "vibe"
             font.pixelSize: 13
             font.bold: true
             color: rootItem.mistralOrange
         }
         PlasmaComponents.Label {
-            text: rootItem.mistralVibeActiveModel !== "" ? rootItem.mistralVibeActiveModel : i18n("Mistral AI")
+            text: rootItem.mistralVibeActiveModel !== "" ? rootItem.mistralVibeActiveModel : "Mistral AI"
             font.pixelSize: 10
             opacity: 0.55
             color: Kirigami.Theme.textColor

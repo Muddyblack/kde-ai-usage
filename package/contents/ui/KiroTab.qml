@@ -26,7 +26,7 @@ ColumnLayout {
             opacity: 0.7
         }
         PlasmaComponents.Label {
-            text: i18n("Kiro")
+            text: "Kiro"
             font.pixelSize: 10
             opacity: 0.6
             color: Kirigami.Theme.textColor

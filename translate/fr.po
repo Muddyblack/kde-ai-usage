@@ -544,10 +544,6 @@ msgstr " jet"
 msgid "GitHub Copilot · @"
 msgstr "GitHub Copilot · @"
 
-#: package/contents/ui/CopilotTab.qml:39
-msgid "GitHub Copilot"
-msgstr "GitHub Copilot"
-
 #: package/contents/ui/CopilotTab.qml:60 package/contents/ui/MistralTab.qml:73
 #: package/contents/ui/ZaiTab.qml:59
 msgid "CONNECTED"
@@ -626,10 +622,6 @@ msgstr ""
 "Aucune statistique d'activité locale pour le moment.\n"
 "Exécutez Copilot CLI pour remplir ~/.copilot/session-store.db"
 
-#: package/contents/ui/CopilotTab.qml:197
-msgid "Copilot CLI"
-msgstr "Copilot CLI"
-
 #: package/contents/ui/CopilotTab.qml:212
 msgid "sessions"
 msgstr "sessions"
@@ -670,10 +662,6 @@ msgstr "Dépôts dans lesquels le CLI a été exécuté"
 #: package/contents/ui/CopilotTab.qml:271
 msgid "Top repositories"
 msgstr "Principaux dépôts"
-
-#: package/contents/ui/CursorTab.qml:34
-msgid "Cursor"
-msgstr "Cursor"
 
 #: package/contents/ui/CursorTab.qml:78
 #: package/contents/tools/aiusage/normalize/cursor.py:59
@@ -797,10 +785,6 @@ msgstr ""
 "Exécutez cursor-agent login (ou connectez-vous au Cursor IDE). Aucune clé "
 "API requise."
 
-#: package/contents/ui/DeepSeekTab.qml:34
-msgid "DeepSeek"
-msgstr "DeepSeek"
-
 #: package/contents/ui/DeepSeekTab.qml:52
 msgid "AVAILABLE"
 msgstr "DISPONIBLE"
@@ -840,10 +824,6 @@ msgstr "Devises"
 #: package/contents/ui/DeepSeekTab.qml:159 package/contents/ui/ZaiTab.qml:170
 msgid "unknown"
 msgstr "inconnu"
-
-#: package/contents/ui/GrokTab.qml:24
-msgid "Grok CLI"
-msgstr "Grok CLI"
 
 #: package/contents/ui/GrokTab.qml:52
 msgid "Run grok --oauth, or add an xAI API key in settings."
@@ -940,10 +920,6 @@ msgstr ""
 msgid "Kimi error"
 msgstr "Erreur Kimi"
 
-#: package/contents/ui/KimiTab.qml:157
-msgid "Kimi / Moonshot"
-msgstr "Kimi / Moonshot"
-
 #: package/contents/ui/KimiTab.qml:166
 #: package/contents/tools/aiusage/normalize/moonshot.py:106
 msgid "Available balance"
@@ -956,10 +932,6 @@ msgstr "Solde de bons"
 #: package/contents/ui/KimiTab.qml:176
 msgid "Cash balance"
 msgstr "Solde espèces"
-
-#: package/contents/ui/KiroTab.qml:29
-msgid "Kiro"
-msgstr "Kiro"
 
 #: package/contents/ui/KiroTab.qml:57 package/contents/ui/main.qml:157
 #: package/contents/ui/main.qml:1598
@@ -1041,14 +1013,6 @@ msgstr "il y a %1 j"
 msgid "%1w ago"
 msgstr "il y a %1 sem"
 
-#: package/contents/ui/MistralTab.qml:49
-msgid "vibe"
-msgstr "vibe"
-
-#: package/contents/ui/MistralTab.qml:55
-msgid "Mistral AI"
-msgstr "Mistral AI"
-
 #: package/contents/ui/MistralTab.qml:73
 msgid "INVALID KEY"
 msgstr "CLÉ INVALIDE"
@@ -1110,10 +1074,6 @@ msgstr ""
 #: package/contents/ui/MuseTab.qml:30
 msgid "Muse Code · "
 msgstr "Muse Code · "
-
-#: package/contents/ui/MuseTab.qml:30
-msgid "Muse Code"
-msgstr "Muse Code"
 
 #: package/contents/ui/MuseTab.qml:66
 msgid "No Muse activity yet"
@@ -1372,10 +1332,6 @@ msgstr ""
 msgid "OpenRouter support is in BETA and currently untested."
 msgstr ""
 "La prise en charge d'OpenRouter est en BÊTA et n'a pas encore été testée."
-
-#: package/contents/ui/OpenRouterTab.qml:66
-msgid "OpenRouter"
-msgstr "OpenRouter"
 
 #: package/contents/ui/OpenRouterTab.qml:83
 msgid "FREE"
@@ -1715,10 +1671,6 @@ msgstr "Les deux"
 msgid "Combined"
 msgstr "Combiné"
 
-#: package/contents/ui/UsageChart.qml:204
-msgid "Gemini"
-msgstr "Gemini"
-
 #: package/contents/ui/UsageChart.qml:209
 msgctxt "quota model"
 msgid "Rest"
@@ -1749,10 +1701,6 @@ msgstr "Reste : "
 #: package/contents/ui/ZaiTab.qml:40
 msgid "Z.AI · "
 msgstr "Z.AI · "
-
-#: package/contents/ui/ZaiTab.qml:40
-msgid "Z.AI"
-msgstr "Z.AI"
 
 #: package/contents/ui/ZaiTab.qml:81
 msgid ""
@@ -1826,10 +1774,6 @@ msgstr "vide → $MOONSHOT_API_KEY"
 #: package/contents/ui/main.qml:596
 msgid "optional — the CLI login is used"
 msgstr "optionnel — la connexion CLI est utilisée"
-
-#: package/contents/ui/main.qml:989 package/contents/ui/main.qml:1003
-msgid "AI Usage Widget"
-msgstr "Widget d'utilisation IA"
 
 #: package/contents/ui/main.qml:989
 msgid "Export failed: could not capture image"

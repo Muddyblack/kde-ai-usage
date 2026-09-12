@@ -154,7 +154,7 @@ ColumnLayout {
             spacing: 8
 
             PlasmaComponents.Label {
-                text: i18n("Kimi / Moonshot")
+                text: "Kimi / Moonshot"
                 font.pixelSize: 11
                 font.bold: true
                 color: Kirigami.Theme.textColor

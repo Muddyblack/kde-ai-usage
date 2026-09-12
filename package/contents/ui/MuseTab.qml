@@ -27,7 +27,7 @@ ColumnLayout {
         }
 
         PlasmaComponents.Label {
-            text: rootItem.museFullName !== "" ? i18n("Muse Code · ") + rootItem.museFullName : i18n("Muse Code")
+            text: rootItem.museFullName !== "" ? i18n("Muse Code · ") + rootItem.museFullName : "Muse Code"
             font.pixelSize: 10
             opacity: 0.65
             color: Kirigami.Theme.textColor

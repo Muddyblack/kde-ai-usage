@@ -201,7 +201,7 @@ Rectangle {
             },
             {
                 id: "gemini",
-                label: i18n("Gemini"),
+                label: "Gemini",
                 dotColor: rootItem.googleBlue
             },
             {

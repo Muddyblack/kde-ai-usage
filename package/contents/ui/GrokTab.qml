@@ -21,7 +21,7 @@ ColumnLayout {
             isMask: true
         }
         PlasmaComponents.Label {
-            text: rootItem.grokTeamName || rootItem.grokEmail || i18n("Grok CLI")
+            text: rootItem.grokTeamName || rootItem.grokEmail || "Grok CLI"
             font.pixelSize: 10
             opacity: 0.65
             Layout.fillWidth: true

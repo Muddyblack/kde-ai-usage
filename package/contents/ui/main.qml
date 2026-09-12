@@ -986,7 +986,7 @@ PlasmoidItem {
             grabItem.grabToImage(function (result) {
                 root._exportHideHeader = false;
                 if (!result.saveToFile(tmpPng)) {
-                    var failCmd = "notify-send " + root.shellQuote(i18n("AI Usage Widget")) + " " + root.shellQuote(i18n("Export failed: could not capture image"));
+                    var failCmd = "notify-send " + root.shellQuote("AI Usage Widget") + " " + root.shellQuote(i18n("Export failed: could not capture image"));
                     exportSaveSource.disconnectSource(failCmd);
                     exportSaveSource.connectSource(failCmd);
                     return;
@@ -1000,7 +1000,7 @@ PlasmoidItem {
                 if (format === "svg")
                     cmd += " " + root._exportW + " " + root._exportH;
 
-                cmd += " && notify-send " + root.shellQuote(i18n("AI Usage Widget")) + " \"$(printf %s " + root.shellQuote(i18n("Saved to ")) + ")$dl/" + fileName + "\"";
+                cmd += " && notify-send " + root.shellQuote("AI Usage Widget") + " \"$(printf %s " + root.shellQuote(i18n("Saved to ")) + ")$dl/" + fileName + "\"";
                 exportSaveSource.disconnectSource(cmd);
                 exportSaveSource.connectSource(cmd);
             });

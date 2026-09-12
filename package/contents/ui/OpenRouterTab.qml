@@ -63,7 +63,7 @@ ColumnLayout {
             opacity: 0.7
         }
         PlasmaComponents.Label {
-            text: rootItem.openrouterLabel || i18n("OpenRouter")
+            text: rootItem.openrouterLabel || "OpenRouter"
             font.pixelSize: 10
             opacity: 0.6
             color: Kirigami.Theme.textColor

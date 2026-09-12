@@ -37,7 +37,7 @@ ColumnLayout {
         }
 
         PlasmaComponents.Label {
-            text: rootItem.zaiLevel !== "" ? i18n("Z.AI · ") + rootItem.zaiLevel : i18n("Z.AI")
+            text: rootItem.zaiLevel !== "" ? i18n("Z.AI · ") + rootItem.zaiLevel : "Z.AI"
             font.pixelSize: 10
             opacity: 0.65
             color: Kirigami.Theme.textColor
