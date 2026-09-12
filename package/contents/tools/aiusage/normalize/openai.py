@@ -1,4 +1,3 @@
-from .. import N_
 from ..billing import OPENAI_PRICING, empty_org_usage, price_models
 from ..contract import (
     jround,
@@ -64,7 +63,7 @@ def codex_normalize(p):
         for i, lim in enumerate(p.get("additional_rate_limits") or []):
             r = lim.get("rate_limit") or {}
             entry = {
-                "name": lim.get("limit_name") or N_("Model %s") % (i + 1),
+                "name": lim.get("limit_name") or f"Model {i + 1}",
                 "session": unavailable_window(),
                 "weekly": unavailable_window(),
                 "limitReached": r.get("limit_reached") is True,
@@ -118,7 +117,7 @@ def normalize_openai(raw):
     }
 
     if not has_key and not logged_in:
-        return provider_error("openai", "OpenAI", "#10a37f", now, N_("OpenAI: no API key or Codex login"), details)
+        return provider_error("openai", "OpenAI", "#10a37f", now, "OpenAI: no API key or Codex login", details)
 
     if codex_available:
         # Only the windows the plan actually reports. Plans without a 5-hour
@@ -135,21 +134,21 @@ def normalize_openai(raw):
         }
         quota_windows = []
         if session_on:
-            quota_windows.append(quota_window("codex_session", N_("Codex 5-hour"), codex["session"], N_("ChatGPT/Codex plan window")))
+            quota_windows.append(quota_window("codex_session", "Codex 5-hour", codex["session"], "ChatGPT/Codex plan window"))
         if weekly_on:
-            quota_windows.append(quota_window("codex_weekly", N_("Codex weekly"), codex["weekly"], N_("Secondary plan window")))
+            quota_windows.append(quota_window("codex_weekly", "Codex weekly", codex["weekly"], "Secondary plan window"))
         for a in codex["additional"]:
             if a["session"]["available"]:
                 quota_windows.append(
                     quota_window(
                         "additional",
-                        N_("%s · 5-hour") % a["name"],
+                        f"{a['name']} · 5-hour",
                         a["session"],
-                        N_("Limit reached") if a["limitReached"] else "",
+                        "Limit reached" if a["limitReached"] else "",
                     )
                 )
             if a["weekly"]["available"]:
-                quota_windows.append(quota_window("additional", N_("%s · weekly") % a["name"], a["weekly"], ""))
+                quota_windows.append(quota_window("additional", f"{a['name']} · weekly", a["weekly"], ""))
         r["quotaWindows"] = quota_windows
         r["slots"] = []
         if session_on:
@@ -158,7 +157,7 @@ def normalize_openai(raw):
                     "pct": codex["session"]["pct"],
                     "color": "#10a37f",
                     "text": None,
-                    "tooltip": N_("Codex 5h: %s%% left") % jround(100 - codex["session"]["pct"]),
+                    "tooltip": f"Codex 5h: {jround(100 - codex['session']['pct'])}% left",
                 }
             )
         if weekly_on:
@@ -167,7 +166,7 @@ def normalize_openai(raw):
                     "pct": codex["weekly"]["pct"],
                     "color": "#10a37f",
                     "text": None,
-                    "tooltip": N_("Codex weekly: %s%% left") % jround(100 - codex["weekly"]["pct"]),
+                    "tooltip": f"Codex weekly: {jround(100 - codex['weekly']['pct'])}% left",
                 }
             )
         r["chartWindows"] = rolling_windows(
@@ -196,21 +195,21 @@ def normalize_openai(raw):
     r["summary"] = {
         "pct": 0,
         "text": total_cost_text,
-        "detail": email if email != "" else N_("API key configured"),
+        "detail": email if email != "" else "API key configured",
         "hasChart": False,
     }
     r["quotaWindows"] = [
         {
             "key": "account",
-            "label": N_("API credentials"),
+            "label": "API credentials",
             "pct": 0,
             "available": True,
             "resetAt": 0,
             "resetText": "",
-            "detail": N_("Organization usage available") if has_key else N_("Codex signed in; no organization API key"),
+            "detail": "Organization usage available" if has_key else "Codex signed in; no organization API key",
             "showMeter": False,
         }
     ]
-    r["slots"] = [{"pct": 0, "color": "#10a37f", "text": total_cost_text, "tooltip": email if email != "" else N_("API key configured")}]
+    r["slots"] = [{"pct": 0, "color": "#10a37f", "text": total_cost_text, "tooltip": email if email != "" else "API key configured"}]
     r["details"] = details
     return r

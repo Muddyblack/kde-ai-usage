@@ -1,4 +1,3 @@
-from .. import N_
 from ..contract import flat_window, money, monthly_window, num, provider_base, provider_error
 
 
@@ -12,7 +11,7 @@ def normalize_deepseek(raw):
             "DeepSeek",
             "#4f8cff",
             now,
-            N_("DeepSeek: no API key configured"),
+            "DeepSeek: no API key configured",
             {"hasKey": False, "keyValid": False},
         )
     if res.get("error") is not None:
@@ -21,7 +20,7 @@ def normalize_deepseek(raw):
             "DeepSeek",
             "#4f8cff",
             now,
-            N_("DeepSeek: %s") % res["error"],
+            f"DeepSeek: {res['error']}",
             {"hasKey": res.get("hasKey") is True, "keyValid": res.get("keyValid") is True},
         )
 
@@ -36,21 +35,21 @@ def normalize_deepseek(raw):
     r["summary"] = {
         "pct": 0,
         "text": money(total, currency),
-        "detail": N_("Available for API calls") if available else N_("Low balance"),
+        "detail": "Available for API calls" if available else "Low balance",
         "hasChart": True,
     }
     r["quotaWindows"] = [
-        flat_window("deepseek_total", N_("Total balance"), 0, 0, money(total, currency), False),
+        flat_window("deepseek_total", "Total balance", 0, 0, money(total, currency), False),
         flat_window(
             "deepseek_split",
-            N_("Granted / topped up"),
+            "Granted / topped up",
             0,
             0,
             f"{money(granted, currency)} / {money(topped, currency)}",
             False,
         ),
     ]
-    r["slots"] = [{"pct": 0, "color": "#4f8cff", "text": money(total, currency), "tooltip": N_("DeepSeek balance: %s") % money(total, currency)}]
+    r["slots"] = [{"pct": 0, "color": "#4f8cff", "text": money(total, currency), "tooltip": f"DeepSeek balance: {money(total, currency)}"}]
     r["chartWindows"] = monthly_window("deepseek", "ds", True)
     r["historyValues"] = {"ds": total}
     r["details"] = {

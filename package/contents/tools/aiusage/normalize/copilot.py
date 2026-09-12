@@ -1,6 +1,5 @@
 import datetime
 
-from .. import N_
 from ..contract import epoch_of, flat_window, jround, monthly_window, num, pct_clamp, provider_base, provider_error
 from ..stats import copilot_stats
 
@@ -32,7 +31,7 @@ def normalize_copilot(raw):
 
     if not isinstance(res, dict) or not res:
         return provider_error(
-            "copilot", "Copilot", "#8b5cf6", now, N_("Copilot: no token configured"), {"hasKey": False, "keyValid": False, "stats": stats}
+            "copilot", "Copilot", "#8b5cf6", now, "Copilot: no token configured", {"hasKey": False, "keyValid": False, "stats": stats}
         )
     if res.get("error") is not None:
         return provider_error(
@@ -40,7 +39,7 @@ def normalize_copilot(raw):
             "Copilot",
             "#8b5cf6",
             now,
-            N_("Copilot: %s") % res["error"],
+            f"Copilot: {res['error']}",
             {"hasKey": res.get("hasKey") is True, "keyValid": res.get("keyValid") is True, "stats": stats},
         )
 
@@ -51,17 +50,17 @@ def normalize_copilot(raw):
     username = res.get("username") or ""
     plan = res.get("plan") or ""
     reset_at = _reset_at(res, now)
-    detail = N_("%s requests · unlimited") % used if unlimited else N_("%s / %s requests") % (used, quota)
+    detail = f"{used} requests · unlimited" if unlimited else f"{used} / {quota} requests"
 
     r = provider_base("copilot", "Copilot", "#8b5cf6", now)
     r["summary"] = {
         "pct": pct,
         "text": "∞" if unlimited else f"{jround(pct)}%",
-        "detail": f"@{username}" if username != "" else N_("Personal billing"),
+        "detail": f"@{username}" if username != "" else "Personal billing",
         "hasChart": True,
     }
-    r["quotaWindows"] = [flat_window("copilot", N_("Premium requests"), pct, reset_at, detail, not unlimited)]
-    r["slots"] = [{"pct": pct, "color": "#8b5cf6", "text": None, "tooltip": N_("Copilot premium requests: %s") % detail}]
+    r["quotaWindows"] = [flat_window("copilot", "Premium requests", pct, reset_at, detail, not unlimited)]
+    r["slots"] = [{"pct": pct, "color": "#8b5cf6", "text": None, "tooltip": f"Copilot premium requests: {detail}"}]
     r["chartWindows"] = monthly_window("copilot", "gh", False)
     r["historyValues"] = {"gh": pct}
     r["details"] = {

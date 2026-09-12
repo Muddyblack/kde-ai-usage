@@ -6,7 +6,6 @@ Ported from tools/sh/get-zai-usage.
 import datetime
 import os
 
-from .. import N_
 from ..http import as_json, error_json, fetch_json, http_error_json, resolve_key
 
 # The API rejects ISO-8601 with a "T" separator by name, asking for this.
@@ -142,14 +141,14 @@ def get_zai_usage():
         fixture_path=os.environ.get("ZAI_RESPONSE_FILE"),
     )
     if result.status != 200:
-        return http_error_json("Z.AI", result.status, N_("Invalid Z.AI token"))
+        return http_error_json("Z.AI", result.status, "Invalid Z.AI token")
 
     body = as_json(result.body)
     if body is None:
-        return error_json(N_("Z.AI invalid JSON"))
+        return error_json("Z.AI invalid JSON")
 
     if body.get("success") is False:
-        return {"hasKey": True, "keyValid": False, "error": body.get("msg") or N_("Z.AI API error")}
+        return {"hasKey": True, "keyValid": False, "error": body.get("msg") or "Z.AI API error"}
 
     data = body.get("data") if isinstance(body.get("data"), dict) else None
     limits = data.get("limits") if data and isinstance(data.get("limits"), list) else None
@@ -179,4 +178,4 @@ def get_zai_usage():
             "models": tools.get("usageDetails") or [],
             "today": _today_usage(api_key),
         }
-    return {"hasKey": True, "keyValid": False, "error": N_("Z.AI unexpected response")}
+    return {"hasKey": True, "keyValid": False, "error": "Z.AI unexpected response"}

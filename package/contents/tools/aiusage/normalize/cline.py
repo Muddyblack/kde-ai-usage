@@ -1,6 +1,5 @@
 import datetime
 
-from .. import N_
 from ..contract import compact_tokens, flat_window, money, num, provider_base, provider_error
 from ..stats import cline_stats
 
@@ -15,7 +14,7 @@ def _period(sessions, since):
 
 
 def _describe(count, tokens, cost):
-    text = N_("%s tokens · %s session%s") % (compact_tokens(tokens), count, "" if count == 1 else "s")
+    text = f"{compact_tokens(tokens)} tokens · {count} session" + ("" if count == 1 else "s")
     return text + (f" · {money(cost, 'USD')}" if cost > 0 else "")
 
 
@@ -27,19 +26,19 @@ def normalize_cline(raw):
     res = raw["inputs"].get("usage") or {}
     stats = cline_stats(res, now)
     if not stats.get("available"):
-        return provider_error("cline", "Cline", ACCENT, now, N_("Cline: no sessions yet — run cline once"), {"stats": stats})
+        return provider_error("cline", "Cline", ACCENT, now, "Cline: no sessions yet — run cline once", {"stats": stats})
 
     sessions = [s for s in res.get("sessions") or [] if isinstance(s, dict)]
     midnight = datetime.datetime.fromtimestamp(now).replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
     periods = [
-        ("cline_today", N_("Today"), _period(sessions, midnight)),
-        ("cline_7d", N_("Last 7 days"), _period(sessions, now - 7 * 86400)),
-        ("cline_30d", N_("Last 30 days"), _period(sessions, now - 30 * 86400)),
+        ("cline_today", "Today", _period(sessions, midnight)),
+        ("cline_7d", "Last 7 days", _period(sessions, now - 7 * 86400)),
+        ("cline_30d", "Last 30 days", _period(sessions, now - 30 * 86400)),
     ]
     month_count, month_tokens, _cost = periods[2][2]
 
     r = provider_base("cline", "Cline", ACCENT, now)
-    r["summary"] = {"pct": 0, "text": compact_tokens(month_tokens), "detail": N_("last 30 days"), "hasChart": False}
+    r["summary"] = {"pct": 0, "text": compact_tokens(month_tokens), "detail": "last 30 days", "hasChart": False}
     r["quotaWindows"] = [flat_window(key, label, 0, 0, _describe(*p), False) for key, label, p in periods]
     r["slots"] = [
         {

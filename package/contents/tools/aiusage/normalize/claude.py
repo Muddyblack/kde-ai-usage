@@ -1,4 +1,3 @@
-from .. import N_
 from ..billing import CLAUDE_PRICING, empty_org_usage, price_models
 from ..contract import (
     jround,
@@ -32,7 +31,7 @@ def scoped_key(name):
 def scoped_label(name):
     # An unnamed scope still gets a row; "scoped" is vague but it is not a lie,
     # and dropping the row would hide a budget that is being spent.
-    return N_("7-day %s") % name if name else N_("7-day scoped")
+    return "7-day " + name if name else "7-day scoped"
 
 
 def claude_windows(u):
@@ -99,7 +98,7 @@ def normalize_claude(raw):
             "Claude",
             "#cc785c",
             now,
-            N_("OAuth missing — API stats only") if has_admin else N_("Claude not logged in"),
+            "OAuth missing — API stats only" if has_admin else "Claude not logged in",
             {
                 **base_details,
                 "session": unavailable_window(),
@@ -118,7 +117,7 @@ def normalize_claude(raw):
             "Claude",
             "#cc785c",
             now,
-            err if err != "" else N_("Claude usage request failed"),
+            err if err != "" else "Claude usage request failed",
             {
                 **base_details,
                 "session": unavailable_window(),
@@ -135,8 +134,8 @@ def normalize_claude(raw):
     s_limit = num((usage.get("five_hour") or {}).get("token_limit"))
     w_tokens = num((usage.get("seven_day") or {}).get("tokens_used"))
     w_limit = num((usage.get("seven_day") or {}).get("token_limit"))
-    s_detail = N_("%s / %s tokens") % (s_tokens, s_limit) if s_limit > 0 else ""
-    w_detail = N_("%s / %s tokens") % (w_tokens, w_limit) if w_limit > 0 else ""
+    s_detail = f"{s_tokens} / {s_limit} tokens" if s_limit > 0 else ""
+    w_detail = f"{w_tokens} / {w_limit} tokens" if w_limit > 0 else ""
 
     r = provider_base("claude", "Claude", "#cc785c", now)
     r["summary"] = {
@@ -146,21 +145,21 @@ def normalize_claude(raw):
         "hasChart": True,
     }
     r["quotaWindows"] = [
-        quota_window("session", N_("5-hour session"), w["session"], s_detail),
-        quota_window("weekly", N_("7-day window"), w["weekly"], w_detail),
+        quota_window("session", "5-hour session", w["session"], s_detail),
+        quota_window("weekly", "7-day window", w["weekly"], w_detail),
     ] + [quota_window(scoped_key(name), scoped_label(name), win, "") for name, win in w["scoped"] if win["available"]]
     r["slots"] = [
         {
             "pct": w["session"]["pct"],
             "color": "#e05252",
             "text": None,
-            "tooltip": N_("Claude 5-hour: %s%%") % jround(w["session"]["pct"]) + (f"\n{s_detail}" if s_detail else ""),
+            "tooltip": f"Claude 5-hour: {jround(w['session']['pct'])}%" + (f"\n{s_detail}" if s_detail else ""),
         },
         {
             "pct": w["weekly"]["pct"],
             "color": "#f5a623",
             "text": None,
-            "tooltip": N_("Claude 7-day: %s%%") % jround(w["weekly"]["pct"]) + (f"\n{w_detail}" if w_detail else ""),
+            "tooltip": f"Claude 7-day: {jround(w['weekly']['pct'])}%" + (f"\n{w_detail}" if w_detail else ""),
         },
     ]
     r["chartWindows"] = rolling_windows("session", "day", "weekly", "s", "w", w["session"], w["weekly"], monthly_id="monthly")

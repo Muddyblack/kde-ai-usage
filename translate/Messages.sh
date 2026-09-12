@@ -59,23 +59,6 @@ xgettext \
     --output="$pot" \
     "${sources[@]}"
 
-# The Python backend emits a language-neutral JSON contract (English), so it is
-# never localized at runtime. The strings it hands to the frontend are marked
-# with gettext_noop (N_) purely so they land in this catalog; the QML translates
-# them when it displays them. xgettext knows N_ as a built-in Python keyword.
-mapfile -t py_sources < <(find package/contents/tools/aiusage -type f -name '*.py' | LC_ALL=C sort)
-xgettext \
-    --from-code=UTF-8 \
-    --language=Python \
-    --keyword=N_ \
-    --add-comments=TRANSLATORS \
-    --package-name="AI Usage Monitor" \
-    --package-version="$version" \
-    --msgid-bugs-address="$bug_url/issues" \
-    --join-existing \
-    --output="$pot" \
-    "${py_sources[@]}"
-
 # xgettext keys the catalog header on the charmap; normalise it so the .pot is
 # stable and the merge in a fresh checkout is a no-op.
 sed -i 's/^"Content-Type: text\/plain; charset=CHARSET\\n"$/"Content-Type: text\/plain; charset=UTF-8\\n"/' "$pot"

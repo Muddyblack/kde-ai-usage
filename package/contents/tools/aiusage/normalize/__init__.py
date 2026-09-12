@@ -1,4 +1,3 @@
-from .. import N_
 from ..contract import provider_error, status_summary
 from .antigravity import normalize_antigravity
 from .claude import normalize_claude
@@ -37,7 +36,7 @@ def normalize(raw):
     id_ = raw.get("id")
     fn = _DISPATCH.get(id_)
     if fn is None:
-        r = provider_error(id_, id_, "#888888", raw.get("now") or 0, N_("unknown provider: %s") % id_, {})
+        r = provider_error(id_, id_, "#888888", raw.get("now") or 0, f"unknown provider: {id_}", {})
     else:
         r = fn(raw)
     # Attached here rather than in each normalizer so every provider carries

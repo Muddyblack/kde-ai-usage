@@ -14,7 +14,6 @@ could sign the user out. An expired token is therefore reported, not renewed.
 import os
 import time
 
-from .. import N_
 from ..contract import epoch_of, num
 from ..http import as_json, clean_credential, fetch_json, http_error_text
 
@@ -134,7 +133,7 @@ def _exhausted_message(data):
         if isinstance(localized, dict) and localized.get("message"):
             message = localized["message"]
         if debug.get("reason") == "REASON_QUOTA_EXCEEDED":
-            return (message or N_("Plan quota used up")).rstrip(".")
+            return (message or "Plan quota used up").rstrip(".")
     return message.rstrip(".") if "balance" in message.lower() else None
 
 
@@ -142,14 +141,14 @@ def parse_usage_response(status, body):
     data = as_json(body)
     if status == 200:
         if not isinstance(data, dict):
-            return {"loggedIn": True, "error": N_("Kimi Code usage response could not be parsed")}
+            return {"loggedIn": True, "error": "Kimi Code usage response could not be parsed"}
         return {"loggedIn": True, "exhausted": False, **parse_usage_payload(data)}
     exhausted = _exhausted_message(data)
     if exhausted is not None:
         return {"loggedIn": True, "exhausted": True, "message": exhausted, "windows": [], "booster": None}
     if status in (401, 403):
-        return {"loggedIn": True, "error": N_("Kimi Code login rejected — run kimi once to refresh it")}
-    return {"loggedIn": True, "error": N_("Kimi Code %s") % http_error_text(status)}
+        return {"loggedIn": True, "error": "Kimi Code login rejected — run kimi once to refresh it"}
+    return {"loggedIn": True, "error": f"Kimi Code {http_error_text(status)}"}
 
 
 def get_kimi_code_usage():
@@ -158,12 +157,12 @@ def get_kimi_code_usage():
         return {}
     token = clean_credential(login.get("access_token"))
     if not token:
-        return {"loggedIn": False, "error": N_("Kimi Code is not signed in — run kimi and /login")}
+        return {"loggedIn": False, "error": "Kimi Code is not signed in — run kimi and /login"}
     expires = num(login.get("expires_at"))
     if expires > 1e11:  # milliseconds
         expires /= 1000
     if expires and expires <= time.time():
-        return {"loggedIn": True, "error": N_("Kimi Code login expired — run kimi once to refresh it")}
+        return {"loggedIn": True, "error": "Kimi Code login expired — run kimi once to refresh it"}
 
     result = fetch_json(
         f"{_base_url()}/usages",

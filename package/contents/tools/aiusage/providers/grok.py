@@ -12,7 +12,6 @@ import re
 import time
 from collections import deque
 
-from .. import N_
 from ..contract import epoch_of
 from ..http import as_json, fetch_json, resolve_key
 
@@ -234,9 +233,9 @@ def _grok_billing_calls(access_token, client_ver):
         if parsed is not None:
             credits_json = parsed
     elif cr.status in (401, 403):
-        billing_error = N_("Grok auth expired — run grok --oauth")
+        billing_error = "Grok auth expired — run grok --oauth"
     elif cr.status not in (0, None, ""):
-        billing_error = N_("Billing HTTP %s") % cr.status
+        billing_error = f"Billing HTTP {cr.status}"
 
     br = fetch_json("https://cli-chat-proxy.grok.com/v1/billing", headers=headers, timeout=12)
     if br.status == 200:

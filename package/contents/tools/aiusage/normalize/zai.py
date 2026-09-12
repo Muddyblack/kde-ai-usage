@@ -1,7 +1,6 @@
 import datetime
 import math
 
-from .. import N_
 from ..contract import compact_tokens, flat_window, jround, monthly_window, num, pct_clamp, provider_base, provider_error
 
 # Anything at or above this, read as a duration, would be more than 31 years —
@@ -30,19 +29,19 @@ def _today_label(today):
     try:
         d = datetime.datetime.strptime(date, "%Y-%m-%d")
     except ValueError:
-        return N_("Today")
-    return N_("Today (%s)") % (d.strftime("%b ") + str(d.day))
+        return "Today"
+    return "Today (" + d.strftime("%b ") + str(d.day) + ")"
 
 
 def _today_detail(today):
     """The value itself: "41.18M tokens", or "" if it did not come back."""
-    return N_("%s tokens") % _compact(today["tokens"]) if today.get("tokens") is not None else ""
+    return f"{_compact(today['tokens'])} tokens" if today.get("tokens") is not None else ""
 
 
 def _today_note(today):
     """The aside: "370 calls". Tokens are what the quota is spent in, so they
     are the value; the call count is context for it."""
-    return N_("%s calls") % num(today["calls"]) if today.get("calls") is not None else ""
+    return f"{num(today['calls'])} calls" if today.get("calls") is not None else ""
 
 
 def _reset_at(value, now):
@@ -60,14 +59,14 @@ def normalize_zai(raw):
     res = raw["inputs"].get("usage") or {}
 
     if not isinstance(res, dict) or not res:
-        return provider_error("zai", "Z.AI", "#126ef4", now, N_("Z.AI: no token configured"), {"hasKey": False, "keyValid": False})
+        return provider_error("zai", "Z.AI", "#126ef4", now, "Z.AI: no token configured", {"hasKey": False, "keyValid": False})
     if res.get("error") is not None:
         return provider_error(
             "zai",
             "Z.AI",
             "#126ef4",
             now,
-            N_("Z.AI: %s") % res["error"],
+            f"Z.AI: {res['error']}",
             {"hasKey": res.get("hasKey") is True, "keyValid": res.get("keyValid") is True},
         )
 
@@ -78,11 +77,11 @@ def normalize_zai(raw):
     token2_reset = _reset_at(res.get("token2ResetMs"), now)
     tools_reset = _reset_at(res.get("toolsResetMs"), now)
     token_detail = (
-        N_("%s / %s tokens") % (num(res.get("tokenUsed")), num(res.get("tokenLimit")))
+        f"{num(res.get('tokenUsed'))} / {num(res.get('tokenLimit'))} tokens"
         if res.get("tokenUsed") is not None and res.get("tokenLimit") is not None
         else ""
     )
-    tools_detail = N_("%s remaining") % num(res.get("toolsRemaining")) if res.get("toolsRemaining") is not None else ""
+    tools_detail = f"{num(res.get('toolsRemaining'))} remaining" if res.get("toolsRemaining") is not None else ""
 
     r = provider_base("zai", "Z.AI", "#126ef4", now)
     r["summary"] = {"pct": token_pct, "text": f"{jround(token_pct)}%", "detail": res.get("level") or "", "hasChart": True}
@@ -90,9 +89,9 @@ def normalize_zai(raw):
     today_detail = _today_detail(today) if today else ""
 
     r["quotaWindows"] = [
-        flat_window("zai_tokens", N_("5-hour tokens"), token_pct, token_reset, token_detail, True),
-        flat_window("zai_tokens_long", N_("7-day tokens"), token2_pct, token2_reset, "", True),
-        flat_window("zai_tools", N_("Monthly tools"), tools_pct, tools_reset, tools_detail, True),
+        flat_window("zai_tokens", "5-hour tokens", token_pct, token_reset, token_detail, True),
+        flat_window("zai_tokens_long", "7-day tokens", token2_pct, token2_reset, "", True),
+        flat_window("zai_tools", "Monthly tools", tools_pct, tools_reset, tools_detail, True),
     ]
     if today_detail:
         # Consumption so far, not a share of anything, so it carries a value
@@ -103,9 +102,9 @@ def normalize_zai(raw):
             flat_window("zai_today", _today_label(today), 0, num(today.get("rollsOverAt")), today_detail, False, note=_today_note(today))
         )
     r["slots"] = [
-        {"pct": token_pct, "color": "#126ef4", "text": None, "tooltip": N_("Z.AI tokens (5h): %s%%") % jround(token_pct)},
-        {"pct": token2_pct, "color": "#3b82f6", "text": None, "tooltip": N_("Z.AI tokens (7d): %s%%") % jround(token2_pct)},
-        {"pct": tools_pct, "color": "#60a5fa", "text": None, "tooltip": N_("Z.AI tools: %s%%") % jround(tools_pct)},
+        {"pct": token_pct, "color": "#126ef4", "text": None, "tooltip": f"Z.AI tokens (5h): {jround(token_pct)}%"},
+        {"pct": token2_pct, "color": "#3b82f6", "text": None, "tooltip": f"Z.AI tokens (7d): {jround(token2_pct)}%"},
+        {"pct": tools_pct, "color": "#60a5fa", "text": None, "tooltip": f"Z.AI tools: {jround(tools_pct)}%"},
     ]
     r["chartWindows"] = monthly_window("zai", "za", False)
     r["historyValues"] = {"za": token_pct}

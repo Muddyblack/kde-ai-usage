@@ -1046,10 +1046,41 @@ PlasmoidItem {
     // Rate-limit tier shown in the Claude header, with the known words
     // localized ("default_claude_ai" → "Par défaut", "default_max_20x" →
     // "Par défaut Max 20x", …). Unknown words keep a capitalized form.
-    // Backend strings travel as stable English tokens (the wire contract is not
-    // localized); the QML translates them only when it shows them.
-    function tr(text) {
-        return text ? i18n(text) : text;
+    // The backend emits stable English tokens (the wire contract is never
+    // localized). Translate the fixed ones by literal id here, so xgettext can
+    // extract them and the i18n tooling keeps context and plurals.
+    function errorText(token) {
+        if (token === "offline")
+            return i18n("offline");
+        if (token === "token expired")
+            return i18n("token expired");
+        if (token === "access denied")
+            return i18n("access denied");
+        if (token === "rate limited")
+            return i18n("rate limited");
+        if (token.indexOf("err ") === 0)
+            return i18n("err %1", token.slice(4));
+        return token;
+    }
+
+    function windowLabel(label) {
+        if (label === "5H")
+            return i18n("5H");
+        if (label === "24H")
+            return i18n("24H");
+        if (label === "7D")
+            return i18n("7D");
+        if (label === "30D")
+            return i18n("30D");
+        return label;
+    }
+
+    function antigravityGroupLabel(label) {
+        if (label === "Gemini Models")
+            return i18n("Gemini Models");
+        if (label === "Claude & GPT Models")
+            return i18n("Claude & GPT Models");
+        return label;
     }
 
     function claudeTierLabel() {
@@ -1908,7 +1939,7 @@ PlasmoidItem {
                 lines.push(root.mistralAvailableModels.length + i18n(" models available"));
 
             if (root.mistralError)
-                lines.push("⚠ " + root.tr(root.mistralError));
+                lines.push("⚠ " + root.errorText(root.mistralError));
         } else if (tab === "openrouter") {
             if (root.openrouterLabel)
                 lines.push(root.openrouterLabel);
@@ -1931,7 +1962,7 @@ PlasmoidItem {
 
             lines.push(root.grokSessionCount + i18n(" local CLI sessions"));
             if (root.grokError)
-                lines.push("⚠ " + root.tr(root.grokError));
+                lines.push("⚠ " + root.errorText(root.grokError));
         } else if (tab === "zai") {
             lines.push(i18n("Z.AI tokens: ") + Math.round(root.zaiTokenPct) + "%" + (root.zaiTokenCountdown ? " (" + root.zaiTokenCountdown + ")" : ""));
             if (root.zaiTokenUsed !== null && root.zaiTokenLimit !== null && root.zaiTokenLimit > 0)
@@ -1948,7 +1979,7 @@ PlasmoidItem {
                 lines.push(root.zaiModels.length + i18n(" models available"));
 
             if (root.zaiError)
-                lines.push("⚠ " + root.tr(root.zaiError));
+                lines.push("⚠ " + root.errorText(root.zaiError));
         } else if (tab === "copilot") {
             lines.push(i18n("Copilot: ") + Math.round(root.copilotPct) + "%" + (root.copilotCountdown ? " (" + root.copilotCountdown + ")" : ""));
             if (root.copilotQuota > 0)
@@ -1958,14 +1989,14 @@ PlasmoidItem {
                 lines.push(root.copilotUsername);
 
             if (root.copilotError)
-                lines.push("⚠ " + root.tr(root.copilotError));
+                lines.push("⚠ " + root.errorText(root.copilotError));
         } else if (tab === "deepseek") {
             if (root.deepseekKeyValid) {
                 lines.push(i18n("Balance: ") + root.formatMoney(root.deepseekPrimaryTotal, root.deepseekPrimaryCurrency));
                 lines.push(root.deepseekIsAvailable ? i18n("Available for API calls") : i18n("Balance unavailable"));
             }
             if (root.deepseekError)
-                lines.push("⚠ " + root.tr(root.deepseekError));
+                lines.push("⚠ " + root.errorText(root.deepseekError));
         } else if (tab === "kimi") {
             for (var k = 0; k < root.kimiPlanWindows.length; k++)
                 lines.push(root.kimiPlanWindows[k].label + ": " + Math.round(root.kimiPlanWindows[k].pct) + "%");
@@ -1977,7 +2008,7 @@ PlasmoidItem {
                 lines.push(i18n("Moonshot balance: ") + root.formatMoney(root.kimiAvailableBalance, "USD"));
 
             if (root.kimiError)
-                lines.push("⚠ " + root.tr(root.kimiError));
+                lines.push("⚠ " + root.errorText(root.kimiError));
         } else if (tab === "cursor") {
             if (root.cursorPlanName)
                 lines.push(i18n("Plan: ") + root.cursorPlanName);
@@ -1992,7 +2023,7 @@ PlasmoidItem {
                 lines.push(i18n("Resets: ") + root.cursorResetTime + (root.cursorCountdown ? " (" + root.cursorCountdown + ")" : ""));
 
             if (root.cursorError)
-                lines.push("⚠ " + root.tr(root.cursorError));
+                lines.push("⚠ " + root.errorText(root.cursorError));
         } else if (tab === "cline") {
             if (root.clineStats.available === true) {
                 lines.push(i18n("Tokens: ") + root.formatTokens(root.clineStats.totalTokens || 0) + i18n(" (all time)"));
@@ -2002,7 +2033,7 @@ PlasmoidItem {
             }
 
             if (root.clineError)
-                lines.push("⚠ " + root.tr(root.clineError));
+                lines.push("⚠ " + root.errorText(root.clineError));
         } else if (tab === "muse") {
             lines.push("Muse" + (root.museModel ? " · " + root.museModel : ""));
             if (root.museCurrentAvailable)
@@ -2014,10 +2045,10 @@ PlasmoidItem {
             if (root.museCostUSD > 0)
                 lines.push(i18n("Spend (est.): ") + root.formatMoney(root.museCostUSD, root.museCurrency));
             if (root.museError)
-                lines.push("⚠ " + root.tr(root.museError));
+                lines.push("⚠ " + root.errorText(root.museError));
         }
         if (root.errorMsg !== "")
-            lines.push("⚠ " + root.tr(root.errorMsg));
+            lines.push("⚠ " + root.errorText(root.errorMsg));
         else if (root.lastUpdate !== "")
             lines.push(i18n("Updated ") + root.lastUpdate + (root.stale ? i18n(" (stale)") : ""));
         return lines.join("\n");
@@ -3099,7 +3130,7 @@ PlasmoidItem {
 
                 PlasmaComponents.Label {
                     visible: root.errorMsg !== ""
-                    text: root.tr(root.errorMsg)
+                    text: root.errorText(root.errorMsg)
                     color: root.dangerColor
                     font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                     Layout.alignment: Qt.AlignVCenter

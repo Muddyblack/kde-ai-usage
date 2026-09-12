@@ -9,7 +9,7 @@ import datetime
 import os
 import time
 
-from . import N_, config
+from . import config
 from .contract import STATUS_FEEDS, STATUS_PAGES
 from .http import as_json, fetch_json, http_error_text
 from .providers.antigravity import get_antigravity_usage
@@ -104,7 +104,7 @@ def collect_claude(now):
         if result.status == 200:
             usage = as_json(result.body)
             if usage is None:
-                usage_error = N_("parse error")
+                usage_error = "parse error"
         else:
             usage_error = http_error_text(result.status)
 

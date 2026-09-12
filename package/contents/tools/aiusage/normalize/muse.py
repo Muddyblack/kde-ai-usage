@@ -1,4 +1,3 @@
-from .. import N_
 from ..contract import (
     compact_tokens,
     epoch_of,
@@ -47,7 +46,7 @@ def normalize_muse(raw):
     # --normalize, so a non-dict here has to be a rendered error, not a
     # traceback.
     if not isinstance(res, dict) or not res:
-        return _error(now, N_("Muse: not installed"), {"hasLogin": False, "stats": {"available": False}})
+        return _error(now, "Muse: not installed", {"hasLogin": False, "stats": {"available": False}})
 
     stats = muse_stats(res.get("stats"), now)
     has_login = res.get("hasLogin") is True
@@ -61,7 +60,7 @@ def normalize_muse(raw):
     if not stats.get("available") and not (current["available"] or weekly["available"]):
         return _error(
             now,
-            N_("Muse: no sessions yet") if has_login else N_("Muse: not logged in"),
+            "Muse: no sessions yet" if has_login else "Muse: not logged in",
             {"hasLogin": has_login, "current": current, "weekly": weekly, "quotaError": quota_error, "stats": stats},
         )
 
@@ -76,24 +75,24 @@ def normalize_muse(raw):
     # Plan windows only exist here when the user opted into the billed call
     # (providers/muse_quota.py); everything else on this tab is free and local.
     windows = []
-    for key, label, w in (("muse_current", N_("Current"), current), ("muse_weekly", N_("Weekly"), weekly)):
+    for key, label, w in (("muse_current", "Current", current), ("muse_weekly", "Weekly", weekly)):
         if w["available"]:
-            windows.append(quota_window(key, label, w, N_("%s%% used") % jround(w["pct"])))
+            windows.append(quota_window(key, label, w, f"{jround(w['pct'])}% used"))
 
     if stats.get("available"):
         windows.append(
             flat_window(
                 "muse_tokens",
-                N_("Tokens"),
+                "Tokens",
                 0,
                 0,
                 tokens,
                 False,
-                note=N_("%s out · %s calls") % (_compact(output), int(calls)) if calls else N_("%s out") % _compact(output),
+                note=f"{_compact(output)} out · {int(calls)} calls" if calls else _compact(output) + " out",
             )
         )
     if cost > 0:
-        windows.append(flat_window("muse_spend", N_("Spend (est.)"), 0, 0, money(cost, currency), False, note=model))
+        windows.append(flat_window("muse_spend", "Spend (est.)", 0, 0, money(cost, currency), False, note=model))
 
     # The headline is the plan window when there is one to show, and the
     # lifetime total otherwise — Muse is the only provider that can be in
@@ -101,18 +100,17 @@ def normalize_muse(raw):
     headline = current if current["available"] else weekly
     pct = headline["pct"] if headline["available"] else 0
 
-    tooltip = N_("Muse tokens: %s") % tokens
+    tooltip = f"Muse tokens: {tokens}"
     if cost > 0:
-        tooltip += N_("\nSpend (est.): %s") % money(cost, currency)
+        tooltip += f"\nSpend (est.): {money(cost, currency)}"
     if headline["available"]:
-        label = N_("Current") if current["available"] else N_("Weekly")
-        tooltip = N_("Muse %s: %s%% used\n") % (label, jround(pct)) + tooltip
+        tooltip = f"Muse {'Current' if current['available'] else 'Weekly'}: {jround(pct)}% used\n" + tooltip
 
     r = provider_base("muse", "Muse", _MUSE_ACCENT, now)
     r["summary"] = {
         "pct": pct,
         "text": f"{jround(pct)}%" if headline["available"] else tokens,
-        "detail": model if model else N_("%s sessions") % int(num(stats.get("totalSessions"))),
+        "detail": model if model else f"{int(num(stats.get('totalSessions')))} sessions",
         "hasChart": True,
     }
     r["quotaWindows"] = windows

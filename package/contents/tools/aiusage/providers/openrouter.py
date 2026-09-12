@@ -5,7 +5,6 @@ Ported from tools/sh/get-openrouter-usage.
 
 import os
 
-from .. import N_
 from ..http import as_json, error_json, fetch_json, http_error_json, resolve_key
 
 
@@ -27,11 +26,11 @@ def get_openrouter_usage():
         fixture_path=os.environ.get("OPENROUTER_RESPONSE_FILE"),
     )
     if result.status != 200:
-        return http_error_json("OpenRouter", result.status, N_("Invalid API key (401)"))
+        return http_error_json("OpenRouter", result.status, "Invalid API key (401)")
 
     body = as_json(result.body)
     if body is None:
-        return error_json(N_("OpenRouter invalid JSON"))
+        return error_json("OpenRouter invalid JSON")
     d = body.get("data") if isinstance(body.get("data"), dict) else body
     return {
         "hasKey": True,

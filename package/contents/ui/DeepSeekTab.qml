@@ -94,7 +94,7 @@ ColumnLayout {
             color: "#ef4444"
         }
         PlasmaComponents.Label {
-            text: rootItem.tr(rootItem.deepseekError)
+            text: rootItem.errorText(rootItem.deepseekError)
             font.pixelSize: 10
             opacity: 0.7
             color: Kirigami.Theme.textColor

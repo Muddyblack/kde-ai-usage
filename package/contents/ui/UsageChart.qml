@@ -153,7 +153,7 @@ Rectangle {
                 PlasmaComponents.Label {
                     id: winLabel
                     anchors.centerIn: parent
-                    text: rootItem.tr(modelData.label)
+                    text: rootItem.windowLabel(modelData.label)
                     font.pixelSize: 9
                     font.bold: rootItem.chartWindow === modelData.id
                     // Near-white accents (Grok, Cursor) would swallow white text.
@@ -238,7 +238,7 @@ Rectangle {
                         Layout.alignment: Qt.AlignVCenter
                     }
                     PlasmaComponents.Label {
-                        text: rootItem.tr(modelData.label)
+                        text: rootItem.windowLabel(modelData.label)
                         font.pixelSize: 9
                         font.bold: rootItem.antigravityChartFilter === modelData.id
                         color: rootItem.antigravityChartFilter === modelData.id ? "#ffffff" : Kirigami.Theme.textColor
